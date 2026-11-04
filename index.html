@@ -906,7 +906,7 @@ main{flex:1;display:flex;min-height:0}
           <button data-act="loadOsm">📥 Charger des chemins OSM</button>
           <button data-act="new">🆕 Nouveau roadbook</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version du 04/11 11h25</div>
+          <div class="ver">Version du 04/11 12h42</div>
         </div>
       </div>
     </div>
@@ -1798,7 +1798,7 @@ function simplifyDP(pts, tol) {         // Douglas-Peucker, renvoie les indices 
 /* ============================================================
    2. État & sauvegarde
    ============================================================ */
-const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, bends: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true };
+const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, followRoad: true, bends: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true };
 const S = {
   name: 'Mon roadbook', desc: '', src: '', ll: [], mm: null, ctrl: [], segs: [], notes: [], settings: { ...DEF_SETTINGS },
   stale: false, routeMode: 'trekking', nextId: 1, sel: null
@@ -3078,6 +3078,8 @@ function noteFromGroup(g, gr, prevS, nextS) {
   const note = mkNote({ s: main.s, xy: main.J.xy, text: lines.join('\n'), cap: Math.round(hOut) % 360, kind: 'junction', tulip });
   note.span = [Math.round(first.s), Math.round(last.s)];
   if (trackName) note.trackName = trackName;
+  { const rid = w => ({ ref: ((w.tags && w.tags.ref) || '').split(';')[0].replace(/\s+/g, '').toUpperCase(), name: tName(w.tags).toLowerCase() });
+    note.rd = { a: rid(first.entry.b.way), b: rid(exitWay), road: entryCat === 'road' && exitCat === 'road' && !surf }; }      // route avant / après le carrefour (pour le regroupement « suivre la route »)
   note.src = { t: 'j', ids: gr.map(x => x.J.id), ss: gr.map(x => Math.round(x.s * 10) / 10), k: gr.map(x => x.ev.kind) };
   return note;
 }
@@ -3259,6 +3261,36 @@ function pointInPoly(p, pts) {
 }
 function addTrackNames(notes) {       // nom de la piste / rue prise au carrefour, en dernière ligne
   for (const n of notes) if (n.trackName) { const l = (n.text || '').split('\n').filter(Boolean); if (!l.includes(n.trackName)) l.push(n.trackName); n.text = l.join('\n'); n.roadNames = [n.trackName]; delete n.trackName; }      // roadNames : la ligne du nom de rue, pour pouvoir la masquer (réglage « Afficher les noms de route »)
+}
+/* « Suivre la route » : des carrefours qui s'enchaînent sur une même route (même numéro ou même nom, sans conflit) ne font plus qu'une note : la première, avec le symbole FRO */
+const FOLLOW_GAP = 150;      // m entre deux notes successives
+function followRoad(notes) {
+  const okDir = /^(?:TD|Lég\. à [DG]|À [DG]|Serrer à [DG])$/;
+  const simple = n => {
+    if (n.kind !== 'junction' || n.auto === false || !n.rd || !n.rd.road || n.edited || n.wp || n.danger || (n.sym && n.sym.length) || (n.lex && n.lex.length)) return false;
+    const l = (n.text || '').split('\n').filter(Boolean);
+    return l.length === 2 && okDir.test(l[0]) && /^sur route(?: .+)?$/.test(l[1]);
+  };
+  const ok = (acc, x) => (!acc.ref || !x.ref || acc.ref === x.ref) && (!acc.name || !x.name || acc.name === x.name);
+  const add = (acc, x) => ({ ref: acc.ref || x.ref, name: acc.name || x.name });
+  const out = []; let removed = 0;
+  for (let i = 0; i < notes.length; i++) {
+    const a = notes[i]; out.push(a);
+    if (!simple(a) || !ok(a.rd.a, a.rd.b)) continue;
+    let acc = add(a.rd.a, a.rd.b), last = a, n = 0;
+    while (i + 1 < notes.length) {
+      const b = notes[i + 1];
+      if (!simple(b) || b.s - last.s > FOLLOW_GAP || !ok(acc, b.rd.a) || !ok(acc, b.rd.b) || !ok(b.rd.a, b.rd.b)) break;
+      acc = add(acc, add(b.rd.a, b.rd.b)); last = b; i++; n++; removed++;
+    }
+    if (n) {
+      const ref = (a.text.split('\n')[1].match(/^sur route (.+)$/) || [])[1] || (last.text.split('\n')[1].match(/^sur route (.+)$/) || [])[1];
+      a.text = a.text.split('\n')[0] + '\nSuivre la route' + (ref ? ' ' + ref : '');
+      a.follow = true;
+      if (a.span && last.span) a.span = [a.span[0], last.span[1]];
+    }
+  }
+  return { notes: out, removed };
 }
 function osmExtras(g, notes) {
   const st = S.settings, ev = [], STEP = 5;
@@ -3747,6 +3779,7 @@ const AUTO_SYM = [      // [ligne de texte, () → { keys: symboles, text: texte
   [/^TD$/, () => ({ keys: ['kpS'], dir: 1, grp: 'nav' })],                 // tout droit → « kpS » (garder tout droit)
   [/^Serrer à D$/, () => ({ keys: ['kpR'], dir: 1, grp: 'nav' })],         // serrer à droite → « kpR » (garder la droite)
   [/^Serrer à G$/, () => ({ keys: ['kpL'], dir: 1, grp: 'nav' })],
+  [/^Suivre la route(?: (.+))?$/, m => ({ keys: ['FRO'], text: m[1] || '', grp: 'nav' })],      // plusieurs carrefours sur la même route → FRO (suivre la route)
   [/^sur route(?: (.+))?$/, m => ({ keys: ['RO'], text: m[1] || '', grp: 'nav' })],      // « sur route D 976 » → RO + « D 976 »
   [/^sur (?:piste|sentier)$/, () => ({ keys: ['P'], grp: 'nav' })],      // piste et sentier : même symbole « P »         // serrer à gauche → « kpL » (garder la gauche)
   [/^Rond-point$/, () => ({ keys: ['roundabout'], grp: 'nav' })],
@@ -3780,7 +3813,7 @@ function noteView(n) {      // lignes de texte restantes et symboles à afficher
   if (n.auto !== false && S.settings.showRoad === false) {      // réglage « Afficher les noms de route » décoché : on retire le nom de la rue / de la piste (dernière ligne) et le numéro de la route (« sur route D 976 » → « sur route »)
     const names = n.roadNames || [];
     for (let i = raw.length - 1; i > 0; i--) if (names.includes(raw[i].trim())) raw.splice(i, 1);
-    for (let i = 0; i < raw.length; i++) raw[i] = raw[i].replace(/^(sur route) .+$/, '$1');
+    for (let i = 0; i < raw.length; i++) raw[i] = raw[i].replace(/^(sur route|Suivre la route) .+$/, '$1');
   }
   if (n.auto !== false && S.settings.showDir === false && DIR_RE.test((raw[0] || '').trim())) raw[0] = '';      // réglage « Afficher les directions » décoché : la place de la direction reste vide
   if (n.auto === false || S.settings.symAuto === false) { if (!raw.some(Boolean)) raw.length = 0; return { lines: raw, keys: lexKeys(n) }; }
@@ -3798,7 +3831,7 @@ function noteView(n) {      // lignes de texte restantes et symboles à afficher
   const has = k => items.some(it => it.keys.includes(k));
   const keys = []; let prev = null;
   for (const it of items) {
-    const ks = it.keys.filter(k => FIA_LEX[k] && !keys.includes(k) && !(k === 'tarmac' && has('RO')) && !(k === 'track' && has('P')));
+    const ks = it.keys.filter(k => FIA_LEX[k] && !keys.includes(k) && !(k === 'tarmac' && (has('RO') || has('FRO'))) && !(k === 'track' && has('P')));
     if (!ks.length) continue;
     if (prev && it.grp && prev.grp === it.grp && keys.length) keys.push('ET');      // symboles de la même phrase (direction, type de chemin…) : reliés par « ET »
     ks.forEach((k, j) => { if (j && it.et) keys.push('ET'); keys.push(k); });          // deux symboles d'une même ligne qui se combinent (pont + voie ferrée)
@@ -4148,6 +4181,8 @@ async function runGenerate() {
     let rep = null;
     if (S.settings.pois || S.settings.landmarks) { prog('Ajout des repères (gués, ponts, villages…)', 0.97); await sleep(10); rep = osmExtras(G, all); }
     addTrackNames(all);
+    let fr = null;
+    if (S.settings.followRoad !== false) { fr = followRoad(all); all.length = 0; all.push(...fr.notes); }
     S.notes = [...all, ...manual];
     S.stale = false; S.sel = null;
     closeModal(); renderTrack(); renderAll();
@@ -4304,6 +4339,7 @@ function openSettings() {
       ${num('sR', 'Rayon dessiné dans la tulipe (m)', s.tulipR, 25, 120)}
     </div>
     ${chk('sStraight', 'Noter aussi les intersections où l’on continue tout droit', s.straight)}
+    ${chk('sFollow', 'Regrouper en une seule note (symbole FRO « suivre la route ») les carrefours qui s’enchaînent sur la même route', s.followRoad !== false)}
     ${chk('sGoudron', 'Noter les changements « fin / début goudron »', s.goudron)}
     ${chk('sBends', 'Noter les virages serrés hors intersection', s.bends)}
     ${num('sBendA', 'Angle mini d’un virage serré (°)', s.bendAngle, 60, 170)}
@@ -4325,7 +4361,7 @@ function openSettings() {
       const same = o => JSON.stringify(Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {}));      // comparaison sans tenir compte de l'ordre des champs
       const before = same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0 });
       S.settings = { sv: DEF_SETTINGS.sv, data: /^(osm|ign|ignd)$/.test($('#sData').value) ? $('#sData').value : 'vt', tol: g('sTol', 40, 10, 100), water: $('#sWater').checked, bld: $('#sBld').checked, pois: $('#sPois').checked, landmarks: $('#sLand').checked, merge: g('sMerge', 30, 5, 100), tulipR: g('sR', 50, 25, 120), straight: $('#sStraight').checked,
-        goudron: $('#sGoudron').checked, bends: $('#sBends').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showCap: $('#sCap').checked };
+        followRoad: $('#sFollow').checked, goudron: $('#sGoudron').checked, bends: $('#sBends').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showCap: $('#sCap').checked };
       afterSettings(before === same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0 }));
     } }]);
   const c = $('#sClear');
@@ -4488,7 +4524,7 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
 })();
 
 // accès pour les tests automatisés
-window.__rb = { S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, ringCircle, dxy, allIGN, importOsm, noteView, notesSVG, renderAll, renderRadii, noteRadii };
+window.__rb = { S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, notesSVG, renderAll, renderRadii, noteRadii };
 })();
 
 // Version installable (PWA) : actif seulement quand la page est servie en https (pas en fichier local)
