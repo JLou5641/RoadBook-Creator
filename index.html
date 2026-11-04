@@ -908,7 +908,7 @@ main{flex:1;display:flex;min-height:0}
           <button data-act="loadOsm">📥 Charger des chemins OSM</button>
           <button data-act="new">🆕 Nouveau roadbook</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version du 04/11 16h20</div>
+          <div class="ver">Version du 04/11 19h30</div>
         </div>
       </div>
     </div>
@@ -1822,7 +1822,7 @@ function simplifyDP(pts, tol) {         // Douglas-Peucker, renvoie les indices 
 /* ============================================================
    2. État & sauvegarde
    ============================================================ */
-const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, lmOff: [], followLvl: 3, bends: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true };
+const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, lmOff: [], followLvl: 3, bends: true, offroad: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true };
 const S = {
   name: 'Mon roadbook', desc: '', src: '', ll: [], mm: null, ctrl: [], segs: [], notes: [], settings: { ...DEF_SETTINGS },
   stale: false, routeMode: 'trekking', nextId: 1, sel: null
@@ -1943,7 +1943,7 @@ function nearestS(p, sExp, win, maxD) {
   for (const c of projAll(p, maxD)) { if (Math.abs(c.s - sExp) > win) continue; if (!best || c.d < best.d) best = c; }
   return best ? best.s : null;
 }
-const tolEff = () => S.mm ? 5 : S.src === 'draw' ? Math.min(S.settings.tol, 12) : Math.min(S.settings.tol, 25);
+const tolEff = () => S.mm ? 5 : S.src === 'draw' ? Math.min(S.settings.tol || 10, 12) : Math.min(S.settings.tol || 10, 25);      // écart 0 = pas de recalage : on garde la trace telle quelle, repérage à 10 m
 
 /* ============================================================
    4. Lecture GPX
@@ -2158,10 +2158,19 @@ function rebuildFromSegs() {
   const ll = [];
   if (S.ctrl.length === 1) ll.push(S.ctrl[0].slice(0, 2));
   for (let i = 1; i < S.ctrl.length; i++) {
-    const seg = S.segs[i - 1] || [S.ctrl[i - 1].slice(0, 2), S.ctrl[i].slice(0, 2)];
+    const seg0 = S.segs[i - 1] || [S.ctrl[i - 1].slice(0, 2), S.ctrl[i].slice(0, 2)], seg = seg0.length >= 3 ? cleanEnds(seg0) : seg0;      // retire aussi les petites pointes des parcours déjà dessinés
     for (let k = ll.length ? 1 : 0; k < seg.length; k++) ll.push(seg[k]);
   }
-  setTrack(ll);
+  // petite pointe au point de contrôle : l'itinéraire s'arrête au chemin le plus proche du clic, puis revient au clic avant de repartir → on retire le clic
+  const cl = [ll[0]];
+  for (let i = 1; i < ll.length - 1; i++) {
+    const A = cl[cl.length - 1], B = ll[i], C = ll[i + 1], k = Math.cos(A[0] * Math.PI / 180);
+    const u = [(B[1] - A[1]) * k * 111320, (B[0] - A[0]) * 110540], w = [(C[1] - B[1]) * k * 111320, (C[0] - B[0]) * 110540], lu = Math.hypot(u[0], u[1]), lw = Math.hypot(w[0], w[1]);
+    if (lu > 0.01 && lw > 0.01 && Math.min(lu, lw) <= 15 && (u[0] * w[0] + u[1] * w[1]) / (lu * lw) < -0.5) continue;
+    cl.push(B);
+  }
+  if (ll.length > 1) cl.push(ll[ll.length - 1]);
+  setTrack(ll.length > 2 ? cl : ll);
 }
 async function fetchJSON(url, opts, ms) {
   const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms || 30000);
@@ -2171,6 +2180,16 @@ async function fetchJSON(url, opts, ms) {
     return await r.json();
   } finally { clearTimeout(t); }
 }
+/* Un itinéraire calculé commence et finit au point de chemin le plus proche du clic, pas au clic lui-même : si ce point est un peu avant / après, on obtient un petit aller-retour
+   (zigzag) au lieu d'un coude net. On retire ces pointes de moins de 30 m aux deux bouts. */
+function cleanEnds(pts) {
+  const v = (p, q) => [(q[1] - p[1]) * Math.cos(p[0] * Math.PI / 180) * 111320, (q[0] - p[0]) * 110540], len = u => Math.hypot(u[0], u[1]);
+  const spike = (A, B, C) => { const u = v(A, B), w = v(B, C), lu = len(u), lw = len(w); return lu > 0.01 && lw > 0.01 && Math.min(lu, lw) <= 30 && (u[0] * w[0] + u[1] * w[1]) / (lu * lw) < -0.5; };
+  const p = pts.slice();
+  while (p.length >= 3 && spike(p[p.length - 3], p[p.length - 2], p[p.length - 1]) && len(v(p[p.length - 2], p[p.length - 1])) <= 30) p.splice(p.length - 2, 1);
+  while (p.length >= 3 && spike(p[0], p[1], p[2]) && len(v(p[0], p[1])) <= 30) p.splice(1, 1);
+  return p;
+}
 let routeWarned = 0;
 async function routeSeg(a, b, mode) {
   if (!mode || mode === 'line') return [a.slice(0, 2), b.slice(0, 2)];
@@ -2178,14 +2197,14 @@ async function routeSeg(a, b, mode) {
     const url = `https://brouter.de/brouter?lonlats=${a[1].toFixed(6)},${a[0].toFixed(6)}|${b[1].toFixed(6)},${b[0].toFixed(6)}&profile=${encodeURIComponent(mode)}&alternativeidx=0&format=geojson`;
     const j = await fetchJSON(url, null, 25000);
     const c = j.features[0].geometry.coordinates;
-    if (c.length >= 2) return [a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)];
+    if (c.length >= 2) return cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]);
   } catch (e) { /* on essaie le serveur de secours */ }
   try {
     const prof = mode === 'car-fast' ? 'routed-car' : mode === 'shortest' ? 'routed-foot' : 'routed-bike';
     const url = `https://routing.openstreetmap.de/${prof}/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson`;
     const j = await fetchJSON(url, null, 25000);
     const c = j.routes[0].geometry.coordinates;
-    if (c.length >= 2) return [a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)];
+    if (c.length >= 2) return cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]);
   } catch (e) { /* ligne droite */ }
   if (Date.now() - routeWarned > 8000) { routeWarned = Date.now(); toast('Itinéraire indisponible (pas d’internet ?) : tracé en ligne droite.', 'err'); }
   return [a.slice(0, 2), b.slice(0, 2)];
@@ -2880,9 +2899,23 @@ async function mapMatch(g, prog, isCancelled) {
   }
   if (!pieces.length) return null;
   const out = []; let sPrev = 0, matched = 0;
-  const raw = (s0, s1) => { for (let s = s0; s < s1; s += 10) out.push(pointAt(s)); };
-  for (const pc of pieces) { raw(sPrev, pc.s0); for (const p of pc.pts) out.push(p); matched += polyLen(pc.pts); sPrev = pc.s1; }
-  if (sPrev < T.L - 1) { raw(sPrev, T.L); out.push(pointAt(T.L)); }
+  // raccord trace brute ↔ trace recalée : l'écart au point de jonction est résorbé sur 40 m (sinon on obtient un petit zigzag au lieu d'un coude net)
+  const FADE = 40;
+  const raw = (s0, s1, dA, dB) => {
+    for (let s = s0; s < s1; s += 10) {
+      let p = pointAt(s);
+      if (dA && s - s0 < FADE) { const k = 1 - (s - s0) / FADE; p = [p[0] + dA[0] * k, p[1] + dA[1] * k]; }
+      if (dB && s1 - s < FADE) { const k = 1 - (s1 - s) / FADE; p = [p[0] + dB[0] * k, p[1] + dB[1] * k]; }
+      out.push(p);
+    }
+  };
+  const gap = (q, s) => { const r = pointAt(s); return [q[0] - r[0], q[1] - r[1]]; };
+  for (let i = 0; i < pieces.length; i++) {
+    const pc = pieces[i];
+    raw(sPrev, pc.s0, sPrev > 0 ? gap(pieces[i - 1].pts[pieces[i - 1].pts.length - 1], sPrev) : null, gap(pc.pts[0], pc.s0));
+    for (const p of pc.pts) out.push(p); matched += polyLen(pc.pts); sPrev = pc.s1;
+  }
+  if (sPrev < T.L - 1) { const lp = pieces[pieces.length - 1]; raw(sPrev, T.L, gap(lp.pts[lp.pts.length - 1], sPrev), null); out.push(pointAt(T.L)); }
   const xy = out.filter((p, i) => i === 0 || dxy(p, out[i - 1]) > 0.3);
   let total = 0; for (let i = 1; i < xy.length; i++) total += dxy(xy[i - 1], xy[i]);
   return { ll: xy.map(p => { const q = inv(p[0], p[1]); return [+q[0].toFixed(6), +q[1].toFixed(6)]; }), ratio: total ? matched / total : 0 };
@@ -3135,19 +3168,20 @@ function collectNear(g, p) {
   if (!ws) return { others: [], snap: null, cat: 'track' };
   return { others: collectOthers(g, p, [ws.a, ws.b], S.settings.tulipR), snap: ws.q, cat: ws.w.cat };
 }
-function trackChain(s1, s2, cat, off) {     // morceau de trace lissé (le bruit GPS est moyenné)
+function trackChain(s1, s2, cat, off, fb) {     // morceau de trace lissé (le bruit GPS est moyenné)
   const out = []; s1 = clamp(s1, 0, T.L); s2 = clamp(s2, 0, T.L);
   const add = s => {
     let x = 0, y = 0, n = 0;
     for (let o = -8; o <= 8; o += 4) { const p = pointAt(clamp(s + o, s1, s2)); x += p[0]; y += p[1]; n++; }
     if (s === s1 || s === s2) { const p = pointAt(s); x = p[0] * n; y = p[1] * n; }
-    out.push({ p: off ? [x / n + off[0], y / n + off[1]] : [x / n, y / n], c: cat });
+    const pp = off ? [x / n + off[0], y / n + off[1]] : [x / n, y / n];
+    out.push({ p: pp, c: typeof cat === 'function' ? (cat(pp, s) || fb) : cat });
   };
   for (let s = s1; s < s2; s += 4) add(s);
   add(s2);
   return out;
 }
-function trackTulip(s, kind) {          // tulipe dessinée depuis la trace (départ, arrivée, virage, note manuelle)
+function trackTulip(s, kind, catFn, noSnap) {          // tulipe dessinée depuis la trace (départ, arrivée, virage, note manuelle)
   const R = S.settings.tulipR;
   let sc = s, s1 = s - R * 1.4, s2 = s + R * 1.4, H;
   if (kind === 'start') { sc = Math.min(T.L / 2, R * 0.75); s1 = 0; s2 = sc + R * 1.4; H = trackBearing(0, Math.min(T.L, R * 1.5)); }
@@ -3159,8 +3193,8 @@ function trackTulip(s, kind) {          // tulipe dessinée depuis la trace (dé
   const anchor = kind === 'start' ? pointAt(0) : kind === 'end' ? pointAt(T.L) : center;
   const xy = off && (kind === 'start' || kind === 'end') ? [anchor[0] + off[0], anchor[1] + off[1]] : anchor;
   // la trace est recalée point par point sur les chemins OSM (sinon : simple décalage)
-  let chain = trackChain(s1, s2, near.cat, null);
-  if (G) {
+  let chain = trackChain(s1, s2, catFn || ((p) => G && G.ways.length && !nearestWaySeg(G, p, 18) ? 'trail' : null), null, near.cat);
+  if (G && !noSnap) {
     let ok = 0;
     const sn = chain.map(q => { const ws = nearestWaySeg(G, q.p, tolEff() + 4); if (ws) { ok++; return { p: ws.q, c: ws.w.cat }; } return q; });
     if (ok >= chain.length * 0.6) chain = sn;
@@ -3200,6 +3234,44 @@ function detectBends(jNotes) {
     const tt = trackTulip(v.s, 'bend');
     const bn = mkNote({ s: v.s, xy: tt.xy, text, cap: Math.round(trackBearing(v.s, v.s + 30)) % 360, kind: 'bend', tulip: tt.tulip });
     bn.src = { t: 'trk', kind: 'bend' }; out.push(bn);
+  }
+  return out;
+}
+/* ---------- Trace hors des chemins : une note « Hors piste » à la sortie des chemins et à chaque changement de cap, flèche pointillée + CAP ---------- */
+function detectOffroad(known) {
+  const out = [];
+  if (!S.settings.offroad || !G || !G.ways.length || T.L < 150) return out;
+  const STEP = 10, onNet = p => !!nearestWaySeg(G, p, 18);
+  const offAt = []; for (let s = 0; s <= T.L; s += STEP) offAt.push(!onNet(pointAt(s)));
+  const raw = []; let a = -1;
+  for (let i = 0; i <= offAt.length; i++) {
+    if (i < offAt.length && offAt[i]) { if (a < 0) a = i; }
+    else if (a >= 0) { raw.push([a, i - 1]); a = -1; }
+  }
+  const runs = [];      // deux parties hors piste séparées de moins de 100 m (la trace traverse ou longe juste une route ou un chemin) n'en font qu'une
+  for (const r of raw) { const l = runs[runs.length - 1]; if (l && r[0] - l[1] <= 10) l[1] = r[1]; else runs.push([r[0], r[1]]); }
+  for (let i = runs.length - 1; i >= 0; i--) { runs[i][0] *= STEP; runs[i][1] *= STEP; if (runs[i][1] - runs[i][0] < 60) runs.splice(i, 1); }
+  const busy = s => known.some(n => Math.abs(n.s - s) < 40 || (n.span && s > n.span[0] - 40 && s < n.span[1] + 40)) || out.some(n => Math.abs(n.s - s) < 40);
+  const mk = (s, ang) => {
+    const catFn = (p, q) => q > s + 4 || !onNet(p) ? 'trail' : 'track';      // pointillés : tout ce qui suit la note (hors piste) et ce qui précède s'il est hors des chemins
+    const tt = trackTulip(s, 'bend', catFn, true);
+    const n = mkNote({ s, xy: tt.xy, text: dirPhrase(ang) + '\nHors piste', cap: Math.round(trackBearing(s, s + 30)) % 360, kind: 'bend', tulip: tt.tulip });
+    n.src = { t: 'trk', kind: 'bend' }; out.push(n);
+  };
+  for (const [r0, r1] of runs) {
+    if (r0 > 30) {      // la note est posée sur le coude (plus fort changement de cap juste avant / après la sortie des chemins), à défaut à la sortie
+      const turn = q => angDiff(trackBearing(q - 25, q - 3), trackBearing(q + 3, q + 25));
+      let bs = r0, bd = turn(r0);
+      for (let q = Math.max(30, r0 - 60); q <= Math.min(T.L - 30, r0 + 20); q += 5) { const d = turn(q); if (Math.abs(d) > Math.abs(bd) + 1) { bs = q; bd = d; } }
+      if (Math.abs(bd) < 25) { bs = r0; bd = turn(r0); }
+      if (!busy(bs)) mk(bs, bd);
+    }
+    for (let s = r0 + 30; s <= r1 - 30; s += 5) {      // changements de cap au milieu de la partie hors piste
+      const d = angDiff(trackBearing(s - 30, s - 3), trackBearing(s + 3, s + 30)), A = Math.abs(d);
+      if (A < 35 || onNet(pointAt(s)) || onNet(pointAt(s - 30)) || onNet(pointAt(s + 30))) continue;      // pas au passage d'une route que la trace traverse
+      let top = true; for (let q = s - 40; q <= s + 40; q += 5) if (q > r0 + 30 && q <= r1 - 30 && Math.abs(angDiff(trackBearing(q - 30, q - 3), trackBearing(q + 3, q + 30))) > A) { top = false; break; }
+      if (top && !busy(s)) mk(s, d);
+    }
   }
   return out;
 }
@@ -3893,6 +3965,7 @@ const AUTO_SYM = [      // [ligne de texte, () → { keys: symboles, text: texte
   [/^Barrière anti-moto$/, () => ({ keys: ['motobar'] })],
   [/^Passage étroit$/, () => ({ keys: ['E3'] })],
   [/^Muret$/, () => ({ keys: ['lowwall'] })],
+  [/^Hors piste$/, () => ({ keys: ['HP'] })],
   [/^Plots$/, () => ({ keys: ['bollard'] })],
   [/^Éolienne(?: à ([DG]))?$/, m => ({ keys: ['wind', ...sideSym(m[1])] })],
   [/^Cheminée(?: à ([DG]))?$/, m => ({ keys: ['chimney', ...sideSym(m[1])] })],
@@ -4259,7 +4332,7 @@ async function runGenerate() {
       return;
     }
     prog('Recalage de la trace sur les chemins…', 0.68);
-    const mm = await mapMatch(G, f => prog('Recalage de la trace sur les chemins…', 0.68 + 0.17 * f), () => cancelGen);
+    const mm = S.settings.tol === 0 ? null : await mapMatch(G, f => prog('Recalage de la trace sur les chemins…', 0.68 + 0.17 * f), () => cancelGen);      // 0 = pas de recalage
     S.mm = mm ? mm.ll : null; buildDerived();
     const ratio = mm ? mm.ratio : 0;
     prog('Repérage des intersections…', 0.87); await sleep(30);
@@ -4267,6 +4340,7 @@ async function runGenerate() {
     const jn = makeJunctionNotes(G, ev);
     prog('Dessin des tulipes…', 0.95); await sleep(10);
     const bends = detectBends(jn);
+    bends.push(...detectOffroad([...jn, ...bends]));
     const manual = S.notes.filter(n => !n.auto);
     const all = [startNote(), ...jn, ...bends, endNote()].sort((a, b) => a.s - b.s);
     let rep = null;
@@ -4279,8 +4353,8 @@ async function runGenerate() {
     closeModal(); renderTrack(); renderAll();
     if (S.notes.length > 1) map.fitBounds(line.getBounds(), { padding: [40, 40] });
     const pc = Math.round(ratio * 100);
-    toast(`${S.notes.length} notes : ${jn.length} intersection${jn.length > 1 ? 's' : ''}${bends.length ? ', ' + bends.length + (bends.length > 1 ? ' virages serrés' : ' virage serré') : ''}${rep && rep.events ? ', ' + rep.events + ' repères' : ''}. Parcours reconnu sur les chemins : ${pc} %.`, 'ok');
-    if (pc < 60) openModal('Parcours peu reconnu', `Seulement <b>${pc} %</b> de ta trace a pu être recalée sur les chemins OpenStreetMap (trait noir sur la carte) : les intersections ne sont repérées que sur cette partie.<br><br>Si ta trace a été dessinée à main levée ou s’écarte des chemins, augmente <b>« Écart maxi trace ↔ chemins »</b> dans ⋯ › Réglages (par ex. 70 m), puis régénère. Les portions hors-piste ou absentes d’OpenStreetMap restent sans intersection.`, [{ label: 'OK', cls: 'primary' }]);
+    toast(`${S.notes.length} notes : ${jn.length} intersection${jn.length > 1 ? 's' : ''}${bends.length ? ', ' + bends.length + (bends.length > 1 ? ' virages serrés' : ' virage serré') : ''}${rep && rep.events ? ', ' + rep.events + ' repères' : ''}. ${S.settings.tol === 0 ? 'Trace non recalée.' : 'Parcours reconnu sur les chemins : ' + pc + ' %.'}`, 'ok');
+    if (pc < 60 && S.settings.tol !== 0) openModal('Parcours peu reconnu', `Seulement <b>${pc} %</b> de ta trace a pu être recalée sur les chemins OpenStreetMap (trait noir sur la carte) : les intersections ne sont repérées que sur cette partie.<br><br>Si ta trace a été dessinée à main levée ou s’écarte des chemins, augmente <b>« Écart maxi trace ↔ chemins »</b> dans ⋯ › Réglages (par ex. 70 m), puis régénère. Les portions hors-piste ou absentes d’OpenStreetMap restent sans intersection.`, [{ label: 'OK', cls: 'primary' }]);
   } catch (e) {
     closeModal();
     if (e.message === 'annulé') { toast('Génération annulée.'); return; }
@@ -4424,7 +4498,7 @@ function openSettings() {
       <b>IGN</b> : routes, routes empierrées, chemins, sentiers, ronds-points, ponts, gués, noms de rues et numéros de routes de la BD TOPO, cours d’eau, plans d’eau, bâtiments ; France seulement.<br>
       <b>IGN détaillé</b> : tout cela, plus les repères de la BD TOPO : barrières, passages à niveau, voies ferrées, murs, clôtures, haies, entrées et sorties de villages, lieux-dits, sommets, cols, châteaux d’eau, antennes, cheminées, éoliennes, églises (un peu plus long à télécharger ; pas de STOP, ni de sable ou boue, ni de pentes).<br>
       <b>Détaillé</b> : en plus clôtures, STOP, sable / boue, état de la piste, pentes, châteaux d’eau, antennes… mais téléchargement bien plus long.</div></div>
-    ${num('sTol', 'Écart maxi trace ↔ chemins (m)', s.tol, 10, 100, 'Ta trace est recalée sur les chemins situés à moins de cette distance. Augmente-la si ta trace est dessinée à main levée.')}
+    ${num('sTol', 'Écart maxi trace ↔ chemins (m)', s.tol, 0, 100, 'Ta trace est recalée sur les chemins situés à moins de cette distance. Augmente-la si ta trace est dessinée à main levée. Mets 0 pour ne pas recaler : la trace est gardée telle quelle.')}
     <div class="fgrid" style="grid-template-columns:1fr 1fr">
       ${num('sMerge', 'Regrouper les notes à moins de (m)', s.merge, 5, 100)}
       ${num('sR', 'Rayon dessiné dans la tulipe (m)', s.tulipR, 25, 120)}
@@ -4435,6 +4509,7 @@ function openSettings() {
       <div class="help">0 aucun · 1 prudent : seulement les notes « direction + sur route » · 2 normal : le nom de la rue ne compte plus · 3 large : les repères secondaires (haie, antenne, clôture…) ne coupent plus la série. Les STOP, ponts, passages à niveau, villages, ronds-points et changements de numéro de route coupent toujours.</div></div>
     ${chk('sGoudron', 'Noter les changements « fin / début goudron »', s.goudron)}
     ${chk('sBends', 'Noter les virages serrés hors intersection', s.bends)}
+    ${chk('sOffroad', 'Noter les passages hors piste (trace hors des chemins : direction, flèche pointillée et CAP)', s.offroad !== false)}
     ${num('sBendA', 'Angle mini d’un virage serré (°)', s.bendAngle, 60, 170)}
     ${chk('sPois', 'Notes de repères : gués, passages à niveau, stops, portails, ponts, tunnels, sable, pentes, clôtures, villages, cols, stations-service', s.pois)}
     ${chk('sLand', 'Repères visuels : châteaux d’eau, antennes, églises, éoliennes, sommets, lieux-dits, noms des pistes', s.landmarks)}
@@ -4458,8 +4533,8 @@ function openSettings() {
       const g = (id, d, a, b) => { const v = parseFloat($('#' + id).value); return isFinite(v) ? clamp(v, a, b) : d; };
       const same = o => JSON.stringify(Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {}));      // comparaison sans tenir compte de l'ordre des champs
       const before = same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0 });
-      S.settings = { sv: DEF_SETTINGS.sv, data: /^(osm|ign|ignd)$/.test($('#sData').value) ? $('#sData').value : 'vt', tol: g('sTol', 40, 10, 100), water: $('#sWater').checked, bld: $('#sBld').checked, pois: $('#sPois').checked, landmarks: $('#sLand').checked, merge: g('sMerge', 30, 5, 100), tulipR: g('sR', 50, 25, 120), straight: $('#sStraight').checked,
-        followLvl: +$('#sFollow').value, lmOff: [...document.querySelectorAll('.lmchk')].filter(c => !c.checked).map(c => c.dataset.lm), goudron: $('#sGoudron').checked, bends: $('#sBends').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showCap: $('#sCap').checked };
+      S.settings = { sv: DEF_SETTINGS.sv, data: /^(osm|ign|ignd)$/.test($('#sData').value) ? $('#sData').value : 'vt', tol: g('sTol', 40, 0, 100), water: $('#sWater').checked, bld: $('#sBld').checked, pois: $('#sPois').checked, landmarks: $('#sLand').checked, merge: g('sMerge', 30, 5, 100), tulipR: g('sR', 50, 25, 120), straight: $('#sStraight').checked,
+        followLvl: +$('#sFollow').value, lmOff: [...document.querySelectorAll('.lmchk')].filter(c => !c.checked).map(c => c.dataset.lm), goudron: $('#sGoudron').checked, bends: $('#sBends').checked, offroad: $('#sOffroad').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showCap: $('#sCap').checked };
       afterSettings(before === same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0 }));
     } }]);
   const lmSet = v => document.querySelectorAll('.lmchk').forEach(c => { c.checked = v; });
@@ -4624,7 +4699,7 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
 })();
 
 // accès pour les tests automatisés
-window.__rb = { S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, notesSVG, renderAll, renderRadii, noteRadii };
+window.__rb = { cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, notesSVG, renderAll, renderRadii, noteRadii };
 })();
 
 // Version installable (PWA) : actif seulement quand la page est servie en https (pas en fichier local)
