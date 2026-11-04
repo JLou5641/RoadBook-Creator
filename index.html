@@ -906,7 +906,7 @@ main{flex:1;display:flex;min-height:0}
           <button data-act="loadOsm">📥 Charger des chemins OSM</button>
           <button data-act="new">🆕 Nouveau roadbook</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version du 04/11 12h58</div>
+          <div class="ver">Version du 04/11 13h27</div>
         </div>
       </div>
     </div>
@@ -3079,7 +3079,7 @@ function noteFromGroup(g, gr, prevS, nextS) {
   note.span = [Math.round(first.s), Math.round(last.s)];
   if (trackName) note.trackName = trackName;
   { const rid = w => ({ ref: ((w.tags && w.tags.ref) || '').split(';')[0].replace(/\s+/g, '').toUpperCase(), name: tName(w.tags).toLowerCase() });
-    note.rd = { a: rid(first.entry.b.way), b: rid(exitWay), road: entryCat === 'road' && exitCat === 'road' && !surf }; }      // route avant / après le carrefour (pour le regroupement « suivre la route »)
+    note.rd = { a: rid(first.entry.b.way), b: rid(exitWay), road: entryCat === 'road' && exitCat === 'road' && !surf, cat: entryCat === exitCat && /^(road|track)$/.test(entryCat) ? entryCat : '' }; }      // route avant / après le carrefour (pour le regroupement « suivre la route »)
   note.src = { t: 'j', ids: gr.map(x => x.J.id), ss: gr.map(x => Math.round(x.s * 10) / 10), k: gr.map(x => x.ev.kind) };
   return note;
 }
@@ -3265,10 +3265,11 @@ function addTrackNames(notes) {       // nom de la piste / rue prise au carrefou
 /* « Suivre la route » : des carrefours qui s'enchaînent sur une même route (même numéro ou même nom, sans conflit, quelle que soit la distance) ne font plus qu'une note : la première, avec le symbole FRO */
 function followRoad(notes) {
   const okDir = /^(?:TD|Lég\. à [DG]|À [DG]|Serrer à [DG])$/;
+  const kind = n => (n.rd.cat === 'track' ? 'track' : 'road');
   const simple = n => {
-    if (n.kind !== 'junction' || n.auto === false || !n.rd || !n.rd.road || n.edited || n.wp || n.danger || (n.sym && n.sym.length) || (n.lex && n.lex.length)) return false;
+    if (n.kind !== 'junction' || n.auto === false || !n.rd || !(n.rd.road || n.rd.cat) || n.edited || n.wp || n.danger || (n.sym && n.sym.length) || (n.lex && n.lex.length)) return false;
     const l = (n.text || '').split('\n').filter(Boolean);
-    return l.length === 2 && okDir.test(l[0]) && /^sur route(?: .+)?$/.test(l[1]);
+    return l.length === 2 && okDir.test(l[0]) && (n.rd.cat === 'track' ? /^sur piste$/ : /^sur route(?: .+)?$/).test(l[1]);
   };
   const ok = (acc, x) => (!acc.ref || !x.ref || acc.ref === x.ref) && (!acc.name || !x.name || acc.name === x.name);
   const add = (acc, x) => ({ ref: acc.ref || x.ref, name: acc.name || x.name });
@@ -3276,15 +3277,15 @@ function followRoad(notes) {
   for (let i = 0; i < notes.length; i++) {
     const a = notes[i]; out.push(a);
     if (!simple(a) || !ok(a.rd.a, a.rd.b)) continue;
-    let acc = add(a.rd.a, a.rd.b), last = a, n = 0;
+    let acc = add(a.rd.a, a.rd.b), last = a, n = 0; const kd = kind(a);
     while (i + 1 < notes.length) {
       const b = notes[i + 1];
-      if (!simple(b) || !ok(acc, b.rd.a) || !ok(acc, b.rd.b) || !ok(b.rd.a, b.rd.b)) break;
+      if (!simple(b) || kind(b) !== kd || !ok(acc, b.rd.a) || !ok(acc, b.rd.b) || !ok(b.rd.a, b.rd.b)) break;
       acc = add(acc, add(b.rd.a, b.rd.b)); last = b; i++; n++; removed++;
     }
     if (n) {
       const ref = (a.text.split('\n')[1].match(/^sur route (.+)$/) || [])[1] || (last.text.split('\n')[1].match(/^sur route (.+)$/) || [])[1];
-      a.text = a.text.split('\n')[0] + '\nSuivre la route' + (ref ? ' ' + ref : '');
+      a.text = a.text.split('\n')[0] + (kd === 'track' ? '\nSuivre la piste' : '\nSuivre la route' + (ref ? ' ' + ref : ''));
       a.follow = true;
       if (a.span && last.span) a.span = [a.span[0], last.span[1]];
     }
@@ -3778,6 +3779,7 @@ const AUTO_SYM = [      // [ligne de texte, () → { keys: symboles, text: texte
   [/^TD$/, () => ({ keys: ['kpS'], dir: 1, grp: 'nav' })],                 // tout droit → « kpS » (garder tout droit)
   [/^Serrer à D$/, () => ({ keys: ['kpR'], dir: 1, grp: 'nav' })],         // serrer à droite → « kpR » (garder la droite)
   [/^Serrer à G$/, () => ({ keys: ['kpL'], dir: 1, grp: 'nav' })],
+  [/^Suivre la piste$/, () => ({ keys: ['FPP'], grp: 'nav' })],      // plusieurs carrefours sur la même piste → FPP (suivre la piste principale)
   [/^Suivre la route(?: (.+))?$/, m => ({ keys: ['FRO'], text: m[1] || '', grp: 'nav' })],      // plusieurs carrefours sur la même route → FRO (suivre la route)
   [/^sur route(?: (.+))?$/, m => ({ keys: ['RO'], text: m[1] || '', grp: 'nav' })],      // « sur route D 976 » → RO + « D 976 »
   [/^sur (?:piste|sentier)$/, () => ({ keys: ['P'], grp: 'nav' })],      // piste et sentier : même symbole « P »         // serrer à gauche → « kpL » (garder la gauche)
@@ -3830,7 +3832,7 @@ function noteView(n) {      // lignes de texte restantes et symboles à afficher
   const has = k => items.some(it => it.keys.includes(k));
   const keys = []; let prev = null;
   for (const it of items) {
-    const ks = it.keys.filter(k => FIA_LEX[k] && !keys.includes(k) && !(k === 'tarmac' && (has('RO') || has('FRO'))) && !(k === 'track' && has('P')));
+    const ks = it.keys.filter(k => FIA_LEX[k] && !keys.includes(k) && !(k === 'tarmac' && (has('RO') || has('FRO'))) && !(k === 'track' && (has('P') || has('FPP'))));
     if (!ks.length) continue;
     if (prev && it.grp && prev.grp === it.grp && keys.length) keys.push('ET');      // symboles de la même phrase (direction, type de chemin…) : reliés par « ET »
     ks.forEach((k, j) => { if (j && it.et) keys.push('ET'); keys.push(k); });          // deux symboles d'une même ligne qui se combinent (pont + voie ferrée)
