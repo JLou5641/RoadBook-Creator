@@ -906,7 +906,7 @@ main{flex:1;display:flex;min-height:0}
           <button data-act="loadOsm">📥 Charger des chemins OSM</button>
           <button data-act="new">🆕 Nouveau roadbook</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version du 04/11 13h27</div>
+          <div class="ver">Version du 04/11 13h50</div>
         </div>
       </div>
     </div>
@@ -1798,7 +1798,7 @@ function simplifyDP(pts, tol) {         // Douglas-Peucker, renvoie les indices 
 /* ============================================================
    2. État & sauvegarde
    ============================================================ */
-const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, followRoad: true, bends: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true };
+const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, followLvl: 3, bends: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true };
 const S = {
   name: 'Mon roadbook', desc: '', src: '', ll: [], mm: null, ctrl: [], segs: [], notes: [], settings: { ...DEF_SETTINGS },
   stale: false, routeMode: 'trekking', nextId: 1, sel: null
@@ -3262,30 +3262,45 @@ function pointInPoly(p, pts) {
 function addTrackNames(notes) {       // nom de la piste / rue prise au carrefour, en dernière ligne
   for (const n of notes) if (n.trackName) { const l = (n.text || '').split('\n').filter(Boolean); if (!l.includes(n.trackName)) l.push(n.trackName); n.text = l.join('\n'); n.roadNames = [n.trackName]; delete n.trackName; }      // roadNames : la ligne du nom de rue, pour pouvoir la masquer (réglage « Afficher les noms de route »)
 }
-/* « Suivre la route » : des carrefours qui s'enchaînent sur une même route (même numéro ou même nom, sans conflit, quelle que soit la distance) ne font plus qu'une note : la première, avec le symbole FRO */
-function followRoad(notes) {
+/* « Suivre la route / la piste » : des carrefours qui s'enchaînent sur une même route (ou piste), sans vrai changement, ne font plus qu'une note : la première, avec le symbole FRO (FPP).
+   Niveau de regroupement (réglage followLvl) : 0 aucun · 1 prudent (notes réduites à « direction + sur route ») · 2 normal (+ le nom de la rue ne compte plus) · 3 large (+ les repères secondaires — haie, antenne, clôture… — ne coupent plus la série) */
+const SECOND_RE = /^(?:Longer (?:haie|clôture|mur) à [DG]|Antenne(?: à [DG])?|Château d'eau(?: à [DG])?|Cheminée(?: à [DG])?|Éolienne(?: à [DG])?|Moulin(?: à [DG])?|Phare(?: à [DG])?|Tour(?: à [DG])?|(?:Église|Lieu de culte)(?: à [DG])?|Station-service(?: à [DG])?|Lieu-dit .+|Hameau .+|Sommet(?: .+)?)$/;
+function followRoad(notes, lvl) {
+  if (lvl === undefined) lvl = S.settings.followLvl === undefined ? (S.settings.followRoad === false ? 0 : 3) : S.settings.followLvl;
+  if (lvl < 1) return { notes, removed: 0 };
   const okDir = /^(?:TD|Lég\. à [DG]|À [DG]|Serrer à [DG])$/;
   const kind = n => (n.rd.cat === 'track' ? 'track' : 'road');
-  const simple = n => {
+  const extra = n => { const l = (n.text || '').split('\n').filter(Boolean), names = n.roadNames || []; return l.slice(2).map(x => names.includes(x) ? { x, name: 1 } : { x, name: 0 }); };
+  const simple = n => {      // direction + « sur route [n°] » (ou « sur piste ») ; niveau 2 : + nom de rue ; niveau 3 : + repères secondaires
     if (n.kind !== 'junction' || n.auto === false || !n.rd || !(n.rd.road || n.rd.cat) || n.edited || n.wp || n.danger || (n.sym && n.sym.length) || (n.lex && n.lex.length)) return false;
     const l = (n.text || '').split('\n').filter(Boolean);
-    return l.length === 2 && okDir.test(l[0]) && (n.rd.cat === 'track' ? /^sur piste$/ : /^sur route(?: .+)?$/).test(l[1]);
+    return l.length >= 2 && okDir.test(l[0]) && (n.rd.cat === 'track' ? /^sur piste$/ : /^sur route(?: .+)?$/).test(l[1])
+      && extra(n).every(e => (e.name && lvl >= 2) || (lvl >= 3 && SECOND_RE.test(e.x)));
   };
-  const ok = (acc, x) => (!acc.ref || !x.ref || acc.ref === x.ref) && (!acc.name || !x.name || acc.name === x.name);
+  const secInfo = n => lvl >= 3 && n.kind === 'info' && !n.wp && !n.danger && (n.text || '').split('\n').filter(Boolean).every(x => SECOND_RE.test(x));
+  // même route : même numéro (les noms de rue peuvent changer le long d'une départementale), sinon même nom ; ce qui est inconnu ne gêne pas
+  const ok = (acc, x) => acc.ref && x.ref ? acc.ref === x.ref : (lvl >= 2 || !acc.name || !x.name || acc.name === x.name);      // niveau 2 et plus : seul un numéro de route différent compte, pas le nom de la rue
   const add = (acc, x) => ({ ref: acc.ref || x.ref, name: acc.name || x.name });
   const out = []; let removed = 0;
   for (let i = 0; i < notes.length; i++) {
     const a = notes[i]; out.push(a);
     if (!simple(a) || !ok(a.rd.a, a.rd.b)) continue;
-    let acc = add(a.rd.a, a.rd.b), last = a, n = 0; const kd = kind(a);
-    while (i + 1 < notes.length) {
-      const b = notes[i + 1];
+    let acc = add(a.rd.a, a.rd.b), last = a, n = 0; const kd = kind(a), refs = [], sec = [];
+    for (let j = i + 1; j < notes.length; j++) {
+      const b = notes[j];
+      if (secInfo(b)) continue;      // un repère secondaire entre deux carrefours garde sa note et ne coupe pas la série
       if (!simple(b) || kind(b) !== kd || !ok(acc, b.rd.a) || !ok(acc, b.rd.b) || !ok(b.rd.a, b.rd.b)) break;
-      acc = add(acc, add(b.rd.a, b.rd.b)); last = b; i++; n++; removed++;
+      acc = add(acc, add(b.rd.a, b.rd.b)); for (let k = i + 1; k < j; k++) out.push(notes[k]);      // les repères sautés restent, dans l'ordre
+      const m = b.text.split('\n')[1].match(/^sur route (.+)$/); if (m) refs.push(m[1]);
+      extra(b).forEach(e => { if (!e.name) sec.push(e.x); });
+      last = b; i = j; n++; removed++;
     }
     if (n) {
-      const ref = (a.text.split('\n')[1].match(/^sur route (.+)$/) || [])[1] || (last.text.split('\n')[1].match(/^sur route (.+)$/) || [])[1];
-      a.text = a.text.split('\n')[0] + (kd === 'track' ? '\nSuivre la piste' : '\nSuivre la route' + (ref ? ' ' + ref : ''));
+      const L = a.text.split('\n'), m = L[1].match(/^sur route (.+)$/), ref = (m && m[1]) || refs[0];
+      const mine = extra(a), keep = L.slice(2).filter(x => !mine.some(e => e.x === x && e.name));      // le nom de la 1re rue ne vaut plus pour toute la série
+      for (const x of sec) if (!keep.includes(x)) keep.push(x);
+      a.text = [L[0], kd === 'track' ? 'Suivre la piste' : 'Suivre la route' + (ref ? ' ' + ref : ''), ...keep].join('\n');
+      a.roadNames = [];
       a.follow = true;
       if (a.span && last.span) a.span = [a.span[0], last.span[1]];
     }
@@ -4183,7 +4198,7 @@ async function runGenerate() {
     if (S.settings.pois || S.settings.landmarks) { prog('Ajout des repères (gués, ponts, villages…)', 0.97); await sleep(10); rep = osmExtras(G, all); }
     addTrackNames(all);
     let fr = null;
-    if (S.settings.followRoad !== false) { fr = followRoad(all); all.length = 0; all.push(...fr.notes); }
+    if (S.settings.followLvl !== 0 && !(S.settings.followLvl === undefined && S.settings.followRoad === false)) { fr = followRoad(all); all.length = 0; all.push(...fr.notes); }
     S.notes = [...all, ...manual];
     S.stale = false; S.sel = null;
     closeModal(); renderTrack(); renderAll();
@@ -4340,7 +4355,9 @@ function openSettings() {
       ${num('sR', 'Rayon dessiné dans la tulipe (m)', s.tulipR, 25, 120)}
     </div>
     ${chk('sStraight', 'Noter aussi les intersections où l’on continue tout droit', s.straight)}
-    ${chk('sFollow', 'Regrouper en une seule note (symbole FRO « suivre la route ») les carrefours qui s’enchaînent sur la même route', s.followRoad !== false)}
+    <div class="fld"><label>Regroupement des notes sur une même route ou piste (FRO / FPP) : <b id="sFollowTxt">${['aucun', 'prudent', 'normal', 'large'][s.followLvl === undefined ? (s.followRoad === false ? 0 : 3) : s.followLvl]}</b>
+      <input type="range" id="sFollow" style="width:100%;margin-top:4px" min="0" max="3" step="1" oninput="document.getElementById('sFollowTxt').textContent=['aucun','prudent','normal','large'][this.value]" value="${s.followLvl === undefined ? (s.followRoad === false ? 0 : 3) : s.followLvl}"></label>
+      <div class="help">0 aucun · 1 prudent : seulement les notes « direction + sur route » · 2 normal : le nom de la rue ne compte plus · 3 large : les repères secondaires (haie, antenne, clôture…) ne coupent plus la série. Les STOP, ponts, passages à niveau, villages, ronds-points et changements de numéro de route coupent toujours.</div></div>
     ${chk('sGoudron', 'Noter les changements « fin / début goudron »', s.goudron)}
     ${chk('sBends', 'Noter les virages serrés hors intersection', s.bends)}
     ${num('sBendA', 'Angle mini d’un virage serré (°)', s.bendAngle, 60, 170)}
@@ -4362,7 +4379,7 @@ function openSettings() {
       const same = o => JSON.stringify(Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {}));      // comparaison sans tenir compte de l'ordre des champs
       const before = same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0 });
       S.settings = { sv: DEF_SETTINGS.sv, data: /^(osm|ign|ignd)$/.test($('#sData').value) ? $('#sData').value : 'vt', tol: g('sTol', 40, 10, 100), water: $('#sWater').checked, bld: $('#sBld').checked, pois: $('#sPois').checked, landmarks: $('#sLand').checked, merge: g('sMerge', 30, 5, 100), tulipR: g('sR', 50, 25, 120), straight: $('#sStraight').checked,
-        followRoad: $('#sFollow').checked, goudron: $('#sGoudron').checked, bends: $('#sBends').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showCap: $('#sCap').checked };
+        followLvl: +$('#sFollow').value, goudron: $('#sGoudron').checked, bends: $('#sBends').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showCap: $('#sCap').checked };
       afterSettings(before === same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0 }));
     } }]);
   const c = $('#sClear');
@@ -4525,7 +4542,7 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
 })();
 
 // accès pour les tests automatisés
-window.__rb = { S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, notesSVG, renderAll, renderRadii, noteRadii };
+window.__rb = { S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, notesSVG, renderAll, renderRadii, noteRadii };
 })();
 
 // Version installable (PWA) : actif seulement quand la page est servie en https (pas en fichier local)
