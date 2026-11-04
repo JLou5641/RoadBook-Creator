@@ -717,6 +717,10 @@ main{flex:1;display:flex;min-height:0}
 
 /* ---------- lignes de roadbook : présentation FIM (3 cases carrées identiques) ---------- */
 .rbr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));aspect-ratio:3/1;container-type:inline-size;position:relative;background:#fff;color:#000;border:2px solid #000;margin-bottom:-2px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rbr.dbox{display:block;aspect-ratio:3/2;margin-bottom:6px;border-width:2px}
+.rbr.dbox textarea{display:block;width:100%;height:100%;box-sizing:border-box;border:0;outline:0;resize:none;background:#fffdf8;color:#000;font-family:var(--cond);font-weight:600;font-size:3.6cqw;line-height:1.3;padding:2.4cqw 3cqw}
+.rbr.dbox textarea::placeholder{color:#9a9384;font-weight:400}
+.rbr.dbox textarea:focus{background:#fff}
 .rbr>.k{position:relative;overflow:hidden;border-right:2px solid #000;min-width:0}
 .rbr>.k3{border-right:0}
 .k1 .tot{position:absolute;top:1.8cqw;left:0;right:0;text-align:center;font-family:var(--cond);font-weight:800;font-size:7.4cqw;line-height:1;letter-spacing:-.1cqw}
@@ -850,6 +854,8 @@ main{flex:1;display:flex;min-height:0}
   .prow>.k{border-right-width:.5mm}
   .prow>.k3{border-right:0}
   .prow .man{display:none}
+  .prow.dbox{display:block;aspect-ratio:3/2;margin-bottom:-.5mm;border-width:.5mm}
+  .prow.dbox .dtxt{width:100%;height:100%;box-sizing:border-box;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--cond);font-weight:600;font-size:3.6cqw;line-height:1.3;padding:2.4cqw 3cqw}
 }
 
 /* symboles posés librement (tulipe et description) */
@@ -900,7 +906,7 @@ main{flex:1;display:flex;min-height:0}
           <button data-act="loadOsm">📥 Charger des chemins OSM</button>
           <button data-act="new">🆕 Nouveau roadbook</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version du 04/11 07h51</div>
+          <div class="ver">Version du 04/11 10h14</div>
         </div>
       </div>
     </div>
@@ -1794,7 +1800,7 @@ function simplifyDP(pts, tol) {         // Douglas-Peucker, renvoie les indices 
    ============================================================ */
 const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, bends: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true };
 const S = {
-  name: 'Mon roadbook', src: '', ll: [], mm: null, ctrl: [], segs: [], notes: [], settings: { ...DEF_SETTINGS },
+  name: 'Mon roadbook', desc: '', src: '', ll: [], mm: null, ctrl: [], segs: [], notes: [], settings: { ...DEF_SETTINGS },
   stale: false, routeMode: 'trekking', nextId: 1, sel: null
 };
 let T = null;    // parcours dérivé : {xy, cum, L, grid}
@@ -1803,7 +1809,7 @@ const LS_KEY = 'rbgen.v1';
 let saveTimer = null, saveWarned = false;
 
 function snapshot() {
-  return { v: 2, name: S.name, src: S.src, ll: S.ll, mm: S.mm, ctrl: S.ctrl, segs: S.segs, notes: S.notes, settings: S.settings,
+  return { v: 2, name: S.name, desc: S.desc, src: S.src, ll: S.ll, mm: S.mm, ctrl: S.ctrl, segs: S.segs, notes: S.notes, settings: S.settings,
     stale: S.stale, routeMode: S.routeMode, nextId: S.nextId };
 }
 function save() {
@@ -1814,7 +1820,7 @@ function save() {
   }, 500);
 }
 function restore(o) {
-  S.name = o.name || 'Mon roadbook'; S.src = o.src || ''; S.ctrl = o.ctrl || []; S.segs = o.segs || [];
+  S.name = o.name || 'Mon roadbook'; S.desc = o.desc || ''; S.src = o.src || ''; S.ctrl = o.ctrl || []; S.segs = o.segs || [];
   S.notes = o.notes || []; S.settings = { ...DEF_SETTINGS, ...(o.settings || {}) }; S.stale = !!o.stale;
   if ((o.settings || {}).sv !== DEF_SETTINGS.sv) S.settings = { ...S.settings, sv: DEF_SETTINGS.sv, tol: DEF_SETTINGS.tol, water: true, bld: true };
   S.routeMode = o.routeMode || 'trekking'; S.nextId = o.nextId || (Math.max(0, ...S.notes.map(n => n.id)) + 1); S.sel = null;
@@ -3855,7 +3861,8 @@ function renderRoadbook() {
     renderInfo(); return;
   }
   let prev = 0; const fl = rbFlags(S.notes);
-  rb.innerHTML = S.notes.map((n, i) => { const par = n.s - prev; prev = n.s; return `<div class="rbr row${n.id === S.sel ? ' sel' : ''}" data-id="${n.id}">${rowInner(n, i, par, fl[i], true)}</div>`; }).join('');
+  const descBox = `<div class="rbr dbox"><textarea id="rbDesc" spellcheck="true" placeholder="Description du roadbook : rallye, étape, date, départ, consignes, rappels…">${esc(S.desc || '')}</textarea></div>`;
+  rb.innerHTML = descBox + S.notes.map((n, i) => { const par = n.s - prev; prev = n.s; return `<div class="rbr row${n.id === S.sel ? ' sel' : ''}" data-id="${n.id}">${rowInner(n, i, par, fl[i], true)}</div>`; }).join('');
   renderInfo();
 }
 function renderAll() { S.notes.sort((a, b) => a.s - b.s); renderRoadbook(); renderMarkers(); renderInfo(); save(); }
@@ -4181,7 +4188,7 @@ async function buildGPX(onProg) {
   const o = [];
   o.push('<?xml version="1.0" encoding="UTF-8"?>');
   o.push(`<gpx xmlns="http://www.topografix.com/GPX/1/1" creator="Generateur de Roadbook OSM" version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:openrally="${NS}" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd ${NS} http://www.openrally.org/xmlschemas/GpxExtensions/v1.0.3/openrally.xsd">`);
-  o.push(`  <metadata>\n    <name>${xmlEsc(S.name)}</name>\n    <time>${new Date().toISOString().replace(/\.\d+Z$/, 'Z')}</time>\n    <extensions>\n      <openrally:units>metric</openrally:units>\n      <openrally:distance>${km(T.L)}</openrally:distance>\n    </extensions>\n  </metadata>`);
+  o.push(`  <metadata>\n    <name>${xmlEsc(S.name)}</name>${(S.desc || '').trim() ? `\n    <desc>${xmlEsc(S.desc.trim())}</desc>` : ''}\n    <time>${new Date().toISOString().replace(/\.\d+Z$/, 'Z')}</time>\n    <extensions>\n      <openrally:units>metric</openrally:units>\n      <openrally:distance>${km(T.L)}</openrally:distance>\n    </extensions>\n  </metadata>`);
   let wpCount = 0;
   for (let i = 0; i < S.notes.length; i++) {
     const n = S.notes[i];
@@ -4232,10 +4239,14 @@ async function exportGPX() {
 }
 function printRB() {
   if (!S.notes.length) { toast('Génère d’abord le roadbook.', 'err'); return; }
-  const fl = rbFlags(S.notes), rows = [], P = 5; let prev = 0;
-  S.notes.forEach((n, i) => { const par = n.s - prev; prev = n.s; rows.push(`<div class="rbr prow">${rowInner(n, i, par, fl[i], false)}</div>`); });
-  const pages = Math.ceil(rows.length / P); let html = '';
-  for (let p = 0; p < pages; p++) html += `<div class="ppage"><div class="ph"><span class="l">${esc(S.name)}</span><span class="c">Page ${p + 1} / ${pages}</span><span class="r">Total ${kmFr(T.L)} km</span></div>${rows.slice(p * P, p * P + P).join('')}</div>`;
+  const fl = rbFlags(S.notes), rows = [], P = 5; let prev = 0;       // une page = 5 places ; la description en prend 2
+  if ((S.desc || '').trim()) rows.push({ w: 2, h: `<div class="rbr prow dbox"><div class="dtxt">${esc(S.desc.trim())}</div></div>` });
+  S.notes.forEach((n, i) => { const par = n.s - prev; prev = n.s; rows.push({ w: 1, h: `<div class="rbr prow">${rowInner(n, i, par, fl[i], false)}</div>` }); });
+  const pages = []; let cur = [], used = 0;
+  for (const r of rows) { if (used + r.w > P) { pages.push(cur); cur = []; used = 0; } cur.push(r.h); used += r.w; }
+  if (cur.length) pages.push(cur);
+  let html = '';
+  pages.forEach((pg, p) => { html += `<div class="ppage"><div class="ph"><span class="l">${esc(S.name)}</span><span class="c">Page ${p + 1} / ${pages.length}</span><span class="r">Total ${kmFr(T.L)} km</span></div>${pg.join('')}</div>`; });
   $('#print').innerHTML = html;
   setTimeout(() => window.print(), 50);
 }
@@ -4439,6 +4450,7 @@ $('#bGen').onclick = generate;
 $('#bExport').onclick = exportGPX;
 $('#bPrint').onclick = printRB;
 $('#rbName').addEventListener('input', e => { S.name = e.target.value; save(); });
+$('#rb').addEventListener('input', e => { if (e.target.id === 'rbDesc') { S.desc = e.target.value; save(); } });
 $('#bMore').onclick = e => { e.stopPropagation(); $('#moreMenu').classList.toggle('open'); };
 document.addEventListener('click', () => $('#moreMenu').classList.remove('open'));
 $('#moreMenu').addEventListener('click', e => {
@@ -4452,7 +4464,7 @@ $('#moreMenu').addEventListener('click', e => {
   else if (act === 'help') openHelp();
   else if (act === 'new') ask('Nouveau roadbook ?', 'Le parcours et les notes en cours seront effacés (pense à exporter ou enregistrer le projet avant).', 'Tout effacer', () => {
     if (drawing) setDrawing(false);
-    S.name = 'Mon roadbook'; S.src = ''; S.ctrl = []; S.segs = []; S.notes = []; S.stale = false; S.sel = null;
+    S.name = 'Mon roadbook'; S.desc = ''; S.src = ''; S.ctrl = []; S.segs = []; S.notes = []; S.stale = false; S.sel = null;
     $('#rbName').value = S.name; setTrack([], true); renderAll();
   });
 });
