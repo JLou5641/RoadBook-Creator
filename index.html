@@ -906,7 +906,7 @@ main{flex:1;display:flex;min-height:0}
           <button data-act="loadOsm">📥 Charger des chemins OSM</button>
           <button data-act="new">🆕 Nouveau roadbook</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version du 04/11 12h42</div>
+          <div class="ver">Version du 04/11 12h58</div>
         </div>
       </div>
     </div>
@@ -3262,8 +3262,7 @@ function pointInPoly(p, pts) {
 function addTrackNames(notes) {       // nom de la piste / rue prise au carrefour, en dernière ligne
   for (const n of notes) if (n.trackName) { const l = (n.text || '').split('\n').filter(Boolean); if (!l.includes(n.trackName)) l.push(n.trackName); n.text = l.join('\n'); n.roadNames = [n.trackName]; delete n.trackName; }      // roadNames : la ligne du nom de rue, pour pouvoir la masquer (réglage « Afficher les noms de route »)
 }
-/* « Suivre la route » : des carrefours qui s'enchaînent sur une même route (même numéro ou même nom, sans conflit) ne font plus qu'une note : la première, avec le symbole FRO */
-const FOLLOW_GAP = 150;      // m entre deux notes successives
+/* « Suivre la route » : des carrefours qui s'enchaînent sur une même route (même numéro ou même nom, sans conflit, quelle que soit la distance) ne font plus qu'une note : la première, avec le symbole FRO */
 function followRoad(notes) {
   const okDir = /^(?:TD|Lég\. à [DG]|À [DG]|Serrer à [DG])$/;
   const simple = n => {
@@ -3280,7 +3279,7 @@ function followRoad(notes) {
     let acc = add(a.rd.a, a.rd.b), last = a, n = 0;
     while (i + 1 < notes.length) {
       const b = notes[i + 1];
-      if (!simple(b) || b.s - last.s > FOLLOW_GAP || !ok(acc, b.rd.a) || !ok(acc, b.rd.b) || !ok(b.rd.a, b.rd.b)) break;
+      if (!simple(b) || !ok(acc, b.rd.a) || !ok(acc, b.rd.b) || !ok(b.rd.a, b.rd.b)) break;
       acc = add(acc, add(b.rd.a, b.rd.b)); last = b; i++; n++; removed++;
     }
     if (n) {
