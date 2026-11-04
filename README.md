@@ -1,2 +1,2 @@
 # RoadBook-Creator
-Application d'autogénération de Roadbook Rally
+Application d'autogénération et édition de Roadbook Rally
