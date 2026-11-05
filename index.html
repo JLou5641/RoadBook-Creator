@@ -977,7 +977,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0511.2133</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0511.2203</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1003,7 +1003,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version v0.0511.2133</div>
+          <div class="ver">Version v0.0511.2203</div>
         </div>
       </div>
     </div>
@@ -1020,6 +1020,8 @@ body.dragNote .leaflet-tooltip{display:none}
           <option value="cyclosm">🚵 CyclOSM (pistes)</option>
           <option value="osm">🗺️ OSM standard</option>
           <option value="sat">🛰️ Satellite</option>
+          <option value="ortho">🇫🇷 Photos aériennes IGN (France)</option>
+          <option value="esritopo">🏔️ Esri Topo (monde)</option>
         </select>
         <label class="radlab" title="Cercle d’ouverture (bleu, pointillé) et cercle de validation (violet) autour de chaque waypoint"><input type="checkbox" id="radChk"> ◎ Rayons des waypoints <span class="radkey"><i class="ro"></i> ouverture <i class="rc"></i> validation</span></label>
       </div>
@@ -1043,8 +1045,13 @@ body.dragNote .leaflet-tooltip{display:none}
             <option value="shortest">Au plus court (sentiers inclus)</option>
             <option value="moped">Petites routes (cyclo)</option>
             <option value="car-fast">Routes (voiture)</option>
+            <option value="ors:foot-hiking">🥾 Randonnée (OpenRoute 🔑)</option>
+            <option value="ors:cycling-mountain">🚵 VTT (OpenRoute 🔑)</option>
+            <option value="ors:cycling-road">🚴 Vélo de route (OpenRoute 🔑)</option>
+            <option value="ors:foot-walking">🚶 Marche (OpenRoute 🔑)</option>
             <option value="line">Ligne droite</option>
           </select>
+          <button id="orsBtn" title="Clé OpenRouteService (profils rando, VTT, vélo de route)">🔑</button>
         </div>
         <div class="dgrp">Dessin</div>
         <div class="row2">
@@ -2094,7 +2101,9 @@ const LAYERS = {
   scan25: L.tileLayer('https://data.geopf.fr/private/wmts?Service=WMTS&apikey=ign_scan_ws&Version=1.0.0&Request=GetTile&Layer=GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN25TOUR&Style=normal&Format=image/jpeg&TileMatrixSet=PM&TileMatrix={z}&TileRow={y}&TileCol={x}', { minZoom: 6, maxNativeZoom: 16, maxZoom: 19, attribution: '© IGN – SCAN 25® Touristique' }),
   planign: L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png', { maxNativeZoom: 19, maxZoom: 19, attribution: '© IGN – Plan IGN' }),
   cyclosm: L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', { subdomains: 'abc', maxZoom: 19, attribution: '© contributeurs OpenStreetMap | CyclOSM' }),
-  osm: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© contributeurs OpenStreetMap' }),
+  ortho: L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/jpeg', { maxNativeZoom: 19, maxZoom: 19, attribution: '© IGN – Photographies aériennes' }),
+  esritopo: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 18, maxZoom: 19, attribution: 'Carte © Esri' }),
+  osm: L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { subdomains: 'abc', maxZoom: 20, attribution: '© contributeurs OpenStreetMap | OSM France' }),
   sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 18, maxZoom: 19, attribution: 'Imagerie © Esri' })
 };
 /* ---------- Fonds de carte personnels (adresse de tuiles {z}/{x}/{y}) ---------- */
@@ -2686,9 +2695,30 @@ function cleanEnds(pts) {
   return p;
 }
 let routeWarned = 0;
+const orsKey = () => { try { return (localStorage.getItem('rbgen.orsKey') || '').trim(); } catch (_) { return ''; } };
+function orsDialog() {
+  const m = openModal('🔑 Clé OpenRouteService', `<p style="margin:0 0 8px">Pour utiliser les profils <b>rando, VTT, vélo de route et marche</b> (comme les profils premium de VisuGPX), colle ici ta clé gratuite OpenRouteService.</p>
+    <ol style="margin:0 0 8px 18px;padding:0"><li>Crée un compte gratuit sur <b>openrouteservice.org</b> (« Sign up »).</li><li>Menu « Dashboard » › « Request a token » › type « Free ».</li><li>Copie la clé et colle-la ci-dessous.</li></ol>
+    <input id="orsK" type="password" placeholder="Clé OpenRouteService" value="${esc(orsKey())}" style="width:100%;box-sizing:border-box;padding:8px">
+    <div class="help" style="margin-top:6px">La clé reste uniquement dans ce navigateur (jamais dans le GPX ni le projet). Quota gratuit : environ 2 000 itinéraires par jour.</div>`,
+    [{ label: 'Effacer la clé', onClick: () => { try { localStorage.removeItem('rbgen.orsKey'); } catch (_) {} toast('Clé effacée.', 'ok'); } }, 'sp', { label: 'Annuler' },
+     { label: 'Enregistrer', cls: 'primary', onClick: mm => { const v = mm.querySelector('#orsK').value.trim(); try { localStorage.setItem('rbgen.orsKey', v); } catch (_) {} toast(v ? 'Clé enregistrée.' : 'Clé effacée.', 'ok'); } }]);
+}
 async function routeSeg(a, b, mode) {
   if (mode === 'trace') mode = S.routeMode;      // tronçon d'une trace chargée dont un point a bougé : on suit le mode « Tracé » du menu
   if (!mode || mode === 'line') return [a.slice(0, 2), b.slice(0, 2)];
+  if (/^ors:/.test(mode)) {
+    const key = orsKey();
+    if (!key) { if (Date.now() - routeWarned > 8000) { routeWarned = Date.now(); toast('Clé OpenRouteService manquante (bouton 🔑 à côté du menu « Tracé ») : calcul avec BRouter.', 'err'); } mode = 'trekking'; }
+    else {
+      try {
+        const j = await fetchJSON(`https://api.openrouteservice.org/v2/directions/${mode.slice(4)}/geojson`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: key },
+          body: JSON.stringify({ coordinates: [[a[1], a[0]], [b[1], b[0]]], radiuses: [1000, 1000] }) }, 25000);
+        const c = j.features[0].geometry.coordinates;
+        if (c.length >= 2) return cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]);
+      } catch (e) { if (Date.now() - routeWarned > 8000) { routeWarned = Date.now(); toast('OpenRouteService : ' + (e.status === 401 || e.status === 403 ? 'clé refusée' : e.status === 429 ? 'quota du jour atteint' : 'indisponible') + ' : calcul avec BRouter.', 'err'); } mode = 'trekking'; }
+    }
+  }
   try {
     const url = `https://brouter.de/brouter?lonlats=${a[1].toFixed(6)},${a[0].toFixed(6)}|${b[1].toFixed(6)},${b[0].toFixed(6)}&profile=${encodeURIComponent(mode)}&alternativeidx=0&format=geojson`;
     const j = await fetchJSON(url, null, 25000);
@@ -5716,7 +5746,8 @@ $('#bSnap').onclick = snapDialog;
 $('#bRedo').onclick = redo;
 $('#bFree').onclick = () => setTool('free');
 $('#bErase').onclick = () => setTool('erase');
-$('#routeMode').onchange = e => { S.routeMode = e.target.value; save(); };
+$('#routeMode').onchange = e => { S.routeMode = e.target.value; save(); if (/^ors:/.test(S.routeMode) && !orsKey()) orsDialog(); };
+$('#orsBtn').onclick = orsDialog;
 $('#bGen').onclick = generate;
 $('#bExport').onclick = exportGPX;
 $('#bPrint').onclick = printRB;
