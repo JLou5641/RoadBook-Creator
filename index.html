@@ -952,6 +952,9 @@ body.dragNote .leaflet-tooltip{display:none}
 .tulbar button.on{background:#e4572e;border-color:#b53d1c;color:#fff}
 .tulbar button:disabled{opacity:.4;cursor:default}
 .tulbar .tsep{flex:1}
+#tulBarR{flex-direction:column;align-items:flex-start;gap:6px}
+.tulbar .trow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tulbar .trow b{min-width:54px}
 #tulHost{position:relative;width:100%;max-width:440px;margin:0 auto;border:2px solid #000;line-height:0;user-select:none}
 #tulBg svg{width:100%;height:auto;display:block}
 #tulOv{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
@@ -988,7 +991,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version du 05/11 18h11</div>
+          <div class="ver">Version du 05/11 18h21</div>
         </div>
       </div>
     </div>
@@ -2289,6 +2292,7 @@ function tulipEditor(n, keep) {
     R.splice(best.i + 1, 0, { p: [Math.round((a[0] + (b[0] - a[0]) * u) * 10) / 10, Math.round((a[1] + (b[1] - a[1]) * u) * 10) / 10], c: R[best.i + 1].c });
     d.sp = best.i + 1; return true;
   };
+  if (!keep && d.reset === undefined && ensureSplit()) d.reset = true;               // trait-point coché par défaut à l'ouverture (décochable)
   const entryT = () => (spOk() ? d.route[d.sp] : d.route[1] || d.route[0] || {}).c, exitT = () => (spOk() ? d.route[d.sp + 1] : d.route[d.route.length - 1] || {}).c;
   const setSide = (side, t) => { if (!ensureSplit()) return; d.route.forEach((q, k) => { if (side === 'e' ? k <= d.sp : k > d.sp) q.c = t; }); };
   const pathD = pts => 'M' + pts.map(p => { const q = toS(p); return f1(q[0]) + ' ' + f1(q[1]); }).join('L');
@@ -2300,10 +2304,10 @@ function tulipEditor(n, keep) {
       <button type="button" id="tulDelPt">Retirer le point</button><button type="button" id="tulDelLn">🗑 Supprimer le trait</button><button type="button" id="tulNew">＋ Nouveau trait</button>
     </div>
     <div class="tulbar" id="tulBarR" style="display:none">
-      <b>Entrée</b> <button type="button" data-e="road">Route</button><button type="button" data-e="track">Piste</button><button type="button" data-e="trail">Hors piste</button>
-      <b style="margin-left:6px">Sortie</b> <button type="button" data-x="road">Route</button><button type="button" data-x="track">Piste</button><button type="button" data-x="trail">Hors piste</button>
-      <label class="chk" style="margin:0 0 0 6px"><input type="checkbox" id="tulReset"> Trait-point (remise à 0 du trip) entre les deux</label>
-      <span id="tulSide"><b>Côté</b> <button type="button" data-sd="auto">Auto</button><button type="button" data-sd="r">Droite</button><button type="button" data-sd="l">Gauche</button></span>
+      <div class="trow"><b>Entrée</b><button type="button" data-e="road">Route</button><button type="button" data-e="track">Piste</button><button type="button" data-e="trail">Hors piste</button></div>
+      <div class="trow"><b>Sortie</b><button type="button" data-x="road">Route</button><button type="button" data-x="track">Piste</button><button type="button" data-x="trail">Hors piste</button></div>
+      <div class="trow"><label class="chk" style="margin:0"><input type="checkbox" id="tulReset"> Trait-point (remise à 0 du trip) entre les deux</label></div>
+      <div class="trow" id="tulSide"><b>Côté</b><button type="button" data-sd="auto">Auto</button><button type="button" data-sd="r">Droite</button><button type="button" data-sd="l">Gauche</button></div>
     </div>
     <div id="tulHost"><div id="tulBg"></div><svg id="tulOv" viewBox="0 0 100 100"></svg></div>
     <div class="help" id="tulHint" style="margin-top:6px"></div>`,
@@ -4170,9 +4174,11 @@ function resetMark(t, sc, oth) {
   const c = sc(R[t.sp].p), a = sc(R[t.sp - 1].p), b = sc(R[t.sp + 1].p);
   const nrm = v => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
   const u1 = nrm([a[0] - c[0], a[1] - c[1]]), u2 = nrm([b[0] - c[0], b[1] - c[1]]);
-  const fw = nrm([u2[0] - u1[0], u2[1] - u1[1]]);                                  // sens de marche à cet endroit
-  const rot = th => [fw[0] * Math.cos(th) - fw[1] * Math.sin(th), fw[0] * Math.sin(th) + fw[1] * Math.cos(th)];
-  const LEN = 9, A = 135 * Math.PI / 180, vr = rot(A), vl = rot(-A);
+  const fw = nrm([-u1[0], -u1[1]]);                                                 // sens de marche à l'ENTRÉE de la tulipe (l'entrée est verticale)
+  const rn = [-fw[1], fw[0]];                                                       // « droite » de la marche à l'écran
+  const rot = th => [u1[0] * Math.cos(th) - u1[1] * Math.sin(th), u1[0] * Math.sin(th) + u1[1] * Math.cos(th)];
+  const LEN = 9, A = 45 * Math.PI / 180, c1 = rot(A), c2 = rot(-A);                 // le trait-point est à 45° de la ligne d'entrée, à droite ou à gauche
+  const dr = v => v[0] * rn[0] + v[1] * rn[1], vr = dr(c1) >= dr(c2) ? c1 : c2, vl = vr === c1 ? c2 : c1;
   const tip = v => [c[0] + v[0] * LEN, c[1] + v[1] * LEN];
   const free = v => {                                                              // distance du bout du trait au tracé le plus proche
     const e = tip(v), mid = [c[0] + v[0] * LEN / 2, c[1] + v[1] * LEN / 2]; let d = Infinity;
