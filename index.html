@@ -890,6 +890,12 @@ main{flex:1;display:flex;min-height:0}
 .leaflet-container.erasing{cursor:not-allowed}
 .leaflet-container.cutting{cursor:crosshair}
 .leaflet-container.freedraw .cpt,.leaflet-container.erasing .cpt,.leaflet-container.cutting .cpt{pointer-events:none}
+
+.cpt.locked{filter:grayscale(1);opacity:.55}
+.stflag span{display:block;background:#2b6cb0;color:#fff;font:700 11px/20px system-ui,sans-serif;text-align:center;border-radius:10px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.mkpin span{display:block;width:26px;height:26px;line-height:24px;text-align:center;font-size:16px;background:#fff;border:2px solid #1b1a17;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.mkpin.cand span{border-style:dashed;border-color:#888}
+.stTab{width:100%;border-collapse:collapse}.stTab th{font-size:11px;color:#8a8478;text-align:left}.stTab td{padding:3px 6px 3px 0}
 </style>
 </head>
 <body>
@@ -910,12 +916,14 @@ main{flex:1;display:flex;min-height:0}
         <button class="btn" id="bMore" title="Plus">⋯</button>
         <div class="dropdown" id="moreMenu">
           <button data-act="settings">⚙️ Réglages de génération</button>
+          <button data-act="stages">🏁 Étapes (distance, dénivelé, verrouillage)</button>
+          <button data-act="marks">📍 Marqueurs (refuges, eau, repères)</button>
           <button data-act="saveProject">🗂️ Enregistrer le projet (.json)</button>
           <button data-act="saveOsm">💾 Enregistrer les chemins OSM (dossier au choix)</button>
           <button data-act="loadOsm">📥 Charger des chemins OSM</button>
           <button data-act="new">🆕 Nouveau roadbook</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version du 05/11 07h45</div>
+          <div class="ver">Version du 05/11 07h57</div>
         </div>
       </div>
     </div>
@@ -1844,9 +1852,9 @@ function simplifyDP(pts, tol) {         // Douglas-Peucker, renvoie les indices 
 /* ============================================================
    2. État & sauvegarde
    ============================================================ */
-const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, lmOff: [], followLvl: 3, bends: true, offroad: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true };
+const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, lmOff: [], followLvl: 3, bends: true, offroad: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true, marksExport: true };
 const S = {
-  name: 'Mon roadbook', desc: '', src: '', ll: [], mm: null, ctrl: [], segs: [], notes: [], settings: { ...DEF_SETTINGS },
+  name: 'Mon roadbook', desc: '', src: '', ll: [], mm: null, ctrl: [], segs: [], notes: [], settings: { ...DEF_SETTINGS }, stages: [], marks: [], ele: null,
   stale: false, routeMode: 'trekking', nextId: 1, sel: null
 };
 let T = null;    // parcours dérivé : {xy, cum, L, grid}
@@ -1856,7 +1864,7 @@ let saveTimer = null, saveWarned = false;
 
 function snapshot() {
   return { v: 2, name: S.name, desc: S.desc, src: S.src, ll: S.ll, mm: S.mm, ctrl: S.ctrl, segs: S.segs, notes: S.notes, settings: S.settings,
-    stale: S.stale, routeMode: S.routeMode, nextId: S.nextId };
+    stale: S.stale, routeMode: S.routeMode, nextId: S.nextId, stages: S.stages, marks: S.marks, ele: S.ele };
 }
 function save() {
   clearTimeout(saveTimer);
@@ -1871,6 +1879,7 @@ function restore(o) {
   if ((o.settings || {}).sv !== DEF_SETTINGS.sv) S.settings = { ...S.settings, sv: DEF_SETTINGS.sv, tol: DEF_SETTINGS.tol, water: true, bld: true };
   S.routeMode = o.routeMode || 'trekking'; S.nextId = o.nextId || (Math.max(0, ...S.notes.map(n => n.id)) + 1); S.sel = null;
   for (let i = 1; i < S.ctrl.length; i++) if (S.segs[i - 1]) routeCache.set(segKey(S.ctrl[i - 1], S.ctrl[i], S.ctrl[i][2]), S.segs[i - 1]);
+  S.stages = o.stages || []; S.marks = o.marks || []; S.ele = o.ele || null; renderMarks();
   G = null;
   S.mm = o.mm || null;
   setTrack(o.ll || [], true, true);
@@ -1978,7 +1987,10 @@ function parseGPX(txt) {
   const ll = pts.map(e => [parseFloat(e.getAttribute('lat')), parseFloat(e.getAttribute('lon'))]).filter(p => isFinite(p[0]) && isFinite(p[1]));
   const md = get(doc, 'metadata')[0], trk = get(doc, 'trk')[0] || get(doc, 'rte')[0];
   const nm = (md && md.getElementsByTagNameNS('*', 'name')[0]) || (trk && trk.getElementsByTagNameNS('*', 'name')[0]);
-  return { ll, name: nm ? nm.textContent.trim() : '', wpts: get(doc, 'wpt').length };
+  const mkT = (el, tag, i) => { const n1 = el.getElementsByTagNameNS('*', 'name')[0]; return { name: n1 ? n1.textContent.trim() : 'Trace ' + (i + 1), ll: get(el, tag).map(e => [parseFloat(e.getAttribute('lat')), parseFloat(e.getAttribute('lon'))]).filter(p => isFinite(p[0]) && isFinite(p[1])) }; };
+  let trks = get(doc, 'trk').map((e, i) => mkT(e, 'trkpt', i)).filter(t => t.ll.length > 1);
+  if (!trks.length) trks = get(doc, 'rte').map((e, i) => mkT(e, 'rtept', i)).filter(t => t.ll.length > 1);
+  return { ll, name: nm ? nm.textContent.trim() : '', wpts: get(doc, 'wpt').length, trks };
 }
 
 /* ============================================================
@@ -2068,6 +2080,7 @@ const hit = L.polyline([], { weight: 22, opacity: 0, bubblingMouseEvents: false 
 const radLayer = L.layerGroup().addTo(map);       // cercles d'ouverture / validation des waypoints (sous les marqueurs)
 const noteLayer = L.layerGroup().addTo(map);
 const ctrlLayer = L.layerGroup().addTo(map);
+const stageLayer = L.layerGroup().addTo(map), lockLayer = L.layerGroup().addTo(map), markLayer = L.layerGroup().addTo(map), candLayer = L.layerGroup().addTo(map);
 const markers = new Map();
 
 function renderTrack(fit) {
@@ -2118,16 +2131,17 @@ function renderMarkers() {
 function refreshMarkerIcons() { S.notes.forEach((n, i) => { const m = markers.get(n.id); if (m) m.setIcon(noteIcon(n, i)); }); renderRadii(); }
 
 hit.on('click', e => {
+  if (pickClick(e.latlng)) return;
   if (drawing) {
     if (tool === 'cut') cutAt(e.latlng);
     else if (!justDragged && !stroke && tool !== 'erase' && !freeOn()) addCtrl([e.latlng.lat, e.latlng.lng]);
   } else addManualNote(e.latlng);
 });
-map.on('click', e => { if (drawing && !justDragged && !stroke && tool !== 'erase' && tool !== 'cut' && !freeOn()) addCtrl([e.latlng.lat, e.latlng.lng]); });
+map.on('click', e => { if (pickClick(e.latlng)) return; if (drawing && !justDragged && !stroke && tool !== 'erase' && tool !== 'cut' && !freeOn()) addCtrl([e.latlng.lat, e.latlng.lng]); });
 hit.on('mousedown', e => {
   if (!drawing || tool === 'cut') return;
   if (strokeStart(e.containerPoint, e.latlng)) return;
-  if (S.ctrl.length >= 2) { const i = nearestSeg(e.latlng); if (i > 0) { pendingIns = { i, p0: e.containerPoint }; map.dragging.disable(); } }
+  if (S.ctrl.length >= 2) { const i = nearestSeg(e.latlng); if (i > 0) { const ls = lockedSet(); if (ls && ls.has(i) && ls.has(i - 1)) { toast('Étape verrouillée 🔒', 'err'); return; } pendingIns = { i, p0: e.containerPoint }; map.dragging.disable(); } }
 });
 map.on('mousedown', e => { if (drawing) strokeStart(e.containerPoint, e.latlng); });
 map.on('mousemove', e => { if (drawing) strokeMove(e.containerPoint, e.latlng); });
@@ -2176,12 +2190,14 @@ function redo() { if (!hist.redo.length) return; hist.undo.push(snap()); S.ctrl 
 function renderCtrl() {
   ctrlLayer.clearLayers();
   if (!drawing) return;
+  const ls = lockedSet();
   S.ctrl.forEach((c, i) => {
-    const m = L.marker([c[0], c[1]], { draggable: true, keyboard: false, icon: L.divIcon({ className: 'cpt' + (i === 0 ? ' first' : ''), iconSize: [16, 16] }) });
+    const lk = !!(ls && ls.has(i));
+    const m = L.marker([c[0], c[1]], { draggable: !lk, keyboard: false, icon: L.divIcon({ className: 'cpt' + (i === 0 ? ' first' : '') + (lk ? ' locked' : ''), iconSize: [16, 16] }) });
     let pre = null;
     m.on('dragstart', () => { pre = snap(); });
     m.on('dragend', () => { const p = m.getLatLng(); pushHist(pre); S.ctrl[i] = [p.lat, p.lng, S.ctrl[i][2]]; reroute(); });
-    m.on('click', () => { pushHist(); S.ctrl.splice(i, 1); if (i === 0 && S.ctrl.length) S.ctrl[0][2] = null; renderCtrl(); reroute(); });
+    m.on('click', () => { if (lk) { toast('Étape verrouillée 🔒', 'err'); return; } pushHist(); S.ctrl.splice(i, 1); if (i === 0 && S.ctrl.length) S.ctrl[0][2] = null; renderCtrl(); reroute(); });
     m.addTo(ctrlLayer);
   });
   updHist();
@@ -2247,10 +2263,10 @@ function strokeEnd() {
   renderCtrl(); reroute();
 }
 function eraseAt(cp) {
-  let changed = false;
-  for (let i = S.ctrl.length - 1; i >= 0; i--) if (lenPx(map.latLngToContainerPoint(S.ctrl[i]), cp) <= 14) { S.ctrl.splice(i, 1); changed = true; }
+  let changed = false; const ls = lockedSet();
+  for (let i = S.ctrl.length - 1; i >= 0; i--) if (!(ls && ls.has(i)) && lenPx(map.latLngToContainerPoint(S.ctrl[i]), cp) <= 14) { S.ctrl.splice(i, 1); changed = true; }
   if (!changed) for (let i = 1; i < S.ctrl.length && !changed; i++) {      // survol d'un tronçon : on retire son point d'arrivée
-    const sg = S.segs[i - 1]; if (!sg || sg.length < 2) continue;
+    const sg = S.segs[i - 1]; if (!sg || sg.length < 2 || (ls && ls.has(i))) continue;
     for (let k = 1; k < sg.length; k++) {
       const p = map.latLngToContainerPoint(sg[k - 1]), q = map.latLngToContainerPoint(sg[k]);
       if (segProj([cp.x, cp.y], [p.x, p.y], [q.x, q.y]).d <= 9) { S.ctrl.splice(i, 1); changed = true; break; }
@@ -4014,6 +4030,7 @@ function symsHTML(syms, close) {  // taille et place calculées pour ne jamais t
 const ARROW_SVG = '<svg class="arr" viewBox="0 0 20 100" preserveAspectRatio="none"><path d="M10 0V76" stroke="#000" stroke-width="5"/><path d="M1 72L10 100L19 72Z" fill="#000"/></svg>';
 
 function renderInfo() {
+  renderStages();
   $('#sumKm').textContent = (T ? kmFr(T.L) : '0,00') + ' km';
   const n = S.notes.length;
   $('#sumNotes').textContent = n + (n > 1 ? ' notes' : ' note');
@@ -4560,6 +4577,10 @@ async function buildGPX(onProg) {
     if (n.fuel) ex.push('<openrally:fuel/>');
     o.push(`  <wpt lat="${n.lat.toFixed(6)}" lon="${n.lon.toFixed(6)}">\n    <name>${i + 1}</name>\n    <desc>${xmlEsc((n.text || '').replace(/\n/g, ' / '))}</desc>\n    <extensions>\n      ${ex.join('\n      ')}\n    </extensions>\n  </wpt>`);
   }
+  if (S.settings.marksExport !== false) for (const m of S.marks || []) {
+    const ic = MARK_ICONS.find(x => x[0] === m.icon) || MARK_ICONS[MARK_ICONS.length - 1];
+    o.push(`  <wpt lat="${m.lat.toFixed(6)}" lon="${m.lon.toFixed(6)}">\n    <name>${xmlEsc(m.name || ic[2])}</name>${(m.desc || '').trim() ? `\n    <desc>${xmlEsc(m.desc.trim())}</desc>` : ''}\n    <sym>${xmlEsc(ic[2])}</sym>\n    <type>Marqueur</type>\n  </wpt>`);
+  }
   o.push(`  <trk>\n    <name>${xmlEsc(S.name)}</name>\n    <trkseg>`);
   for (const p of (S.mm && S.mm.length > 1 ? S.mm : S.ll)) o.push(`      <trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}"/>`);
   o.push('    </trkseg>\n  </trk>\n</gpx>\n');
@@ -4719,7 +4740,9 @@ async function loadFile(file) {
     }
     const g = parseGPX(txt);
     if (g.ll.length < 2) throw new Error(g.wpts ? 'Ce GPX ne contient que des waypoints, pas de trace (trk). Utilise un GPX avec la trace du parcours, ou dessine-le.' : 'Aucune trace trouvée dans ce fichier.');
+    if (g.trks.length > 1) { const pk = await pickTrack(g); if (!pk) return; g.ll = pk.ll; if (pk.name) g.name = pk.name; }
     if (drawing) setDrawing(false);
+    S.stages = []; S.ele = null; S.marks = []; renderMarks();
     S.src = 'gpx'; S.ctrl = []; S.segs = []; S.notes = []; S.stale = false; S.sel = null;
     S.name = g.name || file.name.replace(/\.gpx$/i, ''); $('#rbName').value = S.name;
     setTrack(g.ll, true); renderAll(); renderTrack(true);
@@ -4796,6 +4819,7 @@ $('#bDrawEnd').onclick = () => setDrawing(false);
 /* ---- étape 2 : couper / rogner / départ, inverser, fusionner, réduire les points, coller à la route ---- */
 const gapM = (p, q) => haversine([p[0], p[1]], [q[0], q[1]]);
 function cutAt(ll) {
+  if (anyLock()) { toast('Une étape est verrouillée 🔒 : déverrouille-la (menu ⋯ › Étapes) pour utiliser cet outil.', 'err'); return; }
   if (S.ctrl.length < 2) return;
   const i = nearestSeg(ll); if (i < 1) return;
   const sg = S.segs[i - 1] || [S.ctrl[i - 1].slice(0, 2), S.ctrl[i].slice(0, 2)], cp = map.latLngToContainerPoint(ll);
@@ -4814,15 +4838,18 @@ function cutAt(ll) {
   openModal('Couper ici', `Que veux-tu faire à cet endroit de la trace ?${isLoop ? '' : '<br><span style="color:#8a8478">« Départ ici » n’est proposé que pour une boucle (début et fin à moins de 150 m).</span>'}`, btns);
 }
 function reverseCtrl() {
+  if (anyLock()) { toast('Une étape est verrouillée 🔒 : déverrouille-la (menu ⋯ › Étapes) pour utiliser cet outil.', 'err'); return; }
   if (S.ctrl.length < 2) return;
   pushHist(); const o = S.ctrl;
   S.ctrl = o.slice().reverse().map((c, j) => [c[0], c[1], j ? o[o.length - j][2] : null]);
   renderCtrl(); reroute(); toast('Sens du parcours inversé.', 'ok');
 }
 async function mergeFile(file) {
+  if (anyLock()) { toast('Une étape est verrouillée 🔒 : déverrouille-la (menu ⋯ › Étapes) pour utiliser cet outil.', 'err'); return; }
   try {
     const g = parseGPX(await readFileText(file));
     if (g.ll.length < 2) throw new Error('Aucune trace trouvée dans ce fichier.');
+    if (g.trks.length > 1) { const pk = await pickTrack(g); if (!pk) return; g.ll = pk.ll; }
     const add = llToCtrl(g.ll, 3, 500), o = S.ctrl;
     if (!o.length) { pushHist(); S.ctrl = add; S.src = 'draw'; renderCtrl(); reroute(); return; }
     const cF = o[0], cL = o[o.length - 1], A = add[0], Z = add[add.length - 1];
@@ -4840,6 +4867,7 @@ async function mergeFile(file) {
 let redLayer = null;
 const clearRed = () => { if (redLayer) { map.removeLayer(redLayer); redLayer = null; } };
 function reduceDialog() {
+  if (anyLock()) { toast('Une étape est verrouillée 🔒 : déverrouille-la (menu ⋯ › Étapes) pour utiliser cet outil.', 'err'); return; }
   if (S.ll.length < 3) return;
   const n0 = S.ll.length;
   const show = tol => { const idx = simplifyLL(S.ll, tol, 0); if (redLayer) redLayer.setLatLngs(idx.map(k => S.ll[k])); else redLayer = L.polyline(idx.map(k => S.ll[k]), { color: '#d6001c', weight: 3, opacity: 0.95, interactive: false }).addTo(map); return idx; };
@@ -4852,11 +4880,169 @@ function reduceDialog() {
   m.querySelector('#redTol').oninput = upd; upd();
 }
 function snapDialog() {
+  if (anyLock()) { toast('Une étape est verrouillée 🔒 : déverrouille-la (menu ⋯ › Étapes) pour utiliser cet outil.', 'err'); return; }
   if (S.ctrl.length < 2 && S.ll.length < 2) return;
   if (S.routeMode === 'line') { toast('Choisis d’abord un mode « Tracé » qui suit les chemins (Suivre pistes & chemins…).', 'err'); return; }
   const idx = simplifyLL(S.ll, 20, 60), name = ($('#routeMode').selectedOptions[0] || {}).textContent || S.routeMode;
   openModal('Coller à la route', `La trace est résumée en <b>${idx.length} points</b> puis recalculée sur les chemins avec le mode « ${esc(name)} ». Les tronçons sont recalculés un par un (internet nécessaire).`, ['sp', { label: 'Annuler' }, { label: 'Coller', cls: 'primary', onClick: () => {
     pushHist(); S.ctrl = idx.map((k, j) => [S.ll[k][0], S.ll[k][1], j ? S.routeMode : null]); S.src = 'draw'; renderCtrl(); reroute(); } }]);
+}
+/* ---- étape 3 : étapes, GPX multi-traces, marqueurs ---- */
+const MARK_ICONS = [['refuge', '🏠', 'Refuge'], ['water', '💧', 'Eau'], ['fuel', '⛽', 'Carburant'], ['food', '🍴', 'Repas'], ['bed', '⛺', 'Bivouac'],
+  ['danger', '⚠️', 'Danger'], ['photo', '📷', 'Photo'], ['parking', '🅿️', 'Parking'], ['view', '⛰️', 'Point de vue'], ['pin', '📍', 'Repère']];
+const anyLock = () => (S.stages || []).some(g => g.lock);
+let stagePick = false, markPick = false;
+function pickClick(latlng) {
+  if (stagePick) { stagePick = false; if (!drawing) addStage(latlng); stagesDialog(); return true; }
+  if (markPick) { markPick = false; markForm({ lat: latlng.lat, lon: latlng.lng, icon: 'pin' }, true); return true; }
+  return false;
+}
+function stageList() {      // étapes dans l'ordre du parcours : {s0, s1, lock, i (indice dans S.stages)}
+  if (!T) return [];
+  if (!S.stages || !S.stages.length) return [{ s0: 0, s1: T.L, lock: false, i: 0 }];
+  const st = [];
+  S.stages.forEach((b, i) => {
+    let s = 0;
+    if (i) { const pr = projAll(fwd(b.lat, b.lon), 60); if (!pr.length) return; s = pr.reduce((x, y) => y.d < x.d ? y : x).s; }
+    st.push({ s, lock: !!b.lock, i });
+  });
+  st.sort((x, y) => x.s - y.s);
+  return st.map((x, k) => ({ s0: x.s, s1: k + 1 < st.length ? st[k + 1].s : T.L, lock: x.lock, i: x.i }));
+}
+function ensureStages() { if (!S.stages.length) S.stages = [{ lock: false }]; }
+function addStage(ll) {
+  if (!T) return;
+  const pr = projAll(fwd(ll.lat, ll.lng), 80); if (!pr.length) { toast('Clique sur la trace.', 'err'); return; }
+  const s = pr.reduce((x, y) => y.d < x.d ? y : x).s, L_ = stageList();
+  if (s < 30 || s > T.L - 30 || L_.some(g => Math.abs(g.s0 - s) < 30)) { toast('Coupure trop proche d’une autre ou d’une extrémité.', 'err'); return; }
+  const cur = L_.find(g => s >= g.s0 && s < g.s1), q = inv(...pointAt(s));
+  ensureStages(); S.stages.push({ lat: +q[0].toFixed(6), lon: +q[1].toFixed(6), lock: !!(cur && cur.lock) });
+  save(); renderStages();
+}
+function stageLL(s0, s1) {
+  const out = [inv(...pointAt(s0))];
+  for (let k = 0; k < T.xy.length; k++) if (T.cum[k] > s0 && T.cum[k] < s1) out.push(inv(T.xy[k][0], T.xy[k][1]));
+  out.push(inv(...pointAt(s1))); return out;
+}
+function renderStages() {
+  stageLayer.clearLayers(); lockLayer.clearLayers();
+  if (!T) return;
+  const L_ = stageList();
+  L_.forEach((g, k) => {
+    if (g.lock) L.polyline(stageLL(g.s0, g.s1), { color: '#2b6cb0', weight: 9, opacity: 0.35, interactive: false }).addTo(lockLayer);
+    if (!k || !S.stages[g.i]) return;
+    const b = S.stages[g.i];
+    L.marker([b.lat, b.lon], { keyboard: false, icon: L.divIcon({ className: 'stflag', html: `<span>É${k + 1}</span>`, iconSize: [30, 20], iconAnchor: [15, 10] }) }).bindTooltip(`Début de l’étape ${k + 1} · ${km(g.s0)} km`).addTo(stageLayer);
+  });
+}
+function eleAt(s) { const e = S.ele, f = s / e.step, k = Math.min(e.v.length - 2, Math.max(0, Math.floor(f))); return e.v[k] + (e.v[k + 1] - e.v[k]) * (f - k); }
+function eleStats(s0, s1) {
+  const e = S.ele; if (!e || e.sig !== trackSig(S.ll) || e.v.length < 2) return null;
+  let up = 0, dn = 0, prev = eleAt(s0);
+  const seq = []; for (let k = Math.ceil(s0 / e.step); k <= Math.floor(s1 / e.step) && k < e.v.length; k++) seq.push(e.v[k]);
+  seq.push(eleAt(s1));
+  for (const z of seq) { const d = z - prev; if (d > 0) up += d; else dn -= d; prev = z; }
+  return { up, dn };
+}
+async function fetchEle() {
+  const n = Math.min(400, Math.max(2, Math.ceil(T.L / 100))), step = T.L / (n - 1), pts = [];
+  for (let k = 0; k < n; k++) pts.push(inv(...pointAt(k * step)));
+  const v = [];
+  for (let k = 0; k < n; k += 100) {
+    const part = pts.slice(k, k + 100);
+    const j = await fetchJSON('https://api.open-meteo.com/v1/elevation?latitude=' + part.map(p => p[0].toFixed(5)).join(',') + '&longitude=' + part.map(p => p[1].toFixed(5)).join(','), {}, 20000);
+    if (!j.elevation || j.elevation.length !== part.length) throw new Error('Réponse altitude inattendue.');
+    v.push(...j.elevation);
+  }
+  S.ele = { sig: trackSig(S.ll), step, v }; save();
+}
+function stageGPX(k) {
+  const g = stageList()[k]; if (!g) return;
+  const nm = `${S.name} - étape ${k + 1}`;
+  const pts = stageLL(g.s0, g.s1).map(p => `      <trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}"/>`).join('\n');
+  download(nm.replace(/[\\/:*?"<>|]+/g, '_') + '.gpx', `<?xml version="1.0" encoding="UTF-8"?>\n<gpx xmlns="http://www.topografix.com/GPX/1/1" creator="Generateur de Roadbook OSM" version="1.1">\n  <metadata><name>${xmlEsc(nm)}</name></metadata>\n  <trk>\n    <name>${xmlEsc(nm)}</name>\n    <trkseg>\n${pts}\n    </trkseg>\n  </trk>\n</gpx>\n`, 'application/gpx+xml');
+}
+function stagesDialog() {
+  if (!T) { toast('Charge ou dessine d’abord une trace.', 'err'); return; }
+  const L_ = stageList(), hasEle = !!(S.ele && S.ele.sig === trackSig(S.ll));
+  const rows = L_.map((g, k) => { const e = hasEle ? eleStats(g.s0, g.s1) : null; return `<tr><td><b>${k + 1}</b></td><td>${kmFr(g.s1 - g.s0)} km</td><td>${e ? '+' + Math.round(e.up) + ' / −' + Math.round(e.dn) + ' m' : '—'}</td>
+    <td><label title="Verrouiller : les points de cette étape ne peuvent plus être modifiés en mode dessin"><input type="checkbox" class="stLock" data-i="${g.i}" ${g.lock ? 'checked' : ''}> 🔒</label></td>
+    <td><button class="mbtn stGpx" data-k="${k}" title="Exporter cette étape en GPX">GPX</button>${g.i ? ` <button class="mbtn stDel" data-i="${g.i}" title="Supprimer cette coupure (fusionne avec l’étape précédente)">✖</button>` : ''}</td></tr>`; }).join('');
+  const m = openModal('Étapes', `<table class="stTab"><tr><th>N°</th><th>Distance</th><th>Dénivelé</th><th></th><th></th></tr>${rows}</table>
+    <div style="margin-top:8px;color:#8a8478;font-size:12px">Total : ${kmFr(T.L)} km${hasEle ? '' : ' · le dénivelé se calcule avec « Calculer le dénivelé » (internet nécessaire)'}.</div>`,
+    ['sp', { label: 'Ajouter une coupure', onClick: () => { stagePick = true; toast('Clique sur la trace pour poser le début d’une étape.', 'ok'); } },
+      ...(hasEle ? [] : [{ label: 'Calculer le dénivelé', onClick: async () => { toast('Calcul du dénivelé…'); try { await fetchEle(); } catch (e) { toast('Altitude indisponible : ' + (e.message || e), 'err'); return; } stagesDialog(); } }]),
+      { label: 'Fermer', cls: 'primary' }]);
+  m.querySelectorAll('.stLock').forEach(el => el.onchange = () => { ensureStages(); S.stages[+el.dataset.i].lock = el.checked; save(); renderStages(); if (drawing) renderCtrl(); });
+  m.querySelectorAll('.stGpx').forEach(el => el.onclick = () => stageGPX(+el.dataset.k));
+  m.querySelectorAll('.stDel').forEach(el => el.onclick = () => { S.stages.splice(+el.dataset.i, 1); save(); stagesDialog(); });
+}
+// --- GPX contenant plusieurs traces : on choisit laquelle charger
+function pickTrack(g) {
+  return new Promise(res => {
+    const len = ll => { let d = 0; for (let i = 1; i < ll.length; i++) d += haversine(ll[i - 1], ll[i]); return d; };
+    const body = `Ce fichier contient ${g.trks.length} traces. Laquelle veux-tu charger ?<div style="max-height:45vh;overflow:auto;margin-top:8px">${g.trks.map((t, i) => `<button class="mbtn trkPick" data-i="${i}" style="display:block;width:100%;text-align:left;margin:3px 0">${esc(t.name)} · ${kmFr(len(t.ll))} km</button>`).join('')}</div>`;
+    const m = openModal('Plusieurs traces', body, ['sp', { label: 'Annuler', onClick: () => res(null) }, { label: 'Toutes à la suite', onClick: () => res({ ll: g.ll, name: '' }) }], { onCancel: () => res(null) });
+    m.querySelectorAll('.trkPick').forEach(el => el.onclick = () => { const t = g.trks[+el.dataset.i]; modalOpts = null; closeModal(); res({ ll: t.ll, name: t.name }); });
+  });
+}
+// --- marqueurs
+const markIcon = k => (MARK_ICONS.find(x => x[0] === k) || MARK_ICONS[MARK_ICONS.length - 1]);
+function renderMarks() {
+  markLayer.clearLayers();
+  for (const mk of S.marks || []) {
+    const ic = markIcon(mk.icon);
+    L.marker([mk.lat, mk.lon], { keyboard: false, icon: L.divIcon({ className: 'mkpin', html: `<span>${ic[1]}</span>`, iconSize: [26, 26], iconAnchor: [13, 13] }) })
+      .bindTooltip(`<b>${esc(mk.name || ic[2])}</b>${mk.desc ? '<br>' + esc(mk.desc).replace(/\n/g, '<br>') : ''}`).on('click', () => markForm(mk, false)).addTo(markLayer);
+  }
+}
+function markForm(mk, isNew, cand) {
+  const opts = MARK_ICONS.map(x => `<option value="${x[0]}" ${x[0] === mk.icon ? 'selected' : ''}>${x[1]} ${x[2]}</option>`).join('');
+  const m = openModal(isNew ? 'Nouveau marqueur' : 'Marqueur', `<label>Icône <select id="mkIcon">${opts}</select></label>
+    <label style="display:block;margin-top:8px">Nom <input id="mkName" type="text" value="${esc(mk.name || '')}" style="width:100%"></label>
+    <label style="display:block;margin-top:8px">Description <textarea id="mkDesc" rows="3" style="width:100%">${esc(mk.desc || '')}</textarea></label>`,
+    [...(isNew ? [] : [{ label: 'Supprimer', onClick: () => { S.marks = S.marks.filter(x => x !== mk); renderMarks(); save(); } }]), 'sp', { label: 'Annuler' },
+      { label: 'Enregistrer', cls: 'primary', onClick: () => {
+        mk.icon = m.querySelector('#mkIcon').value; mk.name = m.querySelector('#mkName').value.trim(); mk.desc = m.querySelector('#mkDesc').value.trim();
+        if (isNew) { mk.id = Date.now(); S.marks.push(mk); if (cand) candLayer.removeLayer(cand); }
+        renderMarks(); save(); marksDialog(); } }]);
+}
+async function searchOSMmarks() {
+  if (map.getZoom() < 11) { toast('Zoome davantage (la zone visible est trop grande).', 'err'); return; }
+  const b = map.getBounds(), bb = `${b.getSouth().toFixed(5)},${b.getWest().toFixed(5)},${b.getNorth().toFixed(5)},${b.getEast().toFixed(5)}`;
+  const q = `[out:json][timeout:25];(node["amenity"="drinking_water"](${bb});node["natural"="spring"](${bb});node["tourism"="alpine_hut"](${bb});node["tourism"="wilderness_hut"](${bb});node["amenity"="shelter"](${bb});node["amenity"="fuel"](${bb}););out body 150;`;
+  toast('Recherche sur OpenStreetMap…');
+  try {
+    const j = await overpass(q, () => false, 0);
+    candLayer.clearLayers(); let n = 0;
+    for (const e of j.elements || []) {
+      const t = e.tags || {}, k = t.amenity === 'fuel' ? 'fuel' : (t.tourism === 'alpine_hut' || t.tourism === 'wilderness_hut' || t.amenity === 'shelter') ? 'refuge' : 'water';
+      const ic = markIcon(k), nm = t.name || '';
+      const cm = L.marker([e.lat, e.lon], { keyboard: false, opacity: 0.8, icon: L.divIcon({ className: 'mkpin cand', html: `<span>${ic[1]}</span>`, iconSize: [26, 26], iconAnchor: [13, 13] }) })
+        .bindTooltip(`${esc(nm || ic[2])} (OSM) — clique pour ajouter`).on('click', () => markForm({ lat: e.lat, lon: e.lon, icon: k, name: nm, desc: t.description || '' }, true, cm)).addTo(candLayer); n++;
+    }
+    toast(n ? `${n} résultat${n > 1 ? 's' : ''} (en transparence) : clique sur un pour l’ajouter.` : 'Rien trouvé dans cette zone.', n ? 'ok' : 'err');
+  } catch (e) { toast('Recherche impossible : ' + (e.message || e), 'err'); }
+}
+function marksDialog() {
+  const rows = (S.marks || []).map((mk, i) => `<div style="display:flex;gap:8px;align-items:center;margin:3px 0"><span style="font-size:18px">${markIcon(mk.icon)[1]}</span><span style="flex:1">${esc(mk.name || markIcon(mk.icon)[2])}</span><button class="mbtn mkEd" data-i="${i}">✎</button></div>`).join('') || '<div style="color:#8a8478">Aucun marqueur pour l’instant.</div>';
+  const m = openModal('Marqueurs', `<div style="max-height:40vh;overflow:auto">${rows}</div>
+    <label style="display:block;margin-top:10px"><input type="checkbox" id="mkExp" ${S.settings.marksExport !== false ? 'checked' : ''}> Les ajouter au GPX exporté</label>`,
+    ['sp', ...(candLayer.getLayers().length ? [{ label: 'Masquer les résultats OSM', onClick: () => candLayer.clearLayers() }] : []),
+      { label: '🔎 Refuges, eau, carburant (zone visible)', onClick: searchOSMmarks }, { label: 'Ajouter sur la carte', onClick: () => { markPick = true; toast('Clique sur la carte pour placer le marqueur.', 'ok'); } }, { label: 'Fermer', cls: 'primary' }]);
+  m.querySelector('#mkExp').onchange = e => { S.settings.marksExport = e.target.checked; save(); };
+  m.querySelectorAll('.mkEd').forEach(el => el.onclick = () => { modalOpts = null; closeModal(); markForm(S.marks[+el.dataset.i], false); });
+}
+// positions des points de contrôle le long de la trace (pour le verrouillage)
+function lockedSet() {
+  if (!anyLock() || !T) return null;
+  const ls = stageList().filter(g => g.lock); if (!ls.length) return null;
+  const set = new Set(); let s = 0;
+  S.ctrl.forEach((c, i) => {
+    if (i) { const sg = S.segs[i - 1]; if (sg && sg.length > 1) for (let k = 1; k < sg.length; k++) s += haversine(sg[k - 1], sg[k]); else s += haversine(S.ctrl[i - 1], c); }
+    if (ls.some(g => s >= g.s0 - 3 && s <= g.s1 + 3)) set.add(i);
+  });
+  return set;
 }
 $('#bUndo').onclick = undo;
 $('#bCut').onclick = () => setTool('cut');
@@ -4881,12 +5067,15 @@ $('#moreMenu').addEventListener('click', e => {
   $('#moreMenu').classList.remove('open');
   const act = a.dataset.act;
   if (act === 'settings') openSettings();
+  else if (act === 'stages') stagesDialog();
+  else if (act === 'marks') marksDialog();
   else if (act === 'saveProject') saveProject();
   else if (act === 'saveOsm') saveOsm();
   else if (act === 'loadOsm') $('#fileIn').click();
   else if (act === 'help') openHelp();
   else if (act === 'new') ask('Nouveau roadbook ?', 'Le parcours et les notes en cours seront effacés (pense à exporter ou enregistrer le projet avant).', 'Tout effacer', () => {
     if (drawing) setDrawing(false);
+    S.stages = []; S.ele = null; S.marks = []; renderMarks(); candLayer.clearLayers();
     S.name = 'Mon roadbook'; S.desc = ''; S.src = ''; S.ctrl = []; S.segs = []; S.notes = []; S.stale = false; S.sel = null;
     $('#rbName').value = S.name; setTrack([], true); renderAll();
   });
@@ -4916,7 +5105,7 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
 })();
 
 // accès pour les tests automatisés
-window.__rb = { cutAt, reverseCtrl, mergeFile, reduceDialog, snapDialog, cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, notesSVG, renderAll, renderRadii, noteRadii };
+window.__rb = { stagesDialog, stageList, addStage, marksDialog, markForm, pickTrack, parseGPX, cutAt, reverseCtrl, mergeFile, reduceDialog, snapDialog, cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, notesSVG, renderAll, renderRadii, noteRadii };
 })();
 
 // Version installable (PWA) : actif seulement quand la page est servie en https (pas en fichier local)
