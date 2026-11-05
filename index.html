@@ -888,7 +888,8 @@ main{flex:1;display:flex;min-height:0}
 #drawBox button:disabled{opacity:.45;cursor:default}
 .leaflet-container.freedraw{cursor:cell}
 .leaflet-container.erasing{cursor:not-allowed}
-.leaflet-container.freedraw .cpt,.leaflet-container.erasing .cpt{pointer-events:none}
+.leaflet-container.cutting{cursor:crosshair}
+.leaflet-container.freedraw .cpt,.leaflet-container.erasing .cpt,.leaflet-container.cutting .cpt{pointer-events:none}
 </style>
 </head>
 <body>
@@ -914,7 +915,7 @@ main{flex:1;display:flex;min-height:0}
           <button data-act="loadOsm">📥 Charger des chemins OSM</button>
           <button data-act="new">🆕 Nouveau roadbook</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version du 05/11 07h33</div>
+          <div class="ver">Version du 05/11 07h45</div>
         </div>
       </div>
     </div>
@@ -955,6 +956,16 @@ main{flex:1;display:flex;min-height:0}
           <button id="bFree" title="Dessiner à main levée (ou maintenir la barre espace)">✍ Main levée</button>
           <button id="bErase" title="Effacer des points en les survolant, bouton enfoncé">🧽 Gomme</button>
           <button id="bDrawEnd">✔ Terminer</button>
+        </div>
+        <div class="row2">
+          <button id="bCut" title="Cliquer sur la trace : supprimer le début ou la fin, ou changer le point de départ d’une boucle">✂ Couper</button>
+          <button id="bRev" title="Inverser le sens du parcours">⇅ Inverser</button>
+          <button id="bMerge" title="Ajouter un autre fichier GPX à la suite (ou avant) de ce parcours">➕ Fusionner un GPX</button>
+        </div>
+        <div class="row2">
+          <button id="bReduce" title="Réduire le nombre de points de la trace">Réduire les points</button>
+          <button id="bSnap" title="Recalculer la trace pour qu’elle suive les chemins (mode « Tracé » choisi ci-dessus)">🛣 Coller à la route</button>
+          <input type="file" id="mergeIn" accept=".gpx,.xml" style="display:none">
         </div>
       </div>
       <div id="status">Charge une trace GPX ou dessine ton parcours.</div>
@@ -2107,12 +2118,14 @@ function renderMarkers() {
 function refreshMarkerIcons() { S.notes.forEach((n, i) => { const m = markers.get(n.id); if (m) m.setIcon(noteIcon(n, i)); }); renderRadii(); }
 
 hit.on('click', e => {
-  if (drawing) { if (!justDragged && !stroke && tool !== 'erase' && !freeOn()) addCtrl([e.latlng.lat, e.latlng.lng]); }
-  else addManualNote(e.latlng);
+  if (drawing) {
+    if (tool === 'cut') cutAt(e.latlng);
+    else if (!justDragged && !stroke && tool !== 'erase' && !freeOn()) addCtrl([e.latlng.lat, e.latlng.lng]);
+  } else addManualNote(e.latlng);
 });
-map.on('click', e => { if (drawing && !justDragged && !stroke && tool !== 'erase' && !freeOn()) addCtrl([e.latlng.lat, e.latlng.lng]); });
+map.on('click', e => { if (drawing && !justDragged && !stroke && tool !== 'erase' && tool !== 'cut' && !freeOn()) addCtrl([e.latlng.lat, e.latlng.lng]); });
 hit.on('mousedown', e => {
-  if (!drawing) return;
+  if (!drawing || tool === 'cut') return;
   if (strokeStart(e.containerPoint, e.latlng)) return;
   if (S.ctrl.length >= 2) { const i = nearestSeg(e.latlng); if (i > 0) { pendingIns = { i, p0: e.containerPoint }; map.dragging.disable(); } }
 });
@@ -2129,11 +2142,16 @@ let routeGen = 0, routing = 0;
 const segKey = (a, b, mode) => (mode || 'line') + '|' + a[0].toFixed(6) + ',' + a[1].toFixed(6) + '|' + b[0].toFixed(6) + ',' + b[1].toFixed(6);
 
 /* une trace GPX devient modifiable : on la résume par quelques points de contrôle (tolérance 3 m, 500 points au plus) reliés en ligne droite */
+function simplifyLL(ll, tol, maxN) {      // indices gardés (Douglas-Peucker), tolérance en mètres, tolérance relevée jusqu'à maxN points au plus
+  const k0 = Math.cos(ll[0][0] * Math.PI / 180) * 111320, xy = ll.map(p => [(p[1] - ll[0][1]) * k0, (p[0] - ll[0][0]) * 110540]);
+  let idx = simplifyDP(xy, tol);
+  while (maxN && idx.length > maxN) { tol *= 1.5; idx = simplifyDP(xy, tol); }
+  return idx;
+}
+const llToCtrl = (ll, tol, maxN, mode) => simplifyLL(ll, tol, maxN).map((k, j) => [ll[k][0], ll[k][1], j ? (mode || 'line') : null]);
 function ctrlFromTrack() {
-  const ll = S.ll, k0 = Math.cos(ll[0][0] * Math.PI / 180) * 111320, xy = ll.map(p => [(p[1] - ll[0][1]) * k0, (p[0] - ll[0][0]) * 110540]);
-  let tol = 3, idx = simplifyDP(xy, tol);
-  while (idx.length > 500) { tol *= 1.5; idx = simplifyDP(xy, tol); }
-  S.ctrl = idx.map((k, j) => [ll[k][0], ll[k][1], j ? 'line' : null]);
+  const ll = S.ll;
+  S.ctrl = llToCtrl(ll, 3, 500);
   S.segs = []; for (let i = 1; i < S.ctrl.length; i++) S.segs[i - 1] = [S.ctrl[i - 1].slice(0, 2), S.ctrl[i].slice(0, 2)];
   S.src = 'draw'; S.mm = null; rebuildFromSegs();
 }
@@ -2143,7 +2161,7 @@ function setDrawing(on) {
   $('#drawBox').classList.toggle('show', on);
   map.getContainer().classList.toggle('drawing', on);
   $('#routeMode').value = S.routeMode;
-  if (on) resetHist(); else { tool = null; spaceDown = false; $('#bFree').classList.remove('on'); $('#bErase').classList.remove('on'); }
+  if (on) resetHist(); else { tool = null; spaceDown = false; $('#bFree').classList.remove('on'); $('#bErase').classList.remove('on'); $('#bCut').classList.remove('on'); }
   setCursorCls(); renderCtrl(); renderInfo();
 }
 /* ---- historique annuler / rétablir (points de contrôle) ---- */
@@ -2189,9 +2207,9 @@ let tool = null, spaceDown = false, stroke = null, pendingIns = null, justDragge
 const freeOn = () => drawing && (tool === 'free' || spaceDown);
 function setTool(t) {
   tool = tool === t ? null : t;
-  $('#bFree').classList.toggle('on', tool === 'free'); $('#bErase').classList.toggle('on', tool === 'erase'); setCursorCls();
+  $('#bFree').classList.toggle('on', tool === 'free'); $('#bErase').classList.toggle('on', tool === 'erase'); $('#bCut').classList.toggle('on', tool === 'cut'); setCursorCls();
 }
-function setCursorCls() { const c = map.getContainer(); c.classList.toggle('freedraw', freeOn()); c.classList.toggle('erasing', drawing && tool === 'erase'); }
+function setCursorCls() { const c = map.getContainer(); c.classList.toggle('freedraw', freeOn()); c.classList.toggle('erasing', drawing && tool === 'erase'); c.classList.toggle('cutting', drawing && tool === 'cut'); }
 const lenPx = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 function strokeStart(cp, ll) {
   if (!drawing || stroke) return false;
@@ -4775,7 +4793,78 @@ $('#bDraw').onclick = () => {
   setDrawing(true);
 };
 $('#bDrawEnd').onclick = () => setDrawing(false);
+/* ---- étape 2 : couper / rogner / départ, inverser, fusionner, réduire les points, coller à la route ---- */
+const gapM = (p, q) => haversine([p[0], p[1]], [q[0], q[1]]);
+function cutAt(ll) {
+  if (S.ctrl.length < 2) return;
+  const i = nearestSeg(ll); if (i < 1) return;
+  const sg = S.segs[i - 1] || [S.ctrl[i - 1].slice(0, 2), S.ctrl[i].slice(0, 2)], cp = map.latLngToContainerPoint(ll);
+  let bq = null, bd = 1e9;      // point de la trace le plus proche du clic
+  for (let k = 1; k < sg.length; k++) {
+    const p = map.latLngToContainerPoint(sg[k - 1]), q = map.latLngToContainerPoint(sg[k]), r = segProj([cp.x, cp.y], [p.x, p.y], [q.x, q.y]);
+    if (r.d < bd) { bd = r.d; bq = map.containerPointToLatLng([r.q[0], r.q[1]]); }
+  }
+  const C = [+bq.lat.toFixed(6), +bq.lng.toFixed(6)], o = S.ctrl, n = o.length, md = o[i][2];
+  const first = o[0], last = o[n - 1], isLoop = gapM(first, last) < 150;
+  const apply = (arr) => { pushHist(); S.ctrl = arr; S.ctrl[0][2] = null; S.src = 'draw'; renderCtrl(); reroute(); };
+  const btns = ['sp', { label: 'Annuler' },
+    { label: 'Supprimer le début', onClick: () => apply([[C[0], C[1], null], ...o.slice(i)]) },
+    { label: 'Supprimer la fin', onClick: () => apply([...o.slice(0, i), [C[0], C[1], md]]) }];
+  if (isLoop) btns.push({ label: 'Départ ici (boucle)', cls: 'primary', onClick: () => apply([[C[0], C[1], null], ...o.slice(i, n - 1), ...o.slice(0, i).map((c, k) => k === 0 ? [c[0], c[1], o[1] ? o[1][2] : md] : c), [C[0], C[1], md]]) });
+  openModal('Couper ici', `Que veux-tu faire à cet endroit de la trace ?${isLoop ? '' : '<br><span style="color:#8a8478">« Départ ici » n’est proposé que pour une boucle (début et fin à moins de 150 m).</span>'}`, btns);
+}
+function reverseCtrl() {
+  if (S.ctrl.length < 2) return;
+  pushHist(); const o = S.ctrl;
+  S.ctrl = o.slice().reverse().map((c, j) => [c[0], c[1], j ? o[o.length - j][2] : null]);
+  renderCtrl(); reroute(); toast('Sens du parcours inversé.', 'ok');
+}
+async function mergeFile(file) {
+  try {
+    const g = parseGPX(await readFileText(file));
+    if (g.ll.length < 2) throw new Error('Aucune trace trouvée dans ce fichier.');
+    const add = llToCtrl(g.ll, 3, 500), o = S.ctrl;
+    if (!o.length) { pushHist(); S.ctrl = add; S.src = 'draw'; renderCtrl(); reroute(); return; }
+    const cF = o[0], cL = o[o.length - 1], A = add[0], Z = add[add.length - 1];
+    const opts = [      // [écart, fonction qui construit la nouvelle liste, texte]
+      [gapM(cL, A), () => o.concat(add.map((c, k) => k ? c : [c[0], c[1], 'line'])), 'à la suite'],
+      [gapM(cL, Z), () => o.concat(add.slice().reverse().map((c, k) => [c[0], c[1], 'line'])), 'à la suite, sens inversé'],
+      [gapM(Z, cF), () => add.concat(o.map((c, k) => k ? c : [c[0], c[1], 'line'])), 'avant'],
+      [gapM(A, cF), () => add.slice().reverse().concat(o.map((c, k) => k ? c : [c[0], c[1], 'line'])), 'avant, sens inversé']];
+    opts.sort((x, y) => x[0] - y[0]);
+    const [gap, build, txt] = opts[0];
+    pushHist(); S.ctrl = build(); S.ctrl[0][2] = null; S.src = 'draw'; renderCtrl(); reroute();
+    toast(`Fichier ajouté ${txt} (écart entre les deux parcours : ${gap < 1000 ? Math.round(gap) + ' m' : (gap / 1000).toFixed(1).replace('.', ',') + ' km'}).`, 'ok');
+  } catch (e) { openModal('Fichier non reconnu', esc(e.message || e), [{ label: 'OK', cls: 'primary' }]); }
+}
+let redLayer = null;
+const clearRed = () => { if (redLayer) { map.removeLayer(redLayer); redLayer = null; } };
+function reduceDialog() {
+  if (S.ll.length < 3) return;
+  const n0 = S.ll.length;
+  const show = tol => { const idx = simplifyLL(S.ll, tol, 0); if (redLayer) redLayer.setLatLngs(idx.map(k => S.ll[k])); else redLayer = L.polyline(idx.map(k => S.ll[k]), { color: '#d6001c', weight: 3, opacity: 0.95, interactive: false }).addTo(map); return idx; };
+  let idx = show(5);
+  const m = openModal('Réduire le nombre de points', `<div>Le tracé simplifié apparaît en <b style="color:#d6001c">rouge</b> sur la carte.</div>
+    <div style="margin:10px 0"><input type="range" id="redTol" min="0.5" max="50" step="0.5" value="5" style="width:100%"></div>
+    <div id="redTxt"></div>`, ['sp', { label: 'Annuler', onClick: clearRed }, { label: 'Appliquer', cls: 'primary', onClick: () => {
+      clearRed(); pushHist(); S.ctrl = idx.map((k, j) => [S.ll[k][0], S.ll[k][1], j ? 'line' : null]); S.src = 'draw'; renderCtrl(); reroute(); toast(`${n0} → ${idx.length} points.`, 'ok'); } }], { onCancel: clearRed });
+  const upd = () => { const t = +m.querySelector('#redTol').value; idx = show(t); m.querySelector('#redTxt').textContent = `Tolérance ${String(t).replace('.', ',')} m : ${n0} → ${idx.length} points`; };
+  m.querySelector('#redTol').oninput = upd; upd();
+}
+function snapDialog() {
+  if (S.ctrl.length < 2 && S.ll.length < 2) return;
+  if (S.routeMode === 'line') { toast('Choisis d’abord un mode « Tracé » qui suit les chemins (Suivre pistes & chemins…).', 'err'); return; }
+  const idx = simplifyLL(S.ll, 20, 60), name = ($('#routeMode').selectedOptions[0] || {}).textContent || S.routeMode;
+  openModal('Coller à la route', `La trace est résumée en <b>${idx.length} points</b> puis recalculée sur les chemins avec le mode « ${esc(name)} ». Les tronçons sont recalculés un par un (internet nécessaire).`, ['sp', { label: 'Annuler' }, { label: 'Coller', cls: 'primary', onClick: () => {
+    pushHist(); S.ctrl = idx.map((k, j) => [S.ll[k][0], S.ll[k][1], j ? S.routeMode : null]); S.src = 'draw'; renderCtrl(); reroute(); } }]);
+}
 $('#bUndo').onclick = undo;
+$('#bCut').onclick = () => setTool('cut');
+$('#bRev').onclick = reverseCtrl;
+$('#bMerge').onclick = () => $('#mergeIn').click();
+$('#mergeIn').onchange = e => { const f = e.target.files[0]; if (f) mergeFile(f); e.target.value = ''; };
+$('#bReduce').onclick = reduceDialog;
+$('#bSnap').onclick = snapDialog;
 $('#bRedo').onclick = redo;
 $('#bFree').onclick = () => setTool('free');
 $('#bErase').onclick = () => setTool('erase');
@@ -4827,7 +4916,7 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
 })();
 
 // accès pour les tests automatisés
-window.__rb = { cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, notesSVG, renderAll, renderRadii, noteRadii };
+window.__rb = { cutAt, reverseCtrl, mergeFile, reduceDialog, snapDialog, cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, notesSVG, renderAll, renderRadii, noteRadii };
 })();
 
 // Version installable (PWA) : actif seulement quand la page est servie en https (pas en fichier local)
