@@ -896,6 +896,12 @@ main{flex:1;display:flex;min-height:0}
 .mkpin span{display:block;width:26px;height:26px;line-height:24px;text-align:center;font-size:16px;background:#fff;border:2px solid #1b1a17;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.4)}
 .mkpin.cand span{border-style:dashed;border-color:#888}
 .stTab{width:100%;border-collapse:collapse}.stTab th{font-size:11px;color:#8a8478;text-align:left}.stTab td{padding:3px 6px 3px 0}
+
+#measBox{top:10px;left:56px;display:none;width:330px;max-height:88vh;overflow:auto}
+#measBox.show{display:block}
+#measBox .row2{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}
+#measBox select,#measBox button{font:inherit;font-size:13px;padding:3px 7px;border-radius:6px;border:1px solid #aaa;background:#fff}
+.measlbl span{display:block;text-align:center;font:700 12px/18px system-ui,sans-serif;background:rgba(255,255,255,.88);border-radius:4px;padding:0 3px}
 </style>
 </head>
 <body>
@@ -917,13 +923,15 @@ main{flex:1;display:flex;min-height:0}
         <div class="dropdown" id="moreMenu">
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="stages">🏁 Étapes (distance, dénivelé, verrouillage)</button>
+          <button data-act="meas">📐 Mesurer un cap / liste des virages</button>
+          <button data-act="alt">⛰️ Altitude et horaires (profil, 3D, horodatage)</button>
           <button data-act="marks">📍 Marqueurs (refuges, eau, repères)</button>
           <button data-act="saveProject">🗂️ Enregistrer le projet (.json)</button>
           <button data-act="saveOsm">💾 Enregistrer les chemins OSM (dossier au choix)</button>
           <button data-act="loadOsm">📥 Charger des chemins OSM</button>
           <button data-act="new">🆕 Nouveau roadbook</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version du 05/11 07h57</div>
+          <div class="ver">Version du 05/11 11h01</div>
         </div>
       </div>
     </div>
@@ -942,6 +950,16 @@ main{flex:1;display:flex;min-height:0}
           <option value="sat">🛰️ Satellite</option>
         </select>
         <label class="radlab" title="Cercle d’ouverture (bleu, pointillé) et cercle de validation (violet) autour de chaque waypoint"><input type="checkbox" id="radChk"> ◎ Rayons des waypoints <span class="radkey"><i class="ro"></i> ouverture <i class="rc"></i> validation</span></label>
+      </div>
+      <div class="mapbox" id="measBox">
+        <div style="display:flex;justify-content:space-between;align-items:center"><b>📐 Mesure de cap</b><button id="measX" title="Fermer">✕</button></div>
+        <div class="help" style="margin:4px 0">Clique sur la trace près d’un coude. Les caps sont mesurés depuis le nord (0° = nord, 90° = est, 180° = sud, 270° = ouest).</div>
+        <div class="row2"><label>Entrée <select id="measWi"><option>15</option><option selected>30</option><option>50</option></select> m</label>
+          <label>Sortie <select id="measWo"><option>15</option><option selected>30</option><option>50</option><option>100</option><option>150</option><option>200</option></select> m</label>
+          <label>Virages ≥ <select id="measThr"><option>20</option><option selected>30</option><option>45</option><option>60</option><option>90</option></select>°</label></div>
+        <div id="measRes"></div>
+        <div class="row2"><label><input type="checkbox" id="measNo"> seulement les virages sans note</label></div>
+        <div id="measList"></div>
       </div>
       <div class="mapbox" id="drawBox">
         <b>Mode dessin</b>
@@ -1854,7 +1872,7 @@ function simplifyDP(pts, tol) {         // Douglas-Peucker, renvoie les indices 
    ============================================================ */
 const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, lmOff: [], followLvl: 3, bends: true, offroad: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true, marksExport: true };
 const S = {
-  name: 'Mon roadbook', desc: '', src: '', ll: [], mm: null, ctrl: [], segs: [], notes: [], settings: { ...DEF_SETTINGS }, stages: [], marks: [], ele: null,
+  name: 'Mon roadbook', desc: '', src: '', ll: [], mm: null, ctrl: [], segs: [], notes: [], settings: { ...DEF_SETTINGS }, stages: [], marks: [], ele: null, timing: null,
   stale: false, routeMode: 'trekking', nextId: 1, sel: null
 };
 let T = null;    // parcours dérivé : {xy, cum, L, grid}
@@ -1864,7 +1882,7 @@ let saveTimer = null, saveWarned = false;
 
 function snapshot() {
   return { v: 2, name: S.name, desc: S.desc, src: S.src, ll: S.ll, mm: S.mm, ctrl: S.ctrl, segs: S.segs, notes: S.notes, settings: S.settings,
-    stale: S.stale, routeMode: S.routeMode, nextId: S.nextId, stages: S.stages, marks: S.marks, ele: S.ele };
+    stale: S.stale, routeMode: S.routeMode, nextId: S.nextId, stages: S.stages, marks: S.marks, ele: S.ele, timing: S.timing };
 }
 function save() {
   clearTimeout(saveTimer);
@@ -1879,7 +1897,7 @@ function restore(o) {
   if ((o.settings || {}).sv !== DEF_SETTINGS.sv) S.settings = { ...S.settings, sv: DEF_SETTINGS.sv, tol: DEF_SETTINGS.tol, water: true, bld: true };
   S.routeMode = o.routeMode || 'trekking'; S.nextId = o.nextId || (Math.max(0, ...S.notes.map(n => n.id)) + 1); S.sel = null;
   for (let i = 1; i < S.ctrl.length; i++) if (S.segs[i - 1]) routeCache.set(segKey(S.ctrl[i - 1], S.ctrl[i], S.ctrl[i][2]), S.segs[i - 1]);
-  S.stages = o.stages || []; S.marks = o.marks || []; S.ele = o.ele || null; renderMarks();
+  S.stages = o.stages || []; S.marks = o.marks || []; S.ele = o.ele || null; S.timing = o.timing || null; renderMarks();
   G = null;
   S.mm = o.mm || null;
   setTrack(o.ll || [], true, true);
@@ -2170,6 +2188,7 @@ function ctrlFromTrack() {
   S.src = 'draw'; S.mm = null; rebuildFromSegs();
 }
 function setDrawing(on) {
+  if (on && measOn) closeMeasure();
   drawing = on;
   $('#bDraw').classList.toggle('on', on);
   $('#drawBox').classList.toggle('show', on);
@@ -4030,7 +4049,7 @@ function symsHTML(syms, close) {  // taille et place calculées pour ne jamais t
 const ARROW_SVG = '<svg class="arr" viewBox="0 0 20 100" preserveAspectRatio="none"><path d="M10 0V76" stroke="#000" stroke-width="5"/><path d="M1 72L10 100L19 72Z" fill="#000"/></svg>';
 
 function renderInfo() {
-  renderStages();
+  renderStages(); if (measOn) renderMeasList();
   $('#sumKm').textContent = (T ? kmFr(T.L) : '0,00') + ' km';
   const n = S.notes.length;
   $('#sumNotes').textContent = n + (n > 1 ? ' notes' : ' note');
@@ -4128,13 +4147,13 @@ const AUTO_SYM = [      // [ligne de texte, () → { keys: symboles, text: texte
 const DIR_RE = /^(?:TD|Lég\. à [DG]|À [DG]|Épingle à [DG]|Serrer à [DG]|Virage serré à [DG]|Demi-tour)$/;      // les directions : 1re ligne d'une note de carrefour ou de virage
 function noteView(n) {      // lignes de texte restantes et symboles à afficher sous la direction (automatiques, puis ceux posés à la main sur l'ancienne ligne)
   const raw = (n.text || '').split('\n');
-  if (n.auto !== false && S.settings.showRoad === false) {      // réglage « Afficher les noms de route » décoché : on retire le nom de la rue / de la piste (dernière ligne) et le numéro de la route (« sur route D 976 » → « sur route »)
+  if (n.auto !== false && !n.symLocked && S.settings.showRoad === false) {      // réglage « Afficher les noms de route » décoché : on retire le nom de la rue / de la piste (dernière ligne) et le numéro de la route (« sur route D 976 » → « sur route »)
     const names = n.roadNames || [];
     for (let i = raw.length - 1; i > 0; i--) if (names.includes(raw[i].trim())) raw.splice(i, 1);
     for (let i = 0; i < raw.length; i++) raw[i] = raw[i].replace(/^(sur route|Suivre la route) .+$/, '$1');
   }
-  if (n.auto !== false && S.settings.showDir === false && DIR_RE.test((raw[0] || '').trim())) raw[0] = '';      // réglage « Afficher les directions » décoché : la place de la direction reste vide
-  if (n.auto === false || S.settings.symAuto === false) { if (!raw.some(Boolean)) raw.length = 0; return { lines: raw, keys: lexKeys(n) }; }
+  if (n.auto !== false && !n.symLocked && S.settings.showDir === false && DIR_RE.test((raw[0] || '').trim())) raw[0] = '';      // réglage « Afficher les directions » décoché : la place de la direction reste vide
+  if (n.auto === false || n.symLocked || S.settings.symAuto === false) { if (!raw.some(Boolean)) raw.length = 0; return { lines: raw, keys: lexKeys(n) }; }
   const items = [], lines = [];
   for (let i = 0; i < raw.length; i++) {
     const l = raw[i]; let r = null;
@@ -4239,6 +4258,7 @@ $('#rb').addEventListener('click', e => {
   if (a && a.dataset.a === 'del') { deleteNote(id); return; }
   selectNote(id, 'list');
 });
+$('#rb').addEventListener('click', e => { const c = e.target.closest('.cap'); if (!c) return; const row = e.target.closest('.row'); const n = row && S.notes.find(x => x.id === +row.dataset.id); if (n) measureForNote(n, false); });
 $('#rb').addEventListener('dblclick', e => { const row = e.target.closest('.row'); if (row) editNote(+row.dataset.id); });
 
 function noteNeighbors(n) {
@@ -4280,8 +4300,11 @@ function editNote(id, isNew) {
   const n = S.notes.find(x => x.id === id); if (!n) return;
   normNote(n);
   const wp = n.wp || {}, zone = n.zone || {};
+  // symboles posés automatiquement : à l'ouverture ils deviennent des symboles « comme posés à la main » (retirables, déplaçables, on peut en ajouter) et le texte qu'ils remplaçaient disparaît
+  const pre = n.auto !== false && !n.symLocked && S.settings.symAuto !== false ? noteView(n) : null, conv = !!(pre && pre.keys.length > lexKeys(n).length);
+  const lockTxt = v => conv || n.symLocked ? v.replace(/\s+$/, '') : v.trim();      // note verrouillée : la 1re ligne peut rester vide (place de la direction)
   const body = `
-    <div class="fld"><label for="eText">Texte de la note (1re ligne en gros)</label><textarea id="eText" rows="3">${esc(n.text)}</textarea></div>
+    <div class="fld"><label for="eText">Texte de la note (1re ligne en gros)</label><textarea id="eText" rows="3">${esc(conv ? pre.lines.join('\n') : n.text)}</textarea></div>
     <div class="fld"><label>Symboles du lexique FIA <span style="font-weight:400;color:#8a8478">— sous la direction, dans la case description</span></label>
       <div class="stagehelp">Pose les symboles où tu veux : <b>glisse</b> un symbole dans la tulipe ou la case description, règle sa <b>taille</b> avec le curseur (ou la molette).</div>
       <div class="stlabels"><span>Tulipe</span><span>Description</span></div><div class="stage"><div class="stcase" id="stT" data-c="t"><div class="stm" id="stTm"></div><div class="stin" id="stTin"></div></div><div class="stcase" id="stD" data-c="d"><div class="stm" id="stDm"></div><div class="stin" id="stDin"></div></div></div>
@@ -4296,7 +4319,7 @@ function editNote(id, isNew) {
       </div>
     </div>
     <div class="fgrid">
-      <div class="fld"><label for="eCap">CAP (°)</label><input id="eCap" type="number" min="0" max="359" value="${n.cap == null ? '' : n.cap}"></div>
+      <div class="fld"><label for="eCap">CAP (°)</label><input id="eCap" type="number" min="0" max="359" value="${n.cap == null ? '' : n.cap}"><button type="button" class="mbtn" id="eCapMeas" title="Enregistre la note puis mesure le cap sur la trace" style="margin-top:4px">📐 Mesurer</button></div>
       <div class="fld"><label for="eDanger">Danger</label><select id="eDanger">${[0, 1, 2, 3].map(d => `<option value="${d}"${n.danger === d ? ' selected' : ''}>${d ? '!'.repeat(d) + ' (niveau ' + d + ')' : 'Aucun'}</option>`).join('')}</select></div>
       <div class="fld"><label for="eDist">Distance (km)</label><input id="eDist" type="number" step="0.01" min="0" value="${km(n.s)}"></div>
     </div>
@@ -4323,7 +4346,7 @@ function editNote(id, isNew) {
     { label: 'Supprimer', cls: 'danger', onClick: () => { deleteNote(n.id); } }, 'sp',
     { label: 'Annuler', onClick: () => { if (isNew) { S.notes = S.notes.filter(x => x.id !== n.id); renderAll(); } } },
     { label: 'Enregistrer', cls: 'primary', onClick: () => {
-      n.text = $('#eText').value.trim();
+      n.text = lockTxt($('#eText').value); if (conv) n.symLocked = true;
       const cap = $('#eCap').value; n.cap = cap === '' ? null : norm360(Math.round(+cap)) % 360;
       n.showCap = $('#eShowCap').checked && n.cap != null;
       n.danger = +$('#eDanger').value;
@@ -4363,6 +4386,16 @@ function editNote(id, isNew) {
   };
   // symboles du lexique : sélection (clic = retirer) et palette (clic = ajouter / retirer)
   const lexSel = lexKeys(n), symList = (n.sym || []).filter(q => FIA_LEX[q.k]).map(q => ({ ...q }));
+  if (conv) {      // symboles automatiques → symboles libres de la case description, rangés comme dans le roadbook (rangée sous le texte), que l'on peut ensuite déplacer, agrandir ou rétrécir
+    const man = lexKeys(n), auto = pre.keys.filter(k => !man.includes(k) && FIA_LEX[k]), L0 = pre.lines[0] || '';
+    const h = pre.lines.length ? 22 : 30, extra = pre.lines.slice(1).reduce((t, l) => t + textRows(l), 0);
+    let x = 3, row = 0; const top = (L0 ? (1.4 + 5.6 * (L0.length > 13 ? 2 : 1) + 0.7) / 33.3 * 100 : 3) + extra * 3.96 / 33.3 * 100;
+    for (const k of auto) {
+      const S = FIA_LEX[k], w = Math.min(94, h * S.w / S.h);
+      if (x > 3 && x + w > 97) { x = 3; row++; }
+      symList.push({ k, c: 'd', x: +(x + w / 2).toFixed(1), y: +Math.min(94 - h / 2, top + h / 2 + row * (h + 2)).toFixed(1), h }); x += w + 1.8;
+    }
+  }
   let lexCat = FIA_CATS[0], symSel = null;
   const lexImg = k => `<img src="${FIA_LEX[k].d}" alt="">`;
   const renderLex = () => {
@@ -4391,7 +4424,7 @@ function editNote(id, isNew) {
     // fond des deux cases = le vrai rendu du roadbook (même fonction que la ligne de la note), avec les valeurs en cours de saisie ;
     // les symboles libres sont dessinés par-dessus, à part, pour pouvoir être déplacés
     const cv = $('#eCap').value, cap = cv === '' ? null : norm360(Math.round(+cv)) % 360, wt = $('#eWp').value;
-    const tmp = { ...n, text: $('#eText').value.trim(), cap, showCap: $('#eShowCap').checked && cap != null, danger: +$('#eDanger').value, wp: wt ? { type: wt } : null, lex: lexSel.slice(), sym: [] };
+    const tmp = { ...n, symLocked: conv || n.symLocked, text: lockTxt($('#eText').value), cap, showCap: $('#eShowCap').checked && cap != null, danger: +$('#eDanger').value, wp: wt ? { type: wt } : null, lex: lexSel.slice(), sym: [] };
     const real = `<div class="rbr">${rowInner(tmp, 0, 0, { zone: false, endSp: null, close: false, green: false, red: false }, false)}</div>`;
     $('#stTm').innerHTML = real; $('#stDm').innerHTML = real; $('#stTin').innerHTML = ''; $('#stDin').innerHTML = '';
     symList.forEach((q, i) => {
@@ -4419,6 +4452,7 @@ function editNote(id, isNew) {
   $('#stBack').onclick = () => { if (!symSel) return; symList.splice(symList.indexOf(symSel), 1); symList.unshift(symSel); renderStage(); };
   $('#stDel').onclick = () => { if (!symSel) return; symList.splice(symList.indexOf(symSel), 1); symSel = null; renderStage(); };
   $('#stT').onclick = $('#stD').onclick = e => { if (!e.target.classList.contains('fs')) { symSel = null; renderStage(); } };
+  $('#eCapMeas').onclick = () => { m.querySelector('.mbtn.primary').click(); measureForNote(n, true); };
   for (const id of ['#eText', '#eCap', '#eShowCap', '#eDanger', '#eWp']) $(id).addEventListener(id === '#eText' || id === '#eCap' ? 'input' : 'change', () => renderStage());
   $('#eLexSel').onclick = e => { const b = e.target.closest('button[data-k]'); if (!b) return; lexSel.splice(lexSel.indexOf(b.dataset.k), 1); renderLex(); renderStage(); };
   renderLex(); renderStage();
@@ -4427,7 +4461,7 @@ function editNote(id, isNew) {
   upd();
   setTimeout(() => { const ta = m.querySelector('#eText'); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 30);
 }
-function addManualNote(latlng) {
+function addManualNote(latlng, capOv) {
   if (!T) return;
   const p = fwd(latlng.lat, latlng.lng);
   const pr = projAll(p, 80); if (!pr.length) return;
@@ -4451,6 +4485,7 @@ function addManualNote(latlng) {
     note.src = { t: 'trk', kind: 'manual' };
   }
   note.auto = false;
+  if (capOv != null) { note.cap = capOv; note.showCap = true; }
   S.notes.push(note); renderAll(); selectNote(note.id, 'map');
   editNote(note.id, true);
 }
@@ -4582,7 +4617,17 @@ async function buildGPX(onProg) {
     o.push(`  <wpt lat="${m.lat.toFixed(6)}" lon="${m.lon.toFixed(6)}">\n    <name>${xmlEsc(m.name || ic[2])}</name>${(m.desc || '').trim() ? `\n    <desc>${xmlEsc(m.desc.trim())}</desc>` : ''}\n    <sym>${xmlEsc(ic[2])}</sym>\n    <type>Marqueur</type>\n  </wpt>`);
   }
   o.push(`  <trk>\n    <name>${xmlEsc(S.name)}</name>\n    <trkseg>`);
-  for (const p of (S.mm && S.mm.length > 1 ? S.mm : S.ll)) o.push(`      <trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}"/>`);
+  {
+    const pts = S.mm && S.mm.length > 1 ? S.mm : S.ll, cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + haversine(pts[i - 1], pts[i]));
+    const sc = T && cum[cum.length - 1] ? T.L / cum[cum.length - 1] : 1, ev = eleValid(), tm = S.timing;
+    const ts = tm && tm.exp && tm.start && T ? timeSeries() : null, t0 = ts ? new Date(tm.start).getTime() : 0;
+    pts.forEach((p, i) => {
+      const s = cum[i] * sc;
+      const ex = (ev ? `<ele>${eleAt(Math.min(s, S.ele.step * (S.ele.v.length - 1))).toFixed(1)}</ele>` : '') + (ts ? `<time>${new Date(t0 + timeAt(ts, s) * 1000).toISOString().replace(/\.\d+Z$/, 'Z')}</time>` : '');
+      o.push(ex ? `      <trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}">${ex}</trkpt>` : `      <trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}"/>`);
+    });
+  }
   o.push('    </trkseg>\n  </trk>\n</gpx>\n');
   return o.join('\n');
 }
@@ -4742,7 +4787,7 @@ async function loadFile(file) {
     if (g.ll.length < 2) throw new Error(g.wpts ? 'Ce GPX ne contient que des waypoints, pas de trace (trk). Utilise un GPX avec la trace du parcours, ou dessine-le.' : 'Aucune trace trouvée dans ce fichier.');
     if (g.trks.length > 1) { const pk = await pickTrack(g); if (!pk) return; g.ll = pk.ll; if (pk.name) g.name = pk.name; }
     if (drawing) setDrawing(false);
-    S.stages = []; S.ele = null; S.marks = []; renderMarks();
+    S.stages = []; S.ele = null; S.marks = []; if (S.timing) S.timing.ss = {}; renderMarks();
     S.src = 'gpx'; S.ctrl = []; S.segs = []; S.notes = []; S.stale = false; S.sel = null;
     S.name = g.name || file.name.replace(/\.gpx$/i, ''); $('#rbName').value = S.name;
     setTrack(g.ll, true); renderAll(); renderTrack(true);
@@ -4893,6 +4938,7 @@ const MARK_ICONS = [['refuge', '🏠', 'Refuge'], ['water', '💧', 'Eau'], ['fu
 const anyLock = () => (S.stages || []).some(g => g.lock);
 let stagePick = false, markPick = false;
 function pickClick(latlng) {
+  if (measOn && !drawing) { measureAtLL(latlng); return true; }
   if (stagePick) { stagePick = false; if (!drawing) addStage(latlng); stagesDialog(); return true; }
   if (markPick) { markPick = false; markForm({ lat: latlng.lat, lon: latlng.lng, icon: 'pin' }, true); return true; }
   return false;
@@ -5044,6 +5090,185 @@ function lockedSet() {
   });
   return set;
 }
+/* ---- étape 4 : altitude, aperçu 3D, horodatage ---- */
+const eleValid = () => !!(S.ele && S.ele.sig === trackSig(S.ll) && S.ele.v.length > 1);
+function timingDef() { if (!S.timing) S.timing = { start: '', speed: 30, slope: true, exp: false, ss: {} }; if (!S.timing.ss) S.timing.ss = {}; return S.timing; }
+function timeSeries() {      // temps cumulé (s) tous les 100 m ; allure par étape, corrigée par la pente (montée = plus lent, descente = plus vite)
+  const t = timingDef(), L = T.L, step = 100, n = Math.max(1, Math.ceil(L / step)), stg = stageList(), ev = eleValid(), tc = [0];
+  for (let k = 0; k < n; k++) {
+    const s0 = k * step, s1 = Math.min(L, (k + 1) * step), d = Math.max(1, s1 - s0), sm = (s0 + s1) / 2;
+    const g = ev && t.slope ? (eleAt(Math.min(s1, S.ele.step * (S.ele.v.length - 1))) - eleAt(Math.min(s0, S.ele.step * (S.ele.v.length - 1)))) / d : 0;
+    const st = stg.find(x => sm >= x.s0 && sm < x.s1) || stg[stg.length - 1], base = +(t.ss[st.i] || t.speed) || 30;
+    tc.push(tc[k] + d / (base * clamp(1 - 3 * g, 0.5, 1.3) / 3.6));
+  }
+  return { tc, step, L };
+}
+function timeAt(ts, s) {
+  s = clamp(s, 0, ts.L); const k = Math.min(ts.tc.length - 2, Math.floor(s / ts.step)), a0 = k * ts.step, a1 = Math.min(ts.L, (k + 1) * ts.step);
+  return ts.tc[k] + (ts.tc[k + 1] - ts.tc[k]) * (a1 > a0 ? clamp((s - a0) / (a1 - a0), 0, 1) : 0);
+}
+const hm = sec => { const m = Math.round(sec / 60); return Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0'); };
+const clock = (t0, sec) => { const d = new Date(t0 + sec * 1000); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+function cleanEle() {      // valeurs aberrantes : un point qui s'écarte de plus de 30 m de la médiane de ses voisins est remplacé ; puis lissage léger
+  const v = S.ele.v, n = v.length, out = v.slice(); let fixed = 0;
+  for (let i = 0; i < n; i++) {
+    const w = []; for (let j = -2; j <= 2; j++) if (i + j >= 0 && i + j < n) w.push(v[i + j]);
+    w.sort((x, y) => x - y); const med = w[w.length >> 1];
+    if (Math.abs(v[i] - med) > 30) { out[i] = med; fixed++; }
+  }
+  S.ele.v = out.map((x, i) => +((i && i < n - 1 ? (out[i - 1] + 2 * x + out[i + 1]) / 4 : x)).toFixed(1)); S.ele.clean = true; save();
+  return fixed;
+}
+function eleChart(W, H) {
+  const v = S.ele.v, mn = Math.min(...v), mx = Math.max(...v), r = Math.max(10, mx - mn), n = v.length;
+  const X = k => (k / (n - 1) * W).toFixed(1), Y = z => (H - 8 - (z - mn) / r * (H - 22)).toFixed(1);
+  let d = 'M0,' + H; v.forEach((z, k) => d += ` L${X(k)},${Y(z)}`); d += ` L${W},${H} Z`;
+  const bars = stageList().slice(1).map(g => `<line x1="${(g.s0 / T.L * W).toFixed(1)}" x2="${(g.s0 / T.L * W).toFixed(1)}" y1="0" y2="${H}" stroke="#2b6cb0" stroke-dasharray="3 3"/>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;background:#f3efe4;border-radius:8px"><path d="${d}" fill="#d9c9a3" stroke="#b5651d" stroke-width="1.5"/>${bars}<text x="4" y="12" font-size="11" fill="#555">${Math.round(mx)} m</text><text x="4" y="${H - 2}" font-size="11" fill="#555">${Math.round(mn)} m</text></svg>`;
+}
+function altDialog() {
+  if (!T) { toast('Charge ou dessine d’abord une trace.', 'err'); return; }
+  const ev = eleValid(), t = timingDef(), ts = timeSeries(), stg = stageList(), t0 = t.start ? new Date(t.start).getTime() : null;
+  const es = ev ? eleStats(0, T.L) : null;
+  const rows = stg.map((g, k) => { const dur = timeAt(ts, g.s1) - timeAt(ts, g.s0);
+    return `<tr><td><b>${k + 1}</b></td><td>${kmFr(g.s1 - g.s0)} km</td><td><input type="number" class="alSS" data-i="${g.i}" min="3" max="200" step="1" placeholder="${t.speed}" value="${t.ss[g.i] || ''}" style="width:62px"> km/h</td><td>${hm(dur)}</td><td>${t0 != null ? clock(t0, timeAt(ts, g.s1)) : '—'}</td></tr>`; }).join('');
+  const tot = timeAt(ts, T.L);
+  const m = openModal('Altitude et horaires', `${ev ? eleChart(560, 130) + `<div style="margin:6px 0;font-size:13px">D+ <b>${Math.round(es.up)} m</b> · D− <b>${Math.round(es.dn)} m</b> · mini ${Math.round(Math.min(...S.ele.v))} m · maxi ${Math.round(Math.max(...S.ele.v))} m${S.ele.clean ? ' · nettoyé' : ''}</div>` : '<div style="color:#8a8478;margin-bottom:8px">Pas encore d’altitude : « Calculer l’altitude » (internet nécessaire).</div>'}
+    <div style="border-top:1px solid #ddd;margin:8px 0;padding-top:8px"><b>Horodatage</b>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:6px 0">
+      <label>Départ <input type="datetime-local" id="alStart" value="${esc(t.start || '')}"></label>
+      <label>Vitesse moyenne <input type="number" id="alSpeed" min="3" max="200" step="1" value="${t.speed}" style="width:62px"> km/h</label>
+      <label title="Montée : plus lent, descente : plus rapide (nécessite l’altitude)"><input type="checkbox" id="alSlope" ${t.slope ? 'checked' : ''}> tenir compte de la pente</label></div>
+    <table class="stTab"><tr><th>Étape</th><th>Distance</th><th>Vitesse</th><th>Durée</th><th>Arrivée</th></tr>${rows}</table>
+    <div style="margin-top:6px">Total : <b>${hm(tot)}</b>${t0 != null ? ' · arrivée <b>' + clock(t0, tot) + '</b>' : ''}</div>
+    <label style="display:block;margin-top:8px"><input type="checkbox" id="alExp" ${t.exp ? 'checked' : ''}> Ajouter les heures (et l’altitude) à la trace du GPX exporté${t.exp && !t.start ? ' — <span style="color:#c0392b">choisis une heure de départ</span>' : ''}</label></div>`,
+    ['sp', { label: ev ? 'Recalculer l’altitude' : 'Calculer l’altitude', onClick: async () => { toast('Calcul de l’altitude…'); try { await fetchEle(); } catch (e) { toast('Altitude indisponible : ' + (e.message || e), 'err'); return; } altDialog(); } },
+      ...(ev ? [{ label: 'Nettoyer', onClick: () => { const n = cleanEle(); toast(n ? `${n} valeur${n > 1 ? 's' : ''} aberrante${n > 1 ? 's' : ''} corrigée${n > 1 ? 's' : ''}, profil lissé.` : 'Aucune valeur aberrante, profil lissé.', 'ok'); altDialog(); } }, { label: 'Vue 3D', onClick: view3D }] : []),
+      { label: 'Fermer', cls: 'primary' }]);
+  const chg = () => { t.start = m.querySelector('#alStart').value; t.speed = Math.max(3, +m.querySelector('#alSpeed').value || 30); t.slope = m.querySelector('#alSlope').checked; t.exp = m.querySelector('#alExp').checked; save(); altDialog(); };
+  ['#alStart', '#alSpeed', '#alSlope', '#alExp'].forEach(q => m.querySelector(q).onchange = chg);
+  m.querySelectorAll('.alSS').forEach(el => el.onchange = () => { const v = +el.value; if (v > 0) t.ss[el.dataset.i] = v; else delete t.ss[el.dataset.i]; save(); altDialog(); });
+}
+function view3D() {
+  if (!eleValid()) return;
+  const m = openModal('Aperçu 3D', `<canvas id="c3" width="640" height="400" style="width:100%;background:#f3efe4;border-radius:8px;cursor:grab;touch-action:none"></canvas>
+    <label style="display:block;margin-top:6px">Relief exagéré ×<input type="range" id="ex3" min="1" max="15" value="5" style="vertical-align:middle"> <span id="exv">5</span> · glisse pour tourner</label>`, ['sp', { label: 'Fermer', cls: 'primary' }]);
+  const cv = m.querySelector('#c3'), cx = cv.getContext('2d'), W = cv.width, H = cv.height;
+  const N = Math.min(500, Math.max(20, Math.round(T.L / 60))), P = [];
+  for (let k = 0; k <= N; k++) { const s = T.L * k / N, p = pointAt(s); P.push([p[0], p[1], eleAt(Math.min(s, S.ele.step * (S.ele.v.length - 1)))]); }
+  const mx = P.reduce((a, p) => a + p[0], 0) / P.length, my = P.reduce((a, p) => a + p[1], 0) / P.length, z0 = Math.min(...P.map(p => p[2])), z1 = Math.max(...P.map(p => p[2]));
+  const ext = Math.max(1, ...P.map(p => Math.hypot(p[0] - mx, p[1] - my)));
+  let yaw = 0.6, pitch = 0.9, ex = 5;
+  const draw = () => {
+    cx.clearRect(0, 0, W, H);
+    const sc = Math.min(W, H) * 0.62 / ext, cy_ = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp_ = Math.sin(pitch);
+    const proj = (x, y, z) => { const a = (x - mx) * cy_ - (y - my) * sy, b = (x - mx) * sy + (y - my) * cy_; return [W / 2 + a * sc, H * 0.55 + (-b * sp_ + -(z - z0) * ex * cp + (z1 - z0) * ex * cp / 2) * sc]; };
+    cx.lineWidth = 2; cx.strokeStyle = 'rgba(0,0,0,.18)'; cx.beginPath();
+    P.forEach((p, i) => { const q = proj(p[0], p[1], z0); i ? cx.lineTo(q[0], q[1]) : cx.moveTo(q[0], q[1]); }); cx.stroke();
+    cx.strokeStyle = 'rgba(0,0,0,.08)'; cx.beginPath(); P.forEach((p, i) => { if (i % 6) return; const a = proj(p[0], p[1], z0), b = proj(p[0], p[1], p[2]); cx.moveTo(a[0], a[1]); cx.lineTo(b[0], b[1]); }); cx.stroke();
+    cx.lineWidth = 3.5; cx.lineCap = 'round';
+    for (let i = 1; i < P.length; i++) { const a = proj(P[i - 1][0], P[i - 1][1], P[i - 1][2]), b = proj(P[i][0], P[i][1], P[i][2]), t = z1 > z0 ? (P[i][2] - z0) / (z1 - z0) : 0; cx.strokeStyle = `hsl(${Math.round(210 - 210 * t)} 75% 45%)`; cx.beginPath(); cx.moveTo(a[0], a[1]); cx.lineTo(b[0], b[1]); cx.stroke(); }
+    const s0 = proj(P[0][0], P[0][1], P[0][2]), e0 = proj(P[P.length - 1][0], P[P.length - 1][1], P[P.length - 1][2]);
+    cx.fillStyle = '#2f9e44'; cx.beginPath(); cx.arc(s0[0], s0[1], 6, 0, 7); cx.fill(); cx.fillStyle = '#c0392b'; cx.beginPath(); cx.arc(e0[0], e0[1], 6, 0, 7); cx.fill();
+  };
+  let drag = null;
+  cv.onpointerdown = e => { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; };
+  cv.onpointermove = e => { if (!drag) return; yaw += (e.clientX - drag[0]) * 0.01; pitch = clamp(pitch + (e.clientY - drag[1]) * 0.01, 0.1, 1.45); drag = [e.clientX, e.clientY]; draw(); };
+  cv.onpointerup = () => { drag = null; cv.style.cursor = 'grab'; };
+  m.querySelector('#ex3').oninput = e => { ex = +e.target.value; m.querySelector('#exv').textContent = ex; draw(); };
+  draw();
+}
+/* ---- mesure des caps (depuis le nord) et liste des virages ---- */
+let measOn = false, measRes = null, measCache = null, measBack = false;
+const measLayer = L.layerGroup().addTo(map);
+const cap3 = x => String(Math.round(norm360(x)) % 360).padStart(3, '0') + '°';
+const measWi = () => +$('#measWi').value || 30, measWo = () => +$('#measWo').value || 30, measThr = () => +$('#measThr').value || 30;
+function bendAt(s, wi, wo) {      // cap d'arrivée : de s−wi à s−3 m ; cap de sortie : de s+3 m à s+wo (3 m de marge autour du coude)
+  const g = Math.min(3, wi / 4, wo / 4);
+  const a = trackBearing(Math.max(0, s - wi), Math.max(0, s - g)), b = trackBearing(Math.min(T.L, s + g), Math.min(T.L, s + wo));
+  // l'angle du virage (information et seuil de la liste) est toujours mesuré sur 30 m de chaque côté : la liste ne change pas quand on règle les distances des caps
+  const a2 = trackBearing(Math.max(0, s - 30), Math.max(0, s - g)), b2 = trackBearing(Math.min(T.L, s + g), Math.min(T.L, s + 30));
+  return { s, inn: a, out: b, ang: angDiff(a2, b2) };
+}
+function bendList(wi, wo, thr) {      // repérage des coudes sur 30 m de chaque côté (une sortie longue noierait le coude) ; les caps affichés utilisent les distances réglées
+  const di = 30, dO = 30, key = trackSig(S.ll) + '|' + wi + '|' + wo + '|' + thr;
+  if (measCache && measCache.key === key) return measCache.list;
+  const list = []; let run = null;
+  for (let s = di; s <= T.L - dO; s += 4) {
+    const b = bendAt(s, di, dO);
+    if (Math.abs(b.ang) >= thr) { if (!run || Math.abs(b.ang) > Math.abs(run.ang)) run = b; }
+    else if (run) { list.push(run); run = null; }
+  }
+  if (run) list.push(run);
+  for (let i = 0; i < list.length; i++) {
+    let best = list[i];
+    for (let t = Math.max(di, list[i].s - 4); t <= Math.min(T.L - dO, list[i].s + 4); t += 1) { const b = bendAt(t, di, dO); if (Math.abs(b.ang) > Math.abs(best.ang)) best = b; }
+    list[i] = bendAt(best.s, wi, wo);
+  }
+  measCache = { key, list }; return list;
+}
+function renderMeasList() {
+  if (!T || T.L < 130) { $('#measList').innerHTML = ''; return; }
+  const noOnly = $('#measNo').checked, lst = bendList(measWi(), measWo(), measThr());
+  const rows = lst.map(b => ({ b, note: S.notes.findIndex(n => Math.abs(n.s - b.s) < 40) })).filter(r => !noOnly || r.note < 0);
+  const nNo = lst.filter(b => !S.notes.some(n => Math.abs(n.s - b.s) < 40)).length;
+  $('#measList').innerHTML = `<div style="margin:6px 0 3px"><b>${lst.length}</b> virage${lst.length > 1 ? 's' : ''} · <b style="color:#c0392b">${nNo}</b> sans note</div>
+    <div style="max-height:34vh;overflow:auto"><table class="stTab" style="font-size:12px"><tr><th>km</th><th>arrivée → sortie</th><th>virage</th><th></th></tr>${rows.map(r => `<tr class="measRow" data-s="${r.b.s.toFixed(1)}" style="cursor:pointer"><td>${km(r.b.s)}</td><td>${cap3(r.b.inn)} → <b>${cap3(r.b.out)}</b></td><td>${Math.round(Math.abs(r.b.ang))}° ${r.b.ang > 0 ? '↱' : '↰'}</td><td>${r.note >= 0 ? '<span title="Note ' + (r.note + 1) + '" style="color:#2f9e44">● ' + (r.note + 1) + '</span>' : '<span style="color:#c0392b" title="Pas de note">○</span>'}</td></tr>`).join('') || '<tr><td colspan="4" style="color:#8a8478">Aucun virage.</td></tr>'}</table></div>`;
+  $('#measList').querySelectorAll('.measRow').forEach(el => el.onclick = () => { const s = +el.dataset.s, p = inv(...pointAt(s)); map.setView(p, Math.max(map.getZoom(), measWo() > 100 ? 15 : 16)); showMeasure(s); });
+}
+function showMeasure(s, target) {
+  const wi = measWi(), wo = measWo(); measLayer.clearLayers();
+  const r = measRes = bendAt(s, wi, wo); r.target = target || null; const p = pointAt(s), P = q => inv(q[0], q[1]);
+  const far = (deg, d) => [p[0] + Math.sin(deg * D2R) * d, p[1] + Math.cos(deg * D2R) * d], ext = Math.max(wo, wi) * 1.2;
+  L.polyline([P(far(0, ext)), P(p)], { color: '#555', weight: 2, dashArray: '4 4', interactive: false }).addTo(measLayer);
+  L.polyline([P(pointAt(Math.max(0, s - wi))), P(p)], { color: '#1f6feb', weight: 5, opacity: 0.9, interactive: false }).addTo(measLayer);
+  L.polyline([P(pointAt(Math.min(T.L, s + 3))), P(pointAt(Math.min(T.L, s + wo)))], { color: '#d6001c', weight: 5, opacity: 0.9, interactive: false }).addTo(measLayer);
+  L.polyline([P(p), P(far(r.out, ext))], { color: '#d6001c', weight: 2, dashArray: '5 5', interactive: false }).addTo(measLayer);
+  const lbl = (q, txt, col) => L.marker(P(q), { interactive: false, icon: L.divIcon({ className: 'measlbl', html: `<span style="color:${col}">${txt}</span>`, iconSize: [60, 18], iconAnchor: [30, 9] }) }).addTo(measLayer);
+  lbl(far(0, ext * 1.08), 'N 000°', '#555'); lbl(far(r.out, ext * 1.08), cap3(r.out), '#d6001c');
+  const a0 = pointAt(Math.max(0, s - wi)); lbl([a0[0] - Math.sin(r.inn * D2R) * 0.15 * wi, a0[1] - Math.cos(r.inn * D2R) * 0.15 * wi], cap3(r.inn), '#1f6feb');
+  L.circleMarker(P(p), { radius: 5, color: '#1b1a17', weight: 2, fillColor: '#fff', fillOpacity: 1, interactive: false }).addTo(measLayer);
+  const ni = target ? S.notes.indexOf(target) : S.notes.findIndex(n => Math.abs(n.s - s) < 40);
+  $('#measRes').innerHTML = `<div style="margin:6px 0"><div>Cap à suivre (sortie du coude) : <b style="font-size:26px;color:#d6001c">${cap3(r.out)}</b></div>
+    <div>Cap d’arrivée : <b style="color:#1f6feb">${cap3(r.inn)}</b> · km ${km(s)}</div>
+    <div style="color:#8a8478;font-size:12px">Virage de ${Math.round(Math.abs(r.ang))}° ${r.ang > 0 ? 'à droite' : 'à gauche'} (information)</div>
+    <div class="row2"><button id="measApply">${ni >= 0 ? 'Mettre ' + cap3(r.out) + ' sur la note ' + (ni + 1) : 'Créer une note ici avec ' + cap3(r.out)}</button></div></div>`;
+  $('#measApply').onclick = () => {
+    if (ni >= 0) {
+      const n = S.notes[ni], back = measBack; n.cap = Math.round(norm360(r.out)) % 360; n.showCap = true; n.edited = true; renderAll(); toast(`Note ${ni + 1} : cap ${cap3(n.cap)}.`, 'ok');
+      if (target) { closeMeasure(); if (back) editNote(n.id); } else showMeasure(s);
+    }
+    else { const q = inv(...pointAt(s)); closeMeasure(); addManualNote({ lat: q[0], lng: q[1] }, Math.round(norm360(r.out)) % 360); }
+  };
+}
+function measureAtLL(ll) {
+  if (!T) return;
+  const pr = projAll(fwd(ll.lat, ll.lng), 60); if (!pr.length) { toast('Clique plus près de la trace.', 'err'); return; }
+  let s = pr.reduce((x, y) => y.d < x.d ? y : x).s, best = null;
+  const di = 30, dO = 30;
+  for (let t = Math.max(di, s - 15); t <= Math.min(T.L - dO, s + 15); t += 1) { const b = bendAt(t, di, dO); if (!best || Math.abs(b.ang) > Math.abs(best.ang)) best = b; }
+  if (best && Math.abs(best.ang) >= 15) s = best.s;      // on se cale sur le coude le plus marqué à ±15 m du clic
+  showMeasure(s);
+}
+function snapBend(s) {      // coude le plus marqué à ±15 m de s (si ≥ 15°)
+  let best = null; const di = 30, dO = 30;
+  for (let t = Math.max(di, s - 15); t <= Math.min(T.L - dO, s + 15); t += 1) { const b = bendAt(t, di, dO); if (!best || Math.abs(b.ang) > Math.abs(best.ang)) best = b; }
+  return best && Math.abs(best.ang) >= 15 ? best.s : s;
+}
+function measureForNote(n, back) {      // clic sur la case CAP d'une note, ou bouton 📐 de l'éditeur : mesure au coude de la note et mise à jour de son cap
+  if (!T) return;
+  openMeasure(); measBack = !!back;
+  const s = snapBend(clamp(n.s, 0, T.L)); map.setView(inv(...pointAt(s)), Math.max(map.getZoom(), 16));
+  showMeasure(s, n);
+}
+function openMeasure() {
+  if (!T) { toast('Charge ou dessine d’abord une trace.', 'err'); return; }
+  if (drawing) setDrawing(false);
+  measOn = true; $('#measBox').classList.add('show'); map.getContainer().classList.add('cutting'); $('#measRes').innerHTML = ''; renderMeasList();
+}
+function closeMeasure() { measOn = false; measBack = false; $('#measBox').classList.remove('show'); map.getContainer().classList.remove('cutting'); measLayer.clearLayers(); }
+$('#measX').onclick = closeMeasure;
+['#measWi', '#measWo', '#measThr', '#measNo'].forEach(q => $(q).onchange = () => { renderMeasList(); if (measRes) showMeasure(measRes.s, measRes.target); });
 $('#bUndo').onclick = undo;
 $('#bCut').onclick = () => setTool('cut');
 $('#bRev').onclick = reverseCtrl;
@@ -5069,6 +5294,8 @@ $('#moreMenu').addEventListener('click', e => {
   if (act === 'settings') openSettings();
   else if (act === 'stages') stagesDialog();
   else if (act === 'marks') marksDialog();
+  else if (act === 'alt') altDialog();
+  else if (act === 'meas') openMeasure();
   else if (act === 'saveProject') saveProject();
   else if (act === 'saveOsm') saveOsm();
   else if (act === 'loadOsm') $('#fileIn').click();
@@ -5105,7 +5332,7 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
 })();
 
 // accès pour les tests automatisés
-window.__rb = { stagesDialog, stageList, addStage, marksDialog, markForm, pickTrack, parseGPX, cutAt, reverseCtrl, mergeFile, reduceDialog, snapDialog, cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, notesSVG, renderAll, renderRadii, noteRadii };
+window.__rb = { measureForNote, openMeasure, measureAtLL, bendList, bendAt, editNote, altDialog, view3D, cleanEle, timeSeries, timeAt, buildGPX, stagesDialog, stageList, addStage, marksDialog, markForm, pickTrack, parseGPX, cutAt, reverseCtrl, mergeFile, reduceDialog, snapDialog, cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, notesSVG, renderAll, renderRadii, noteRadii };
 })();
 
 // Version installable (PWA) : actif seulement quand la page est servie en https (pas en fichier local)
