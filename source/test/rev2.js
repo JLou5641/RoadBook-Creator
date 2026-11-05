@@ -1,0 +1,14 @@
+const { chromium } = require('playwright'); const path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1300, height: 800 } });
+  await p.route(/brouter|routing\.openstreetmap|tile|arcgisonline|overpass|kumi|private\.coffee|mail\.ru/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.waitForTimeout(400);
+  await p.evaluate(() => { const R = window.__rb, S = R.S;
+    S.ctrl = [[45, 6, null], [45.01, 6.01, 'trekking'], [45.02, 6.0, 'trekking']];
+    S.segs = [[[45, 6], [45.003, 6.008], [45.006, 6.004], [45.01, 6.01]], [[45.01, 6.01], [45.014, 6.002], [45.017, 6.007], [45.02, 6.0]]]; S.src = 'draw';
+    R.map.fitBounds([[44.998, 5.995], [45.022, 6.015]]); window.__rb.renderAll && 0; });
+  await p.click('#bDraw').catch(() => {}); await p.waitForTimeout(500); await p.evaluate(() => window.__rb.rebuildFromSegs());
+  await p.evaluate(() => { const R = window.__rb; R.map.invalidateSize(); R.map.fitBounds([[44.998, 5.995], [45.022, 6.015]]); });
+  await p.waitForTimeout(300); await p.screenshot({ path: '/home/claude/out/apercu-inverser-avant.png', clip: { x: 0, y: 60, width: 880, height: 700 } });
+  await p.evaluate(async () => { window.__rb.reverseCtrl(); }); await p.waitForTimeout(500);
+  await p.screenshot({ path: '/home/claude/out/apercu-inverser-apres.png', clip: { x: 0, y: 60, width: 880, height: 700 } });
+  await b.close(); })();

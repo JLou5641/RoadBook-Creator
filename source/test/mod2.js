@@ -1,0 +1,11 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+const out = process.argv[2];
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1300, height: 800 } });
+  await p.route(/brouter|routing\.openstreetmap|tile|arcgisonline|overpass|kumi|private\.coffee|mail\.ru/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.evaluate(t => window.__rb.loadText(t, 't.gpx'), fs.readFileSync(path.join(__dirname, 'andorra.gpx'), 'utf8')); await p.waitForTimeout(500);
+  await p.click('#bDraw'); await p.click('button.mbtn.primary'); await p.waitForTimeout(600);
+  await p.evaluate(() => { const R = window.__rb, ll = R.S.ll, m = Math.floor(ll.length * 0.45); R.map.setView(ll[m], 15); });
+  await p.waitForTimeout(500);
+  await p.screenshot({ path: out, clip: { x: 340, y: 60, width: 520, height: 640 } });
+  await b.close(); })();
