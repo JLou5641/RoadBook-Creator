@@ -737,6 +737,9 @@ main{flex:1;display:flex;min-height:0}
 .k2 .cpf{position:absolute;inset:0;border:1cqw solid #FF00FF;pointer-events:none}
 .k3{padding:1.4cqw 1.7cqw;display:flex;flex-direction:column}
 .k3.hc{padding-bottom:6.6cqw}
+.k3.hs{padding-bottom:12.4cqw}
+.k3 .sg{position:absolute;right:1.4cqw;bottom:1.4cqw;display:flex;align-items:center;gap:.6cqw}
+.k3 .sg .sym{height:var(--h);width:var(--h)}
 .k3 .wpbig{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;font-family:Arial,Helvetica,sans-serif;font-weight:700;font-size:9cqw;line-height:1;pointer-events:none}
 .k3 .k3top{display:flex;align-items:flex-start;justify-content:space-between;gap:1cqw}
 .k3 .tl{color:#E00000;font-family:Arial,Helvetica,sans-serif;font-weight:900;font-size:6cqw;line-height:.95;letter-spacing:-.1cqw;margin-left:auto;white-space:nowrap}
@@ -996,7 +999,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version du 05/11 19h46</div>
+          <div class="ver">Version du 05/11 19h51</div>
         </div>
       </div>
     </div>
@@ -4375,11 +4378,17 @@ function noteSymbols(n, f) {     // ordre du lexique : waypoint, FZ + panneau ba
   if (t && FIM_SYM[t]) {
     const lim = /^(dn|dt|dss)$/.test(t) && n.wp.speed;      // DN / DT / DSS avec limitation : panneau (DN / DT : rond orange)
     out.push(symImg(lim && t !== 'dss' ? t + 'v' : t));
-    if (lim && !zt) out.push(symSign(n.wp.speed));
   }
-  if (zt === 'fz' || zt === 'fzdz') { out.push(symImg('fz')); if (f.endSp) out.push(symSign(f.endSp, true)); }
-  if (zt === 'dz' || zt === 'fzdz') { out.push(symImg('dz')); if (n.zone.speed) out.push(symSign(n.zone.speed)); }
+  if (zt === 'fz' || zt === 'fzdz') out.push(symImg('fz'));
+  if (zt === 'dz' || zt === 'fzdz') out.push(symImg('dz'));
   if (n.fuel) out.push(symImg('fuel'));
+  return out;
+}
+function noteSigns(n, f) {       // panneaux de limitation de vitesse : en bas à droite de la 3e case (et non plus dans la 1re)
+  const t = n.wp && n.wp.type, zt = n.zone && n.zone.type, out = [];
+  if (/^(dn|dt|dss)$/.test(t || '') && n.wp.speed && !zt) out.push(speedSign(n.wp.speed));
+  if ((zt === 'fz' || zt === 'fzdz') && f.endSp) out.push(speedSign(f.endSp, true));
+  if ((zt === 'dz' || zt === 'fzdz') && n.zone.speed) out.push(speedSign(n.zone.speed));
   return out;
 }
 function symsHTML(syms, close) {  // taille et place calculées pour ne jamais toucher la distance partielle ni la flèche 300 m
@@ -4540,10 +4549,10 @@ const textRows = l => {         // nombre de lignes qu'occupe un texte de la 3e 
   for (const w of String(l).split(/\s+/).filter(Boolean)) { if (cur && cur + 1 + w.length > 17) { r++; cur = w.length; } else cur += (cur ? 1 : 0) + w.length; while (cur > 17) { r++; cur -= 17; } }
   return r;
 };
-function fitLines(lines, dg, cap, symH) {  // lignes secondaires qui tiennent dans la 3e case (le texte complet reste dans la note) ; symH : hauteur des symboles (cqw)
+function fitLines(lines, dg, cap, symH, bot) {  // lignes secondaires qui tiennent dans la 3e case (le texte complet reste dans la note) ; symH : hauteur des symboles (cqw)
   const extra = lines.slice(1), long = (lines[0] || '').length > 13;
   const max = symH || !lines[0]
-    ? Math.floor((33.3 - 1.4 - (cap ? 6.6 : 1.4) - (dg ? 5.7 : 0) - (lines[0] ? 5.6 * (long ? 2 : 1) : 0) - (symH ? symH + 0.7 : 0) - 0.6) / 3.96 + 0.05)      // mesure exacte quand il y a des symboles
+    ? Math.floor((33.3 - 1.4 - (bot || (cap ? 6.6 : 1.4)) - (dg ? 5.7 : 0) - (lines[0] ? 5.6 * (long ? 2 : 1) : 0) - (symH ? symH + 0.7 : 0) - 0.6) / 3.96 + 0.05)      // mesure exacte quand il y a des symboles
     : 4 - (dg ? 1 : 0) + (cap ? 0 : 1) - (long ? 1 : 0);
   const rows = extra.map(textRows);
   if (rows.reduce((t, r) => t + r, 0) <= max) return extra;
@@ -4558,14 +4567,15 @@ function rowInner(n, i, par, f, screen) {
   const bg = (t && WP_BG[t]) || (zt === 'fz' ? WP_BG.fz : zt ? WP_BG.dz : null)
     || (/^(dn|fn|dt|ft)$/.test(t || '') ? '#D8D8D8' : null)      // seul un DZ colore la case en orange : une limite saisie sur DN / DT / DSS ne change pas le fond
     || (f.green ? '#A0D080' : '#fff');
-  const sym = symsHTML(noteSymbols(n, f), f.close);
+  const sym = symsHTML(noteSymbols(n, f), f.close), signs = noteSigns(n, f);
+  const sg = signs.length ? `<div class="sg" style="--h:${signs.length > 1 ? 8 : 10.5}cqw">${signs.join('')}</div>` : '';
   const dg = n.danger && t !== 'wps' ? `<div class="dg">${'!'.repeat(n.danger)}</div>` : '';
   const big = /^(dss|ass)$/.test(t || '') ? `<div class="wpbig">${t.toUpperCase()}</div>` : '';      // DSS / ASS : le sigle en grand au milieu de la 3e case (le symbole de la 1re case n'a plus le mot)
   const tl = /^(dss|dt)$/.test(t || '') && n.wp.limit > 0 ? `<div class="tl">T:${n.wp.limit}</div>` : '';      // temps limite : texte rouge en haut de la 3e case
   const top = dg || tl ? `<div class="k3top">${dg}${tl}</div>` : '';
   const cap = n.showCap && n.cap != null ? `<div class="cap">${Math.round(n.cap) % 360}°</div>` : '';
   // symboles du lexique : on les réduit si besoin pour qu'ils tiennent entre la direction et l'encadré du CAP
-  const lk = NV.keys, avail = 33.3 - 1.4 - (cap ? 6.6 : 1.4) - (dg || tl ? 5.7 : 0) - (lines[0] ? 5.6 * (lines[0].length > 13 ? 2 : 1) : 0) - 0.7;
+  const lk = NV.keys, avail = 33.3 - 1.4 - (signs.length ? 12.4 : cap ? 6.6 : 1.4) - (dg || tl ? 5.7 : 0) - (lines[0] ? 5.6 * (lines[0].length > 13 ? 2 : 1) : 0) - 0.7;
   let lh = lines.length ? 7.5 : 11, lr = lexRows(lk, lh, 29.6, 0.6);
   if (!lines.length && lr > 1) for (let h = 10.5; h >= 6; h -= 0.5) if (lexRows(lk, h, 29.6, 0.6) === 1) { lh = h; lr = 1; break; }      // sans texte : plutôt une seule rangée, un peu plus petite
   const need = 3.96 * Math.min(3, lines.slice(1).filter(Boolean).slice(0, 2).reduce((t, l) => t + textRows(l), 0));      // on garde la place des 2 premières lignes de texte (nom de rue, de village…), même si elles passent à la ligne
@@ -4573,7 +4583,7 @@ function rowInner(n, i, par, f, screen) {
   const lx = lk.length ? `<div class="lx" style="--lh:${lh}cqw">${lk.map(k => `<img src="${FIA_LEX[k].d}" alt="${esc(FIA_LEX[k].l)}" title="${esc(FIA_LEX[k].l)}">`).join('')}</div>` : '';
   return `<div class="k k1" style="background:${bg}"><div class="tot">${kmFr(n.s)}</div><div class="bl"><div class="par">${kmFr(par)}</div>${f.close ? ARROW_SVG : ''}</div>${sym}<div class="br"><div class="num">${i + 1}</div></div></div>`
     + `<div class="k k2">${tulipSVG(n.tulip, 200)}${freeLayer(n.sym, 't')}${t === 'cp' ? '<div class="cpf"></div>' : ''}</div>`
-    + `<div class="k k3${cap ? ' hc' : ''}">${big}${top}${n.kind === 'info' ? lx : ''}<div class="t1">${esc(lines[0] || '')}</div>${n.kind === 'info' ? '' : lx}${freeLayer(n.sym, 'd')}<div class="t2">${esc(fitLines(lines, !!(dg || tl), !!cap, lk.length ? lr * (lh + 0.6) - 0.6 : 0).join('\n'))}</div>${cap}`
+    + `<div class="k k3${signs.length ? ' hs' : cap ? ' hc' : ''}">${big}${top}${n.kind === 'info' ? lx : ''}<div class="t1">${esc(lines[0] || '')}</div>${n.kind === 'info' ? '' : lx}${freeLayer(n.sym, 'd')}<div class="t2">${esc(fitLines(lines, !!(dg || tl), !!(cap || signs.length), lk.length ? lr * (lh + 0.6) - 0.6 : 0, signs.length ? 12.4 : 0).join('\n'))}</div>${cap}${sg}`
     + (screen && (!n.auto || n.moved) ? '<div class="man">manuelle</div>' : '')
     + (screen ? `<div class="acts"><button data-a="edit" title="Modifier la note">✎</button><button data-a="del" title="Supprimer la note">🗑</button></div>` : '') + `</div>`
     + (f.zone ? `<div class="fr zone${f.zTop ? ' zt' : ''}${f.zBot ? ' zb' : ''}"></div>` : '') + (f.red ? '<div class="fr red"></div>' : '');
