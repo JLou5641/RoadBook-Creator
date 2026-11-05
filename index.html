@@ -988,7 +988,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version du 05/11 17h52</div>
+          <div class="ver">Version du 05/11 18h11</div>
         </div>
       </div>
     </div>
@@ -2264,7 +2264,7 @@ function tulipEditor(n, keep) {
   const d = keep || JSON.parse(JSON.stringify(n.tulip));
   d.others = d.others || []; d.route = d.route || [];
   let sel = null, ip = -1, nw = null, drag = null;            // sel : 'r' (parcours bleu) ou n° d'un trait ; nw : trait en cours de dessin
-  const TYPES = [['road', 'Route'], ['track', 'Piste'], ['trail', 'Sentier']];
+  const TYPES = [['road', 'Route'], ['track', 'Piste'], ['trail', 'Hors piste']];
   const kk = () => TK / d.R;
   const toS = p => [TCX + p[0] * kk(), TCY - p[1] * kk()];
   const fromS = (x, y) => [Math.round((x - TCX) / kk() * 10) / 10, Math.round((TCY - y) / kk() * 10) / 10];
@@ -2295,13 +2295,13 @@ function tulipEditor(n, keep) {
   const m = openModal('Modifier la tulipe', `
     <div class="help" style="margin:0 0 6px">Clique un trait pour le choisir, puis glisse ses points. Clique sur le trait choisi pour y ajouter un point. Le trait bleu est le parcours.</div>
     <div class="tulbar" id="tulBar">
-      <span id="tulTypes"><button type="button" data-t="road">Route</button> <button type="button" data-t="track">Piste</button> <button type="button" data-t="trail">Sentier</button></span>
+      <span id="tulTypes"><button type="button" data-t="road">Route</button> <button type="button" data-t="track">Piste</button> <button type="button" data-t="trail">Hors piste</button></span>
       <span class="tsep"></span>
       <button type="button" id="tulDelPt">Retirer le point</button><button type="button" id="tulDelLn">🗑 Supprimer le trait</button><button type="button" id="tulNew">＋ Nouveau trait</button>
     </div>
     <div class="tulbar" id="tulBarR" style="display:none">
-      <b>Entrée</b> <button type="button" data-e="road">Route</button><button type="button" data-e="track">Piste</button><button type="button" data-e="trail">Sentier</button>
-      <b style="margin-left:6px">Sortie</b> <button type="button" data-x="road">Route</button><button type="button" data-x="track">Piste</button><button type="button" data-x="trail">Sentier</button>
+      <b>Entrée</b> <button type="button" data-e="road">Route</button><button type="button" data-e="track">Piste</button><button type="button" data-e="trail">Hors piste</button>
+      <b style="margin-left:6px">Sortie</b> <button type="button" data-x="road">Route</button><button type="button" data-x="track">Piste</button><button type="button" data-x="trail">Hors piste</button>
       <label class="chk" style="margin:0 0 0 6px"><input type="checkbox" id="tulReset"> Trait-point (remise à 0 du trip) entre les deux</label>
       <span id="tulSide"><b>Côté</b> <button type="button" data-sd="auto">Auto</button><button type="button" data-sd="r">Droite</button><button type="button" data-sd="l">Gauche</button></span>
     </div>
