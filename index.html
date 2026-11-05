@@ -902,6 +902,46 @@ main{flex:1;display:flex;min-height:0}
 #measBox .row2{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}
 #measBox select,#measBox button{font:inherit;font-size:13px;padding:3px 7px;border-radius:6px;border:1px solid #aaa;background:#fff}
 .measlbl span{display:block;text-align:center;font:700 12px/18px system-ui,sans-serif;background:rgba(255,255,255,.88);border-radius:4px;padding:0 3px}
+
+.setsec{margin:8px 0;border:1px solid var(--line,#d9d2c3);border-radius:10px;padding:2px 12px 8px;background:#fffdf7}
+.setsec>summary{cursor:pointer;font-weight:700;font-size:15px;padding:8px 0;list-style:none}
+.setsec>summary::-webkit-details-marker{display:none}
+.setsec>summary::before{content:'▸ ';color:#b5651d}.setsec[open]>summary::before{content:'▾ '}
+.setbadge{font-weight:500;font-size:12px;color:#8a8478;margin-left:6px;background:#f1ecdf;border-radius:10px;padding:1px 8px}
+
+.dropdown .mgrp{padding:7px 10px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8a8478}
+.dropdown .mgrp:not(:first-child){border-top:1px solid #e5dfd3;margin-top:4px}
+#drawBox .dgrp{margin-top:8px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8a8478;border-top:1px solid #e5dfd3;padding-top:5px}
+
+/* ---------- thèmes « rallye-raid » (comme le menu de l'appli lecteur) ---------- */
+body[data-theme]{--stripes:linear-gradient(#F6C21A 0 5px,transparent 5px 7px,#E8731C 7px 12px,transparent 12px 14px,#C1272D 14px 19px)}
+body[data-theme="day"],body[data-theme="night"]{--r:10px}
+body[data-theme="day"]{--ink:#2B1A0E;--paper:#F7EBD3;--sand:#E8731C;--sand2:#F9DDAA;--line:#3A2412;--bg:#F2A13A;--plate:#F7EBD3;--plateink:#2B1A0E;--edge:#3A2412;--title:#3A2412;--platecol:#3A2412;--side:#F9DDAA}
+body[data-theme="night"]{--ink:#1E140B;--paper:#E3C08D;--sand:#E8731C;--sand2:#E3C08D;--line:#18100A;--bg:#0B1424;--plate:#E3C08D;--plateink:#1E140B;--edge:#18100A;--title:#F3D9A4;--platecol:#E8731C;--side:#2A3A58}
+body[data-theme] header{background:linear-gradient(var(--bg),var(--bg));border-bottom:0;position:relative;padding-bottom:26px;color:var(--title)}
+body[data-theme="day"] header{background:linear-gradient(#F2A13A,#F9DDAA)}
+body[data-theme="night"] header{background:linear-gradient(#0B1424,#2A3A58)}
+body[data-theme] header::after{content:"";position:absolute;left:0;right:0;bottom:0;height:19px;background:var(--stripes)}
+body[data-theme] .brand{font-weight:900;font-style:italic;color:var(--title)}
+body[data-theme] .brand small{color:var(--title);opacity:.8}
+body[data-theme] .brand svg rect{fill:var(--plate)}
+body[data-theme] #rbName{background:var(--plate);color:var(--plateink);border:3px solid var(--edge);border-radius:var(--r);font-weight:700}
+body[data-theme] .btn,body[data-theme] .mbtn,body[data-theme] #drawBox button,body[data-theme] .mapbox select{background:var(--plate);color:var(--plateink);border:3px solid var(--edge);border-radius:var(--r);font-weight:800}
+body[data-theme] .btn:hover{background:var(--plate);filter:brightness(.95)}
+body[data-theme] .btn.primary,body[data-theme] .mbtn.primary,body[data-theme] .btn.on,body[data-theme] #drawBox button.on{background:var(--platecol);color:#F7EBD3;border-color:var(--edge)}
+body[data-theme="night"] .btn.primary,body[data-theme="night"] .mbtn.primary{color:#1E140B}
+body[data-theme] .dropdown,body[data-theme] .modal,body[data-theme] .mapbox{background:var(--plate);color:var(--plateink);border:3px solid var(--edge);border-radius:var(--r)}
+body[data-theme] .modal{border-top:3px solid var(--edge)}
+body[data-theme] .modal h2{font-style:italic;font-weight:900}
+body[data-theme] .dropdown button{color:var(--plateink);font-weight:700}
+body[data-theme] .dropdown button:hover{background:rgba(0,0,0,.1)}
+body[data-theme] .dropdown .mgrp{color:var(--plateink);opacity:.7}
+body[data-theme] .setsec{background:rgba(255,255,255,.35);border-color:var(--edge)}
+body[data-theme] #side{background:var(--side);border-left:3px solid var(--edge)}
+body[data-theme] #sideHead{background:var(--plate);color:var(--plateink);border-bottom:3px solid var(--edge)}
+body[data-theme] #status{background:var(--edge);color:var(--plate)}
+body[data-theme="day"] #side{background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 470 200' preserveAspectRatio='none'><path d='M0 90 Q120 30 240 80 T470 60 V200 H0Z' fill='%23E6B87E'/><path d='M0 130 Q100 80 220 120 T470 105 V200 H0Z' fill='%23CF914F'/><path d='M0 170 Q140 130 260 160 T470 150 V200 H0Z' fill='%23A0602E'/></svg>") bottom/100% 160px no-repeat,linear-gradient(#F2A13A,#F9DDAA)}
+body[data-theme="night"] #side{background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 470 200' preserveAspectRatio='none'><path d='M0 90 Q120 30 240 80 T470 60 V200 H0Z' fill='%233B2A1C'/><path d='M0 130 Q100 80 220 120 T470 105 V200 H0Z' fill='%232A1D13'/><path d='M0 170 Q140 130 260 160 T470 150 V200 H0Z' fill='%2318100A'/></svg>") bottom/100% 160px no-repeat,linear-gradient(#0B1424,#2A3A58)}
 </style>
 </head>
 <body>
@@ -921,17 +961,21 @@ main{flex:1;display:flex;min-height:0}
       <div class="menuwrap">
         <button class="btn" id="bMore" title="Plus">⋯</button>
         <div class="dropdown" id="moreMenu">
-          <button data-act="settings">⚙️ Réglages de génération</button>
+          <div class="mgrp">Analyse de la trace</div>
           <button data-act="stages">🏁 Étapes (distance, dénivelé, verrouillage)</button>
           <button data-act="meas">📐 Mesurer un cap / liste des virages</button>
           <button data-act="alt">⛰️ Altitude et horaires (profil, 3D, horodatage)</button>
           <button data-act="marks">📍 Marqueurs (refuges, eau, repères)</button>
+          <div class="mgrp">Fichiers</div>
           <button data-act="saveProject">🗂️ Enregistrer le projet (.json)</button>
           <button data-act="saveOsm">💾 Enregistrer les chemins OSM (dossier au choix)</button>
           <button data-act="loadOsm">📥 Charger des chemins OSM</button>
           <button data-act="new">🆕 Nouveau roadbook</button>
+          <div class="mgrp">Configuration</div>
+          <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
+          <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version du 05/11 11h01</div>
+          <div class="ver">Version du 05/11 12h36</div>
         </div>
       </div>
     </div>
@@ -974,6 +1018,7 @@ main{flex:1;display:flex;min-height:0}
             <option value="line">Ligne droite</option>
           </select>
         </div>
+        <div class="dgrp">Dessin</div>
         <div class="row2">
           <button id="bUndo" title="Annuler (Ctrl+Z)">↶ Annuler</button>
           <button id="bRedo" title="Rétablir (Ctrl+Y)">↷ Rétablir</button>
@@ -983,6 +1028,7 @@ main{flex:1;display:flex;min-height:0}
           <button id="bErase" title="Effacer des points en les survolant, bouton enfoncé">🧽 Gomme</button>
           <button id="bDrawEnd">✔ Terminer</button>
         </div>
+        <div class="dgrp">Modifier la trace</div>
         <div class="row2">
           <button id="bCut" title="Cliquer sur la trace : supprimer le début ou la fin, ou changer le point de départ d’une boucle">✂ Couper</button>
           <button id="bRev" title="Inverser le sens du parcours">⇅ Inverser</button>
@@ -1870,7 +1916,7 @@ function simplifyDP(pts, tol) {         // Douglas-Peucker, renvoie les indices 
 /* ============================================================
    2. État & sauvegarde
    ============================================================ */
-const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, lmOff: [], followLvl: 3, bends: true, offroad: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true, marksExport: true };
+const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, lmOff: [], followLvl: 3, bends: true, offroad: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true, marksExport: true, showRO: true, showPI: true, showTR: true };
 const S = {
   name: 'Mon roadbook', desc: '', src: '', ll: [], mm: null, ctrl: [], segs: [], notes: [], settings: { ...DEF_SETTINGS }, stages: [], marks: [], ele: null, timing: null,
   stale: false, routeMode: 'trekking', nextId: 1, sel: null
@@ -4153,6 +4199,10 @@ function noteView(n) {      // lignes de texte restantes et symboles à afficher
     for (let i = 0; i < raw.length; i++) raw[i] = raw[i].replace(/^(sur route|Suivre la route) .+$/, '$1');
   }
   if (n.auto !== false && !n.symLocked && S.settings.showDir === false && DIR_RE.test((raw[0] || '').trim())) raw[0] = '';      // réglage « Afficher les directions » décoché : la place de la direction reste vide
+  const OFF = { RO: S.settings.showRO === false, P: S.settings.showPI === false, T: S.settings.showTR === false };      // « sur route » / « sur piste » / « sur sentier » masqués (le regroupement FRO / FPP se fait à la génération : il n'est pas touché)
+  if (n.auto !== false && !n.symLocked && S.settings.symAuto === false && (OFF.RO || OFF.P || OFF.T)) {
+    for (let i = raw.length - 1; i >= 0; i--) { const l = raw[i].trim(); if ((OFF.RO && /^sur (?:route|rue)(?: .+)?$/.test(l)) || (OFF.P && /^sur (?:petite )?piste$/.test(l)) || (OFF.T && /^sur sentier$/.test(l))) raw.splice(i, 1); }
+  }
   if (n.auto === false || n.symLocked || S.settings.symAuto === false) { if (!raw.some(Boolean)) raw.length = 0; return { lines: raw, keys: lexKeys(n) }; }
   const items = [], lines = [];
   for (let i = 0; i < raw.length; i++) {
@@ -4160,6 +4210,7 @@ function noteView(n) {      // lignes de texte restantes et symboles à afficher
     for (const [re, fn] of AUTO_SYM) { const m = re.exec(l.trim()); if (m) { r = fn(m); break; } }
     if (!r) { lines.push(l); continue; }
     items.push(r);
+    if (r.keys.length === 1 && OFF[r.keys[0]]) { r.off = true; continue; }      // ligne masquée par le réglage (ni symbole ni texte), mais elle compte encore pour éviter « Début / Fin goudron » en doublon
     if (r.text) lines.push(r.text); else if (r.dir && i === 0) lines.push('');      // la direction devient un symbole : sa place reste vide, le reste du texte ne monte pas en gros
   }
   if (!lines.some(Boolean)) lines.length = 0;
@@ -4168,6 +4219,7 @@ function noteView(n) {      // lignes de texte restantes et symboles à afficher
   const has = k => items.some(it => it.keys.includes(k));
   const keys = []; let prev = null;
   for (const it of items) {
+    if (it.off) continue;
     const ks = it.keys.filter(k => FIA_LEX[k] && !keys.includes(k) && !(k === 'tarmac' && (has('RO') || has('FRO'))) && !(k === 'track' && (has('P') || has('FPP') || has('T'))));
     if (!ks.length) continue;
     if (prev && it.grp && prev.grp === it.grp && keys.length) keys.push('ET');      // symboles de la même phrase (direction, type de chemin…) : reliés par « ET »
@@ -4692,28 +4744,29 @@ function openSettings() {
   const num = (id, label, v, min, max, help) => `<div class="fld"><label for="${id}">${label}</label><input id="${id}" type="number" min="${min}" max="${max}" value="${v}">${help ? `<div class="help" style="margin:2px 0 0">${help}</div>` : ''}</div>`;
   const chk = (id, label, v) => `<label class="chk"><input type="checkbox" id="${id}"${v ? ' checked' : ''}> ${label}</label>`;
   openModal('Réglages de génération', `
+    <details class="setsec" open><summary>🗺️ Données et trace <span class="setbadge">source des chemins</span></summary>
     <div class="fld"><label for="sData">Source des chemins</label><select id="sData">
       <option value="vt"${!/^(osm|ign|ignd)$/.test(s.data) ? ' selected' : ''}>Rapide — fond vectoriel OpenFreeMap (par défaut)</option>
       <option value="ign"${s.data === 'ign' ? ' selected' : ''}>IGN — BD TOPO, France seulement (mêmes chemins que le SCAN 25)</option>
       <option value="ignd"${s.data === 'ignd' ? ' selected' : ''}>IGN détaillé — BD TOPO avec les repères, France seulement</option>
       <option value="osm"${s.data === 'osm' ? ' selected' : ''}>Détaillé — OpenStreetMap complet (Overpass, plus lent)</option></select>
-      <div class="help" style="margin:2px 0 0"><b>Rapide</b> : chemins, carrefours, ronds-points, goudron / piste, eau, bâtiments, ponts, tunnels, gués, portails, villages, sommets, stations-service, églises.<br>
+      <details class="lmbox"><summary>ℹ️ Détails des sources</summary><div class="help" style="margin:2px 0 0"><b>Rapide</b> : chemins, carrefours, ronds-points, goudron / piste, eau, bâtiments, ponts, tunnels, gués, portails, villages, sommets, stations-service, églises.<br>
       <b>IGN</b> : routes, routes empierrées, chemins, sentiers, ronds-points, ponts, gués, noms de rues et numéros de routes de la BD TOPO, cours d’eau, plans d’eau, bâtiments ; France seulement.<br>
       <b>IGN détaillé</b> : tout cela, plus les repères de la BD TOPO : barrières, passages à niveau, voies ferrées, murs, clôtures, haies, entrées et sorties de villages, lieux-dits, sommets, cols, châteaux d’eau, antennes, cheminées, éoliennes, églises (un peu plus long à télécharger ; pas de STOP, ni de sable ou boue, ni de pentes).<br>
-      <b>Détaillé</b> : en plus clôtures, STOP, sable / boue, état de la piste, pentes, châteaux d’eau, antennes… mais téléchargement bien plus long.</div></div>
+      <b>Détaillé</b> : en plus clôtures, STOP, sable / boue, état de la piste, pentes, châteaux d’eau, antennes… mais téléchargement bien plus long.</div></details></div>
     ${num('sTol', 'Écart maxi trace ↔ chemins (m)', s.tol, 0, 100, 'Ta trace est recalée sur les chemins situés à moins de cette distance. Augmente-la si ta trace est dessinée à main levée. Mets 0 pour ne pas recaler : la trace est gardée telle quelle.')}
-    <div class="fgrid" style="grid-template-columns:1fr 1fr">
-      ${num('sMerge', 'Regrouper les notes à moins de (m)', s.merge, 5, 100)}
-      ${num('sR', 'Rayon dessiné dans la tulipe (m)', s.tulipR, 25, 120)}
-    </div>
+    ${chk('sFoot', 'Inclure les voies piétonnes et cyclables (footway, cycleway, escaliers)', s.foot)}
+    </details>
+    <details class="setsec" open><summary>📝 Quelles notes créer <span class="setbadge">↻ à régénérer</span></summary>
+${num('sMerge', 'Regrouper les notes à moins de (m)', s.merge, 5, 100)}
     ${chk('sStraight', 'Noter aussi les intersections où l’on continue tout droit', s.straight)}
     <div class="fld"><label>Regroupement des notes sur une même route ou piste (FRO / FPP) : <b id="sFollowTxt">${['aucun', 'prudent', 'normal', 'large'][s.followLvl === undefined ? (s.followRoad === false ? 0 : 3) : s.followLvl]}</b>
       <input type="range" id="sFollow" style="width:100%;margin-top:4px" min="0" max="3" step="1" oninput="document.getElementById('sFollowTxt').textContent=['aucun','prudent','normal','large'][this.value]" value="${s.followLvl === undefined ? (s.followRoad === false ? 0 : 3) : s.followLvl}"></label>
       <div class="help">0 aucun · 1 prudent : seulement les notes « direction + sur route » · 2 normal : le nom de la rue ne compte plus · 3 large : les repères secondaires (haie, antenne, clôture…) ne coupent plus la série. Les STOP, ponts, passages à niveau, villages, ronds-points et changements de numéro de route coupent toujours.</div></div>
     ${chk('sGoudron', 'Noter les changements « fin / début goudron »', s.goudron)}
     ${chk('sBends', 'Noter les virages serrés hors intersection', s.bends)}
-    ${chk('sOffroad', 'Noter les passages hors piste (trace hors des chemins : direction, flèche pointillée et CAP)', s.offroad !== false)}
     ${num('sBendA', 'Angle mini d’un virage serré (°)', s.bendAngle, 60, 170)}
+    ${chk('sOffroad', 'Noter les passages hors piste (trace hors des chemins : direction, flèche pointillée et CAP)', s.offroad !== false)}
     ${chk('sPois', 'Notes de repères : gués, passages à niveau, stops, portails, ponts, tunnels, sable, pentes, clôtures, villages, cols, stations-service', s.pois)}
     ${chk('sLand', 'Repères visuels : châteaux d’eau, antennes, églises, éoliennes, sommets, lieux-dits, noms des pistes', s.landmarks)}
     <details class="lmbox"><summary>Choisir les repères un par un</summary>
@@ -4721,24 +4774,32 @@ function openSettings() {
       <div class="lmbtns"><button type="button" class="mbtn" id="lmAll">Tout cocher</button> <button type="button" class="mbtn" id="lmNone">Tout décocher</button></div>
       ${[['p', 'Notes de repères'], ['v', 'Repères visuels']].map(([g, tt]) => `<div class="lmgrp"><b>${tt}</b>${LM_TYPES.filter(x => x[2] === g).map(x => `<label class="chk"><input type="checkbox" class="lmchk" data-lm="${x[0]}"${(s.lmOff || []).includes(x[0]) ? '' : ' checked'}> ${x[1]}</label>`).join('')}</div>`).join('')}
     </details>
+    </details>
+    <details class="setsec"><summary>🌷 Dessin de la tulipe <span class="setbadge">↻ à régénérer</span></summary>
+${num('sR', 'Rayon dessiné dans la tulipe (m)', s.tulipR, 25, 120)}
     ${chk('sWater', 'Dessiner les cours d’eau et plans d’eau (bleu ciel)', s.water)}
     ${chk('sBld', 'Dessiner les bâtiments', s.bld)}
     ${chk('sExt', 'Montrer la route d’où l’on vient et où l’on va (la suite du tracé en noir, avant le point de départ et après la flèche)', s.routeExt !== false)}
+    </details>
+    <details class="setsec" open><summary>👁️ Affichage des notes <span class="setbadge">⚡ immédiat, sans régénérer</span></summary>
     ${chk('sSym', 'Remplacer les repères connus par leur symbole du lexique (Pont, Tunnel, Gué, rond-point, village, antenne…)', s.symAuto !== false)}
     ${chk('sDir', 'Afficher les directions dans la 3e case (TD, Lég. à G, À D, Épingle, Serrer à D…)', s.showDir !== false)}
+    ${chk('sRO', 'Afficher « sur route / sur rue » (symbole RO) — le regroupement « Suivre la route » (FRO) reste actif', s.showRO !== false)}
+    ${chk('sPI', 'Afficher « sur piste » (symbole P) — le regroupement « Suivre la piste » (FPP) reste actif', s.showPI !== false)}
+    ${chk('sTR', 'Afficher « sur sentier » (symbole T)', s.showTR !== false)}
     ${chk('sRoad', 'Afficher les noms de route dans les instructions (nom de la rue ou de la piste, numéro de route : D 976…)', s.showRoad !== false)}
-    ${chk('sFoot', 'Inclure les voies piétonnes et cyclables (footway, cycleway, escaliers)', s.foot)}
     ${chk('sCap', 'Afficher le CAP sur les nouvelles notes', s.showCap)}
+    </details>
     <div class="help" style="margin-top:6px">Les chemins téléchargés sont gardés dans ce navigateur pour aller plus vite (⋯ › « Enregistrer les chemins OSM » pour en faire une copie dans un dossier). <a href="#" id="sClear">Vider cette mémoire</a></div>`, [
     { label: 'Valeurs par défaut', onClick: () => { S.settings = { ...DEF_SETTINGS }; afterSettings(); } }, 'sp',
     { label: 'Annuler' },
     { label: 'Enregistrer', cls: 'primary', onClick: () => {
       const g = (id, d, a, b) => { const v = parseFloat($('#' + id).value); return isFinite(v) ? clamp(v, a, b) : d; };
       const same = o => JSON.stringify(Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {}));      // comparaison sans tenir compte de l'ordre des champs
-      const before = same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0 });
+      const before = same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0 });
       S.settings = { sv: DEF_SETTINGS.sv, data: /^(osm|ign|ignd)$/.test($('#sData').value) ? $('#sData').value : 'vt', tol: g('sTol', 40, 0, 100), water: $('#sWater').checked, bld: $('#sBld').checked, pois: $('#sPois').checked, landmarks: $('#sLand').checked, merge: g('sMerge', 30, 5, 100), tulipR: g('sR', 50, 25, 120), straight: $('#sStraight').checked,
-        followLvl: +$('#sFollow').value, lmOff: [...document.querySelectorAll('.lmchk')].filter(c => !c.checked).map(c => c.dataset.lm), goudron: $('#sGoudron').checked, bends: $('#sBends').checked, offroad: $('#sOffroad').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showCap: $('#sCap').checked };
-      afterSettings(before === same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0 }));
+        followLvl: +$('#sFollow').value, lmOff: [...document.querySelectorAll('.lmchk')].filter(c => !c.checked).map(c => c.dataset.lm), goudron: $('#sGoudron').checked, bends: $('#sBends').checked, offroad: $('#sOffroad').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showRO: $('#sRO').checked, showPI: $('#sPI').checked, showTR: $('#sTR').checked, showCap: $('#sCap').checked };
+      afterSettings(before === same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0 }));
     } }]);
   const lmSet = v => document.querySelectorAll('.lmchk').forEach(c => { c.checked = v; });
   if ($('#lmAll')) { $('#lmAll').onclick = () => lmSet(true); $('#lmNone').onclick = () => lmSet(false); }
@@ -5299,6 +5360,7 @@ $('#moreMenu').addEventListener('click', e => {
   else if (act === 'saveProject') saveProject();
   else if (act === 'saveOsm') saveOsm();
   else if (act === 'loadOsm') $('#fileIn').click();
+  else if (act === 'theme') cycleTheme();
   else if (act === 'help') openHelp();
   else if (act === 'new') ask('Nouveau roadbook ?', 'Le parcours et les notes en cours seront effacés (pense à exporter ou enregistrer le projet avant).', 'Tout effacer', () => {
     if (drawing) setDrawing(false);
@@ -5337,6 +5399,21 @@ window.__rb = { measureForNote, openMeasure, measureAtLL, bendList, bendAt, edit
 
 // Version installable (PWA) : actif seulement quand la page est servie en https (pas en fichier local)
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+// ---------- thème de l'interface (Dakar jour / Bivouac nuit) ----------
+const THEMES = [['day', 'Dakar jour'], ['night', 'Bivouac nuit']];
+function applyTheme(t) {
+  if (!THEMES.some(x => x[0] === t)) t = 'day';
+  document.body.dataset.theme = t;
+  const el = document.getElementById('themeName'); if (el) el.textContent = THEMES.find(x => x[0] === t)[1];
+}
+function cycleTheme() {
+  const cur = document.body.dataset.theme || 'day';
+  const nt = cur === 'day' ? 'night' : 'day';
+  try { localStorage.setItem('rbgen.theme', nt); } catch (e) {}
+  applyTheme(nt);
+}
+try { applyTheme(localStorage.getItem('rbgen.theme') || 'day'); } catch (e) { applyTheme('day'); }
 </script>
 </body>
 </html>
