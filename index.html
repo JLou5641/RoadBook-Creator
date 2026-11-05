@@ -991,7 +991,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version du 05/11 18h21</div>
+          <div class="ver">Version du 05/11 18h23</div>
         </div>
       </div>
     </div>
@@ -4122,6 +4122,11 @@ function buildTulip(c, H, chain, others, kind, keepEntry) {
   }
   const t = { R, sq: 1, kind, route: rt.map(q => ({ p: rnd(q.p), c: q.c })), others: oth };
   if (wa.length) t.wa = wa; if (wl.length) t.wl = wl; if (bld.length) t.bld = bld;
+  if (kind !== 'start' && kind !== 'end' && !keepEntry && t.route.length >= 3) {      // trait-point (remise à 0 du trip) posé par défaut au centre de la tulipe
+    let bi = 1, bdd = Infinity;
+    for (let i = 1; i <= t.route.length - 2; i++) { const d = t.route[i].p[0] ** 2 + t.route[i].p[1] ** 2; if (d < bdd) { bdd = d; bi = i; } }
+    if (bdd < 9) { t.sp = bi; t.reset = true; }
+  }
   return t;
 }
 function clipChain(rt, ci, bx) {
