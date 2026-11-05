@@ -975,7 +975,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0511.1955</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0511.2120</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1001,7 +1001,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version v0.0511.1955</div>
+          <div class="ver">Version v0.0511.2120</div>
         </div>
       </div>
     </div>
@@ -2461,11 +2461,16 @@ function simplifyLL(ll, tol, maxN) {      // indices gardés (Douglas-Peucker), 
   while (maxN && idx.length > maxN) { tol *= 1.5; idx = simplifyDP(xy, tol); }
   return idx;
 }
-const llToCtrl = (ll, tol, maxN, mode) => simplifyLL(ll, tol, maxN).map((k, j) => [ll[k][0], ll[k][1], j ? (mode || 'line') : null]);
+const llToCtrl = (ll, tol, maxN, mode) => {
+  const idx = simplifyLL(ll, tol, maxN), c = idx.map((k, j) => [ll[k][0], ll[k][1], j ? (mode || 'line') : null]);
+  // mode 'trace' : chaque tronçon garde exactement les points d'origine de la trace (pas de corde entre deux points de contrôle) ; si on déplace un point, ses voisins suivent le mode « Tracé » choisi
+  if (mode === 'trace') for (let j = 1; j < idx.length; j++) routeCache.set(segKey(c[j - 1], c[j], 'trace'), ll.slice(idx[j - 1], idx[j] + 1));
+  return c;
+};
 function ctrlFromTrack() {
   const ll = S.ll;
-  S.ctrl = llToCtrl(ll, 3, 500);
-  S.segs = []; for (let i = 1; i < S.ctrl.length; i++) S.segs[i - 1] = [S.ctrl[i - 1].slice(0, 2), S.ctrl[i].slice(0, 2)];
+  S.ctrl = llToCtrl(ll, 3, 500, 'trace');
+  S.segs = []; for (let i = 1; i < S.ctrl.length; i++) S.segs[i - 1] = routeCache.get(segKey(S.ctrl[i - 1], S.ctrl[i], 'trace'));
   S.src = 'draw'; S.mm = null; rebuildFromSegs();
 }
 function setDrawing(on) {
@@ -2608,18 +2613,19 @@ async function reroute() {
   renderInfo();
 }
 function rebuildFromSegs() {
-  const ll = [];
+  const ll = [], prot = new Set();
   if (S.ctrl.length === 1) ll.push(S.ctrl[0].slice(0, 2));
   for (let i = 1; i < S.ctrl.length; i++) {
-    const seg0 = S.segs[i - 1] || [S.ctrl[i - 1].slice(0, 2), S.ctrl[i].slice(0, 2)], seg = seg0.length >= 3 ? cleanEnds(seg0) : seg0;      // retire aussi les petites pointes des parcours déjà dessinés
-    for (let k = ll.length ? 1 : 0; k < seg.length; k++) ll.push(seg[k]);
+    const keep = S.ctrl[i][2] === 'trace', seg0 = S.segs[i - 1] || [S.ctrl[i - 1].slice(0, 2), S.ctrl[i].slice(0, 2)], seg = seg0.length >= 3 && !keep ? cleanEnds(seg0) : seg0;      // retire aussi les petites pointes des parcours déjà dessinés (jamais sur une trace chargée : ses épingles restent intactes)
+    for (let k = ll.length ? 1 : 0; k < seg.length; k++) { ll.push(seg[k]); if (keep) prot.add(ll.length - 1); }
+    if (keep && ll.length > seg.length) prot.add(ll.length - seg.length);
   }
   // petite pointe au point de contrôle : l'itinéraire s'arrête au chemin le plus proche du clic, puis revient au clic avant de repartir → on retire le clic
   const cl = [ll[0]];
   for (let i = 1; i < ll.length - 1; i++) {
     const A = cl[cl.length - 1], B = ll[i], C = ll[i + 1], k = Math.cos(A[0] * Math.PI / 180);
     const u = [(B[1] - A[1]) * k * 111320, (B[0] - A[0]) * 110540], w = [(C[1] - B[1]) * k * 111320, (C[0] - B[0]) * 110540], lu = Math.hypot(u[0], u[1]), lw = Math.hypot(w[0], w[1]);
-    if (lu > 0.01 && lw > 0.01 && Math.min(lu, lw) <= 15 && (u[0] * w[0] + u[1] * w[1]) / (lu * lw) < -0.5) continue;
+    if (!prot.has(i) && lu > 0.01 && lw > 0.01 && Math.min(lu, lw) <= 15 && (u[0] * w[0] + u[1] * w[1]) / (lu * lw) < -0.5) continue;
     cl.push(B);
   }
   if (ll.length > 1) cl.push(ll[ll.length - 1]);
@@ -2645,6 +2651,7 @@ function cleanEnds(pts) {
 }
 let routeWarned = 0;
 async function routeSeg(a, b, mode) {
+  if (mode === 'trace') mode = S.routeMode;      // tronçon d'une trace chargée dont un point a bougé : on suit le mode « Tracé » du menu
   if (!mode || mode === 'line') return [a.slice(0, 2), b.slice(0, 2)];
   try {
     const url = `https://brouter.de/brouter?lonlats=${a[1].toFixed(6)},${a[0].toFixed(6)}|${b[1].toFixed(6)},${b[0].toFixed(6)}&profile=${encodeURIComponent(mode)}&alternativeidx=0&format=geojson`;
@@ -5277,8 +5284,10 @@ function cutAt(ll) {
 function reverseCtrl() {
   if (anyLock()) { toast('Une étape est verrouillée 🔒 : déverrouille-la (menu ⋯ › Étapes) pour utiliser cet outil.', 'err'); return; }
   if (S.ctrl.length < 2) return;
-  pushHist(); const o = S.ctrl;
+  pushHist(); const o = S.ctrl, oldSegs = S.segs.slice(), N = o.length;
   S.ctrl = o.slice().reverse().map((c, j) => [c[0], c[1], j ? o[o.length - j][2] : null]);
+  // on inverse simplement chaque tronçon déjà calculé (même trajet dans l'autre sens) au lieu de le recalculer : sinon l'itinéraire peut changer, ou se réduire à des lignes droites hors connexion
+  for (let j = 1; j < N; j++) { const sg = oldSegs[N - j - 1], mode = S.ctrl[j][2]; if (mode && mode !== 'line' && sg && sg.length >= 2) routeCache.set(segKey(S.ctrl[j - 1], S.ctrl[j], mode), sg.slice().reverse()); }
   renderCtrl(); reroute(); toast('Sens du parcours inversé.', 'ok');
 }
 async function mergeFile(file) {
