@@ -1,0 +1,17 @@
+const { chromium } = require('playwright'); const path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1300, height: 800 } });
+  let calls = 0, hdr = '';
+  await p.route(/brouter|routing\.openstreetmap|tile|arcgisonline|overpass|kumi|private\.coffee|mail\.ru/, r => r.abort());
+  await p.route(/openrouteservice/, r => { if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' } });
+    calls++; hdr = r.request().headers()['authorization'] || '';
+    const o = JSON.parse(r.request().postData()).coordinates; const mid = [(o[0][0] + o[1][0]) / 2 + 0.001, (o[0][1] + o[1][1]) / 2];
+    r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ features: [{ geometry: { coordinates: [o[0], mid, o[1]] } }] }) }); });
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.click('#bDraw'); await p.waitForTimeout(300);
+  await p.selectOption('#routeMode', 'ors:foot-hiking'); await p.waitForTimeout(400);
+  await p.screenshot({ path: process.argv[2] });
+  await p.fill('#orsK', 'TESTKEY123'); await p.click('button.mbtn.primary'); await p.waitForTimeout(300);
+  await p.evaluate(() => { const R = window.__rb; R.map.setView([42.5, 1.5], 14); });
+  await p.mouse.click(400, 300); await p.mouse.click(600, 400); await p.waitForTimeout(1500);
+  console.log('appels ORS', calls, 'auth', hdr, 'points trace', await p.evaluate(() => window.__rb.S.ll.length));
+  await b.close(); })();

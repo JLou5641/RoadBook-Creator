@@ -1,0 +1,33 @@
+// Symboles du lexique séparés : liste, recherche, pose de deux symboles « Animal » indépendants, enregistrement, export
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+const TD = '/home/claude/vt/tiles_bay';
+(async () => {
+  const browser = await chromium.launch(); const page = await browser.newPage({ viewport: { width: 1500, height: 1500 }, deviceScaleFactor: 1.3 });
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  await page.route(/overpass|kumi|private\.coffee|mail\.ru|tile\.|arcgisonline|geopf|opentopomap|cyclosm/, r => r.abort());
+  await page.route(/openfreemap|data\.gouv\.fr/, r => { const m = /\/(\d+)\/(\d+)\/(\d+)\.pbf/.exec(r.request().url()), f = m && path.join(TD, m[2], m[3] + '.pbf'); if (!f || !fs.existsSync(f)) return r.fulfill({ status: 404, body: '' }); r.fulfill({ status: 200, body: fs.readFileSync(f) }); });
+  await page.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html'));
+  await page.evaluate(async () => { localStorage.clear(); await new Promise(r => { const q = indexedDB.deleteDatabase('rbgen-osm'); q.onsuccess = q.onerror = q.onblocked = r; }); }); await page.reload();
+  await page.evaluate(t => window.__rb.loadText(t, 't.gpx'), fs.readFileSync(path.join(__dirname, 'bayreuth_long.gpx'), 'utf8')); await page.waitForTimeout(300);
+  await page.evaluate(() => window.__rb.generate());
+  await page.waitForFunction(() => !document.querySelector('#modalBg').classList.contains('show'), null, { timeout: 120000 });
+  await page.evaluate(() => document.querySelectorAll('#toast div').forEach(d => d.remove()));
+  await page.evaluate(i => document.querySelectorAll('#rb .row')[i].dispatchEvent(new MouseEvent('dblclick', { bubbles: true })), 51); await page.waitForTimeout(200);
+  await page.click('#eLexOpen'); await page.click('#eLexTabs button[data-c="Symboles"]'); await page.waitForTimeout(200);
+  await page.fill('#eLexQ', 'animal');
+  console.log('recherche « animal » :', (await page.$$eval('#eLexGrid button', b => b.map(x => x.dataset.k))).join(', '));
+  await page.click('#eLexGrid button[data-k="animal_1"]'); await page.click('#eLexGrid button[data-k="animal_2"]');
+  const st = await (await page.$('#stT')).boundingBox();
+  const ims = await page.$$('#stTin .fs'); let bb = await ims[0].boundingBox();
+  await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2); await page.mouse.down(); await page.mouse.move(st.x + st.width * 0.3, st.y + st.height * 0.3, { steps: 6 }); await page.mouse.up();
+  bb = await ims[1].boundingBox(); await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2); await page.mouse.down(); await page.mouse.move(st.x + st.width * 0.7, st.y + st.height * 0.7, { steps: 6 }); await page.mouse.up();
+  console.log('symboles posés :', (await page.$$('#stTin .fs')).length);
+  await page.fill('#eLexQ', ''); await page.click('#eLexTabs button[data-c="Symboles"]');
+  await page.evaluate(() => { document.querySelector('#eLexGrid').style.maxHeight = 'none'; });
+  const grid = await page.$('#eLexGrid'); await grid.screenshot({ path: '/tmp/sp_grid.png' });
+  await page.evaluate(() => { document.querySelector('.modal').scrollTop = 0; });
+  await page.click('.mbtn.primary'); await page.waitForTimeout(300);
+  console.log('enregistré :', await page.evaluate(() => window.__rb.S.notes[51].sym.map(q => q.k).join(' · ')));
+  const gpx = await page.evaluate(() => window.__rb.buildGPX()); fs.writeFileSync(path.join(__dirname, 'split.gpx'), gpx);
+  console.log(errs.join('\n') || 'aucune erreur JS'); await browser.close();
+})().catch(e => { console.error(e); process.exit(1); });
