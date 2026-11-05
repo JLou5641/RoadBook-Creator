@@ -996,7 +996,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version du 05/11 19h15</div>
+          <div class="ver">Version du 05/11 19h46</div>
         </div>
       </div>
     </div>
@@ -4412,9 +4412,8 @@ function rbFlags(notes) {       // zone de vitesse DZ→FZ (et DN/DT avec limite
     normNote(n);
     const t = n.wp && n.wp.type, zt = n.zone && n.zone.type;
     const endSp = zt === 'fz' || zt === 'fzdz' ? zsp : null;      // vitesse de la zone qui se termine (panneau barré)
-    const wpSp = /^(dn|dt)$/.test(t || '') && n.wp.speed;         // DN / DT avec limite : début de zone (cadre orange) ; le DSS avec limite n'a pas de cadre
     if (zt === 'dz' || zt === 'fzdz') zsp = n.zone.speed || null; else if (/^(dn|dt|dss)$/.test(t || '') && n.wp.speed) zsp = n.wp.speed;
-    const starts = zt === 'dz' || zt === 'fzdz' || !!wpSp;
+    const starts = zt === 'dz' || zt === 'fzdz';      // seul un DZ colore la zone en orange (une limite saisie sur DN / DT / DSS ne colore rien)
     if (starts) zone = true;
     const z = zone, ends = zt === 'fz' || zt === 'fzdz' || t === 'fn' || t === 'ft' || t === 'ass';
     if (zt === 'fz' || t === 'fn' || t === 'ft' || t === 'ass') zone = false;
@@ -4557,7 +4556,8 @@ function fitLines(lines, dg, cap, symH) {  // lignes secondaires qui tiennent da
 function rowInner(n, i, par, f, screen) {
   const t = n.wp && n.wp.type, zt = n.zone && n.zone.type, NV = noteView(n), lines = NV.lines;
   const bg = (t && WP_BG[t]) || (zt === 'fz' ? WP_BG.fz : zt ? WP_BG.dz : null)
-    || (/^(dn|dt|dss)$/.test(t || '') && n.wp.speed ? WP_BG.dz : /^(dn|fn|dt|ft)$/.test(t || '') ? '#D8D8D8' : null) || (f.green ? '#A0D080' : '#fff');
+    || (/^(dn|fn|dt|ft)$/.test(t || '') ? '#D8D8D8' : null)      // seul un DZ colore la case en orange : une limite saisie sur DN / DT / DSS ne change pas le fond
+    || (f.green ? '#A0D080' : '#fff');
   const sym = symsHTML(noteSymbols(n, f), f.close);
   const dg = n.danger && t !== 'wps' ? `<div class="dg">${'!'.repeat(n.danger)}</div>` : '';
   const big = /^(dss|ass)$/.test(t || '') ? `<div class="wpbig">${t.toUpperCase()}</div>` : '';      // DSS / ASS : le sigle en grand au milieu de la 3e case (le symbole de la 1re case n'a plus le mot)
