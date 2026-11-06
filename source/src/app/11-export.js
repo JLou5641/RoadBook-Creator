@@ -103,6 +103,6 @@ function printRB() {
 }
 function saveProject() {
   if (!S.ll.length && !S.notes.length) { toast('Rien à enregistrer pour l’instant.'); return; }
-  download(fileName('.roadbook.json'), JSON.stringify(snapshot()), 'application/json');
+  download(fileName('.roadbook.json'), JSON.stringify(snapshot()), 'application/json'); setDirty(false);
 }
 

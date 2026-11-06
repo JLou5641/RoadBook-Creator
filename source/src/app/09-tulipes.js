@@ -571,7 +571,7 @@ function rowInner(n, i, par, f, screen) {
     + `<div class="k k2">${tulipSVG(n.tulip, 200)}${freeLayer(n.sym, 't')}${t === 'cp' ? '<div class="cpf"></div>' : ''}</div>`
     + `<div class="k k3${signs.length ? ' hs' : cap ? ' hc' : ''}">${big}${top}${n.kind === 'info' ? lx : ''}<div class="t1">${esc(lines[0] || '')}</div>${n.kind === 'info' ? '' : lx}${freeLayer((n.sym || []).concat(mainFree), 'd')}<div class="t2">${esc(fitLines(lines, !!(dg || tl), !!(cap || signs.length), lk.length ? lr * (lh + 0.6) - 0.6 : 0, signs.length ? 12.4 : 0).join('\n'))}</div>${cap}${sg}`
     + (screen && (!n.auto || n.moved) ? '<div class="man">manuelle</div>' : '')
-    + (screen ? `<div class="acts"><button data-a="edit" title="Modifier la note">✎</button><button data-a="del" title="Supprimer la note">🗑</button></div>` : '') + `</div>`
+    + (screen ? `<div class="acts">${n.why ? '<button data-a="why" title="Pourquoi cette note ?">?</button>' : ''}<button data-a="edit" title="Modifier la note">✎</button><button data-a="del" title="Supprimer la note">🗑</button></div>` : '') + `</div>`
     + (f.zone ? `<div class="fr zone${f.zTop ? ' zt' : ''}${f.zBot ? ' zb' : ''}"></div>` : '') + (f.red ? '<div class="fr red"></div>' : '');
 }
 function renderRoadbook() {
@@ -586,7 +586,7 @@ function renderRoadbook() {
   }
   let prev = 0; const fl = rbFlags(S.notes);
   const descBox = `<div class="rbr dbox"><textarea id="rbDesc" spellcheck="true" placeholder="Description du roadbook : rallye, étape, date, départ, consignes, rappels…">${esc(S.desc || '')}</textarea></div>`;
-  rb.innerHTML = descBox + S.notes.map((n, i) => { const par = n.s - prev; prev = n.s; return `<div class="rbr row${n.id === S.sel ? ' sel' : ''}" data-id="${n.id}">${rowInner(n, i, par, fl[i], true)}</div>`; }).join('');
+  rb.innerHTML = descBox + S.notes.map((n, i) => { const par = n.s - prev; prev = n.s; return `<div class="rbr row${n.id === S.sel ? ' sel' : ''}" data-id="${n.id}"${n.why ? ` title="Pourquoi cette note ? ${esc(n.why)}"` : ''}>${rowInner(n, i, par, fl[i], true)}</div>`; }).join('');
   renderInfo();
 }
 function renderAll() { S.notes.sort((a, b) => a.s - b.s); renderRoadbook(); renderMarkers(); renderInfo(); save(); }
@@ -607,6 +607,7 @@ function deleteNote(id) {
 $('#rb').addEventListener('click', e => {
   const row = e.target.closest('.row'); if (!row) return;
   const id = +row.dataset.id, a = e.target.closest('button[data-a]');
+  if (a && a.dataset.a === 'why') { const q = S.notes.find(x => x.id === id); if (q) openModal('Pourquoi cette note ?', esc(q.why), [{ label: 'OK', cls: 'primary' }]); return; }
   if (a && a.dataset.a === 'edit') { editNote(id); return; }
   if (a && a.dataset.a === 'del') { deleteNote(id); return; }
   selectNote(id, 'list');
@@ -657,6 +658,14 @@ function regMySyms(o) {
 }
 try { regMySyms(JSON.parse(localStorage.getItem('rbgen.mySyms') || '{}')); } catch (e) { }
 function saveMySyms() { try { localStorage.setItem('rbgen.mySyms', JSON.stringify(MYS)); } catch (e) { toast('Bibliothèque de symboles pleine : le symbole reste dans le projet seulement.'); } }
+function removeMySym(k) {      // retire un symbole importé de la bibliothèque, du projet et de toutes les notes
+  delete MYS[k]; delete FIA_LEX[k]; saveMySyms();
+  if (!Object.keys(MYS).length) { const i = FIA_CATS.indexOf('Mes symboles'); if (i >= 0) FIA_CATS.splice(i, 1); }
+  for (const n of S.notes) {
+    if (n.sym) { n.sym = n.sym.filter(q => q.k !== k); if (!n.sym.length) delete n.sym; }
+    if (n.lex) { n.lex = n.lex.filter(x => x !== k); if (!n.lex.length) delete n.lex; }
+  }
+}
 async function importSymbol(file) {      // image → PNG de 160 px max, fond blanc uni retiré (à partir des bords)
   const url = URL.createObjectURL(file), im = new Image();
   await new Promise((ok, ko) => { im.onload = ok; im.onerror = () => ko(new Error('Image illisible')); im.src = url; });
@@ -681,6 +690,7 @@ function editNote(id, isNew) {
   const body = `
     <div class="entabs" id="enTabs"><button type="button" class="on" data-t="0">Note</button><button type="button" data-t="1">Dessin<i></i></button><button type="button" data-t="2">Waypoint<i></i></button><button type="button" data-t="3">Zone<i></i></button></div>
     <div class="enp on" data-p="0">
+    ${n.why ? `<div class="help why">💡 <b>Pourquoi cette note ?</b> ${esc(n.why)}</div>` : ''}
     <div class="fld"><label for="eText">Texte de la note (1re ligne en gros)</label><textarea id="eText" rows="3">${esc(conv ? pre.lines.join('\n') : n.text)}</textarea></div>
     <div class="fgrid">
       <div class="fld"><label for="eCap">CAP (°)</label><input id="eCap" type="number" min="0" max="359" value="${n.cap == null ? '' : n.cap}"><button type="button" class="mbtn" id="eCapMeas" title="Enregistre la note puis mesure le cap sur la trace" style="margin-top:4px">📐 Mesurer</button></div>
@@ -798,7 +808,7 @@ function editNote(id, isNew) {
       symList.push({ k, c: 'd', x: +(x + w / 2).toFixed(1), y: +Math.min(94 - h / 2, top + h / 2 + row * (h + 2)).toFixed(1), h }); x += w + 1.8;
     }
   }
-  let lexCat = FIA_CATS[0], symSel = null;
+  let lexCat = FIA_CATS[0], symSel = null, delMode = false;
   const lexImg = k => `<img src="${FIA_LEX[k].d}" alt="">`;
   const renderLex = () => {
     $('#eLexSel').innerHTML = lexSel.length ? lexSel.map(k => `<button type="button" class="lexchip" data-k="${k}" title="Retirer : ${esc(FIA_LEX[k].l)}">${lexImg(k)}<span>×</span></button>`).join('')
@@ -806,8 +816,9 @@ function editNote(id, isNew) {
     const q = ($('#eLexQ').value || '').trim().toLowerCase();
     const norm = t => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const keys = Object.keys(FIA_LEX).filter(k => !FIA_LEX[k].x).filter(k => q ? norm(FIA_LEX[k].l + ' ' + FIA_LEX[k].en + ' ' + k).includes(norm(q)) : FIA_LEX[k].c === lexCat);
-    $('#eLexGrid').innerHTML = keys.length ? keys.map(k => `<button type="button" class="lextile${lexSel.includes(k) ? ' on' : ''}" data-k="${k}" title="${esc(FIA_LEX[k].l)} — ${esc(FIA_LEX[k].en)}">${lexImg(k)}<span>${esc(FIA_LEX[k].l)}</span></button>`).join('')
-      : '<div class="help" style="margin:6px 0">Aucun symbole trouvé.</div>';
+    const delBar = !q && lexCat === 'Mes symboles' && keys.length ? `<div class="lexdel" style="grid-column:1/-1"><button type="button" class="mbtn" id="eLexDelBtn">${delMode ? '✔ Terminé' : '🗑 Supprimer un symbole importé'}</button>${delMode ? ' <span class="help" style="margin:0">Clique sur le symbole à supprimer définitivement.</span>' : ''}</div>` : '';
+    $('#eLexGrid').innerHTML = delBar + (keys.length ? keys.map(k => `<button type="button" class="lextile${lexSel.includes(k) ? ' on' : ''}${delMode ? ' del' : ''}" data-k="${k}" title="${esc(FIA_LEX[k].l)} — ${esc(FIA_LEX[k].en)}">${lexImg(k)}<span>${esc(FIA_LEX[k].l)}</span></button>`).join('')
+      : '<div class="help" style="margin:6px 0">Aucun symbole trouvé.</div>');
     $('#eLexTabs').classList.toggle('dim', !!q);
   };
   $('#eSymImp').onclick = () => $('#eSymFile').click();
@@ -824,7 +835,19 @@ function editNote(id, isNew) {
   $('#eLexTabs').onclick = e => { const b = e.target.closest('button[data-c]'); if (!b) return; lexCat = b.dataset.c; $('#eLexQ').value = ''; $('#eLexTabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); renderLex(); };
   $('#eLexQ').oninput = renderLex;
   $('#eLexGrid').onclick = e => {
+    if (e.target.closest('#eLexDelBtn')) { delMode = !delMode; renderLex(); return; }
     const b = e.target.closest('button[data-k]'); if (!b) return; const k = b.dataset.k;
+    if (delMode && MYS[k]) {
+      const use = S.notes.filter(n => (n.sym || []).some(q => q.k === k) || (n.lex || []).includes(k)).length;
+      if (!confirm('Supprimer le symbole « ' + FIA_LEX[k].l + ' » ?' + (use ? '\nIl est utilisé dans ' + use + ' note' + (use > 1 ? 's' : '') + ' : il sera retiré de ' + (use > 1 ? 'ces notes.' : 'cette note.') : ''))) return;
+      removeMySym(k);
+      for (let i = symList.length - 1; i >= 0; i--) if (symList[i].k === k) symList.splice(i, 1);
+      const li = lexSel.indexOf(k); if (li >= 0) lexSel.splice(li, 1);
+      if (symSel && symSel.k === k) symSel = null;
+      if (!MYS || !Object.keys(MYS).length) { lexCat = FIA_CATS[0]; delMode = false; }
+      $('#eLexTabs').innerHTML = FIA_CATS.map(c => `<button type="button" data-c="${esc(c)}"${c === lexCat ? ' class="on"' : ''}>${esc(c)}</button>`).join('');
+      renderLex(); renderStage(); renderAll(); toast('Symbole supprimé.'); return;
+    }
     symSel = { k, c: symSel ? symSel.c : lastCase, x: 50, y: 50, h: 16 }; symList.push(symSel); renderStage();       // nouveau symbole au centre, devant les autres
   };
   // zone de placement : deux cases carrées, les symboles se glissent (même d'une case à l'autre) et se redimensionnent

@@ -172,6 +172,7 @@ function roundaboutNote(g, grp, prevS, nextS) {
   const text = ['Rond-point', (no === 1 ? '1re' : no + 'e') + ' sortie', 'sur ' + wayLabel(last.exit.b.way)].join('\n');
   const n = mkNote({ s: (first.s + last.s) / 2, xy: c, text, cap: Math.round(last.hOut) % 360, kind: 'junction', tulip });      // la note est prise au milieu du rond-point
   n.span = [Math.round(first.s), Math.round(last.s)];
+  n.why = 'Rond-point : ' + grp.length + ' branches de la trace regroupées, sortie n°' + no + ' · données ' + dataLbl();
   n.src = { t: 'rb', ids: grp.map(x => x.J.id), ss: grp.map(x => Math.round(x.s * 10) / 10), k: grp.map(x => x.ev.kind) };
   return n;
 }
@@ -217,6 +218,12 @@ function noteFromGroup(g, gr, prevS, nextS) {
   if (trackName) note.trackName = trackName;
   { const rid = w => ({ ref: ((w.tags && w.tags.ref) || '').split(';')[0].replace(/\s+/g, '').toUpperCase(), name: tName(w.tags).toLowerCase() });
     note.rd = { a: rid(first.entry.b.way), b: rid(exitWay), road: entryCat === 'road' && exitCat === 'road' && !surf, cat: entryCat === exitCat && /^(road|track)$/.test(entryCat) ? entryCat : '' }; }      // route avant / après le carrefour (pour le regroupement « suivre la route »)
+  { const bits = [];
+    if (fork) bits.push('fourche à ' + (arms.length + 2) + ' branches, toutes du même type de voie (' + (entryCat === 'road' ? 'goudron' : 'non goudronné') + ')');
+    else if (jn.length) bits.push('intersection à ' + main.brs.length + ' branches : ' + ({ 'TD': 'tout droit', 'Lég. à D': 'légèrement à droite', 'Lég. à G': 'légèrement à gauche', 'À D': 'tourner à droite', 'À G': 'tourner à gauche', 'Serrer à D': 'serrer à droite', 'Serrer à G': 'serrer à gauche' }[t1] || t1));
+    if (surf) bits.push('changement de revêtement (' + (exitCat === 'road' ? 'début' : 'fin') + ' de goudron)');
+    if (gr.length > 1) bits.push(gr.length + ' embranchements proches regroupés en une note');
+    note.why = bits.join(' ; ').replace(/^./, c => c.toUpperCase()) + ' · données ' + dataLbl(); }
   note.src = { t: 'j', ids: gr.map(x => x.J.id), ss: gr.map(x => Math.round(x.s * 10) / 10), k: gr.map(x => x.ev.kind) };
   return note;
 }
@@ -313,7 +320,7 @@ function detectBends(jNotes) {
     const text = uturn ? 'Demi-tour' : (At >= 130 ? 'Épingle à ' : 'Virage serré à ') + sd;
     const tt = trackTulip(v.s, 'bend');
     const bn = mkNote({ s: v.s, xy: tt.xy, text, cap: Math.round(trackBearing(v.s, v.s + 30)) % 360, kind: 'bend', tulip: tt.tulip });
-    bn.src = { t: 'trk', kind: 'bend' }; out.push(bn);
+    bn.why = (uturn ? 'Demi-tour' : At >= 130 ? 'Épingle' : 'Virage serré') + ' : la trace tourne de ' + Math.round(At) + '° en quelques mètres (seuil réglé à ' + st.bendAngle + '°)'; bn.src = { t: 'trk', kind: 'bend' }; out.push(bn);
   }
   return out;
 }
@@ -336,7 +343,7 @@ function detectOffroad(known) {
     const catFn = (p, q) => q > s + 4 || !onNet(p) ? 'trail' : 'track';      // pointillés : tout ce qui suit la note (hors piste) et ce qui précède s'il est hors des chemins
     const tt = trackTulip(s, 'bend', catFn, true);
     const n = mkNote({ s, xy: tt.xy, text: dirPhrase(ang) + '\nHors piste', cap: Math.round(trackBearing(s, s + 30)) % 360, kind: 'bend', tulip: tt.tulip });
-    n.src = { t: 'trk', kind: 'bend' }; out.push(n);
+    n.why = 'Trace hors des chemins connus (' + dataLbl() + ') : sortie ou changement de cap'; n.src = { t: 'trk', kind: 'bend' }; out.push(n);
   };
   for (const [r0, r1] of runs) {
     if (r0 > 30) {      // la note est posée sur le coude (plus fort changement de cap juste avant / après la sortie des chemins), à défaut à la sortie
@@ -355,6 +362,7 @@ function detectOffroad(known) {
   }
   return out;
 }
+const dataLbl = () => ({ osm: 'OSM', vt: 'OSM', ign: 'IGN', ignd: 'IGN détaillé' }[S.settings.data] || 'OSM');
 function mkNote(o) {
   const ll = inv(o.xy[0], o.xy[1]);
   return { id: S.nextId++, s: Math.round(o.s * 10) / 10, lat: +ll[0].toFixed(6), lon: +ll[1].toFixed(6), text: o.text || '',
@@ -477,7 +485,7 @@ function followRoad(notes, lvl) {
       for (const x of sec) if (!keep.includes(x)) keep.push(x);
       a.text = [L[0], kd === 'track' ? 'Suivre la piste' : 'Suivre la route' + (ref ? ' ' + ref : ''), ...keep].join('\n');
       a.roadNames = [];
-      a.follow = true;
+      a.follow = true; a.why = (n + 1) + ' carrefours regroupés : la trace reste sur la même ' + (kd === 'track' ? 'piste' : 'route' + (ref ? ' ' + ref : '')) + ' (niveau de regroupement ' + lvl + ')';
       if (a.span && last.span) a.span = [a.span[0], last.span[1]];
     }
   }
@@ -651,7 +659,7 @@ function osmExtras(g, notes) {
     } else if (e.own) {
       const tt = trackTulip(e.s, 'info');
       const nn = mkNote({ s: e.s, xy: tt.xy, text: e.text, cap: Math.round(trackBearing(e.s, e.s + 30)) % 360, kind: 'info', tulip: tt.tulip });
-      nn.src = { t: 'trk', kind: 'info' }; nn.danger = e.danger || 0;
+      nn.why = 'Repère trouvé dans les données ' + dataLbl() + ' le long de la trace'; nn.src = { t: 'trk', kind: 'info' }; nn.danger = e.danger || 0;
       notes.push(nn); notes.sort((a, b) => a.s - b.s); added++;
     }
   }

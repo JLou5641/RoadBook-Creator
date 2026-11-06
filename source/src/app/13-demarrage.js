@@ -17,7 +17,7 @@ async function loadFile(file) {
       if (o && o.type === 'rbgen-osm') { await importOsm(o); return; }
       if (!o || !o.ll) throw new Error('Projet illisible.');
       if (drawing) setDrawing(false);
-      restore(o); $('#rbName').value = S.name; renderAll(); renderTrack(true);
+      restore(o); $('#rbName').value = S.name; renderAll(); renderTrack(true); setDirty(false);
       toast('Projet ouvert.', 'ok'); return;
     }
     const g = parseGPX(txt);
@@ -594,6 +594,7 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
 (function init() {
   try { const raw = localStorage.getItem(LS_KEY); if (raw) { restore(JSON.parse(raw)); $('#rbName').value = S.name; } } catch (e) { console.warn(e); }
   $('#routeMode').value = S.routeMode;
+  try { setDirty(localStorage.getItem('rbgen.dirty') === '1'); } catch (e) { }
   renderRoadbook(); renderMarkers(); renderTrack(true); renderInfo();
 })();
 

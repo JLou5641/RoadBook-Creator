@@ -1,0 +1,14 @@
+const { chromium } = require('playwright'); const path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1300, height: 800 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file)(?!https:\/\/data\.geopf\.fr).*/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.setInputFiles('#fileIn', '/mnt/user-data/uploads/458e641c-1er_trac__RB_MORVAN.json'); await p.waitForTimeout(1500);
+  const before = await p.evaluate(() => window.__rb.S.notes.map(n => ({ id: n.id, s: Math.round(n.s), t: (n.text || '').split('\n').join('/'), ed: !!n.edited, wp: n.wp && n.wp.type })));
+  await p.setInputFiles('#fileIn', '/mnt/user-data/uploads/d628998c-chemins-osm-2026-11-06.rbosm'); await p.waitForTimeout(4000);
+  const toast = await p.evaluate(() => (document.querySelector('#toast') || {}).innerText);
+  console.log('avant', before.length, 'toast', toast);
+  await p.click('#bGen'); await p.waitForFunction(() => !document.querySelector('#modalBg.show') || /Aucun|indisponibles|peu reconnu/.test(document.querySelector('#modal').innerText), null, { timeout: 170000 }).catch(() => {});
+  await p.waitForTimeout(1500);
+  const after = await p.evaluate(() => ({ modal: document.querySelector('#modalBg.show') ? document.querySelector('#modal').innerText.slice(0, 160) : '', notes: window.__rb.S.notes.map(n => ({ s: Math.round(n.s), t: (n.text || '').split('\n').join('/'), ed: !!n.edited, wp: n.wp && n.wp.type, auto: n.auto })) }));
+  console.log('après', after.notes.length, after.modal, 'erreurs', errs.slice(0, 3).join('|') || 0);
+  require('fs').writeFileSync('/tmp/morvan.json', JSON.stringify({ before, after: after.notes })); await b.close(); })();

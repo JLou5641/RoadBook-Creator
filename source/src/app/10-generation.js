@@ -49,7 +49,8 @@ async function runGenerate() {
     closeModal(); renderTrack(); renderAll();
     if (S.notes.length > 1) map.fitBounds(line.getBounds(), { padding: [40, 40] });
     const pc = Math.round(ratio * 100);
-    toast(`${S.notes.length} notes : ${jn.length} intersection${jn.length > 1 ? 's' : ''}${bends.length ? ', ' + bends.length + (bends.length > 1 ? ' virages serrés' : ' virage serré') : ''}${rep && rep.events ? ', ' + rep.events + ' repères' : ''}. ${S.settings.tol === 0 ? 'Trace non recalée.' : 'Parcours reconnu sur les chemins : ' + pc + ' %.'}`, 'ok');
+    const nk = manual.length, nr = all.length;
+    toast(`${nk ? nk + (nk > 1 ? ' notes gardées' : ' note gardée') + ' (modifiées ou ajoutées à la main), ' + nr + (nr > 1 ? ' recalculées' : ' recalculée') + '. ' : ''}${S.notes.length} notes : ${jn.length} intersection${jn.length > 1 ? 's' : ''}${bends.length ? ', ' + bends.length + (bends.length > 1 ? ' virages serrés' : ' virage serré') : ''}${rep && rep.events ? ', ' + rep.events + ' repères' : ''}. ${S.settings.tol === 0 ? 'Trace non recalée.' : 'Parcours reconnu sur les chemins : ' + pc + ' %.'}`, 'ok');
     if (pc < 60 && S.settings.tol !== 0) openModal('Parcours peu reconnu', `Seulement <b>${pc} %</b> de ta trace a pu être recalée sur les chemins OpenStreetMap (trait noir sur la carte) : les intersections ne sont repérées que sur cette partie.<br><br>Si ta trace a été dessinée à main levée ou s’écarte des chemins, augmente <b>« Écart maxi trace ↔ chemins »</b> dans ⋯ › Réglages (par ex. 70 m), puis régénère. Les portions hors-piste ou absentes d’OpenStreetMap restent sans intersection.`, [{ label: 'OK', cls: 'primary' }]);
   } catch (e) {
     closeModal();

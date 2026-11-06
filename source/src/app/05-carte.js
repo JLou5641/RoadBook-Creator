@@ -208,7 +208,7 @@ function renderMarkers() {
   noteLayer.clearLayers(); markers.clear();
   S.notes.forEach((n, i) => {
     const m = L.marker([n.lat, n.lon], { icon: noteIcon(n, i), keyboard: false, riseOnHover: true });
-    m.bindTooltip(() => `<div style="display:flex;gap:8px;align-items:center">${tulipSVG(n.tulip, 86)}<div><b>${i + 1} · ${km(n.s)} km</b><br>${esc(n.text).replace(/\n/g, '<br>')}${radiiText(n) ? `<br><span style="color:#6b6559">◎ ${radiiText(n)}</span>` : ''}${n.id === S.sel && !drawing ? '<br><span style="color:#b5651d">↔ glisse pour déplacer</span>' : ''}</div></div>`, { direction: 'top', offset: [0, -12], opacity: 1 });
+    m.bindTooltip(() => `<div style="display:flex;gap:8px;align-items:center">${tulipSVG(n.tulip, 86)}<div><b>${i + 1} · ${km(n.s)} km</b><br>${esc(n.text).replace(/\n/g, '<br>')}${n.why ? `<br><span style="color:#6b6559;font-size:11px">💡 ${esc(n.why)}</span>` : ''}${radiiText(n) ? `<br><span style="color:#6b6559">◎ ${radiiText(n)}</span>` : ''}${n.id === S.sel && !drawing ? '<br><span style="color:#b5651d">↔ glisse pour déplacer</span>' : ''}</div></div>`, { direction: 'top', offset: [0, -12], opacity: 1 });
     m.on('click', () => selectNote(n.id, 'map'));
     m.on('dragstart', () => { moving = true; document.body.classList.add('dragNote'); });
     m.on('drag', () => dragBubble(n, m));

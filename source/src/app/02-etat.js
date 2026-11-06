@@ -15,7 +15,10 @@ function snapshot() {
   return { v: 2, name: S.name, desc: S.desc, src: S.src, ll: S.ll, mm: S.mm, ctrl: S.ctrl, segs: S.segs, notes: S.notes, settings: S.settings,
     stale: S.stale, routeMode: S.routeMode, nextId: S.nextId, stages: S.stages, marks: S.marks, ele: S.ele, timing: S.timing, mySyms: MYS };
 }
+let dirty = false;
+function setDirty(v) { dirty = v; try { localStorage.setItem('rbgen.dirty', v ? '1' : ''); } catch (e) { } const b = document.getElementById('bSave'); if (b) { b.classList.toggle('dirty', v); b.title = v ? 'Modifications non sauvegardées dans un fichier : clique pour sauvegarder le projet' : 'Sauvegarder le projet en cours (fichier .json à rouvrir plus tard)'; } }
 function save() {
+  setDirty(true);
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try { localStorage.setItem(LS_KEY, JSON.stringify(snapshot())); }

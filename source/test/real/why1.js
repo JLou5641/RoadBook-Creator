@@ -1,0 +1,32 @@
+const { chromium } = require('playwright'); const path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1300, height: 900 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  p.on('dialog', d => d.accept());
+  await p.route(/^(?!file)(?!https:\/\/data\.geopf\.fr).*/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.setInputFiles('#fileIn', '/mnt/user-data/uploads/458e641c-1er_trac__RB_MORVAN.json'); await p.waitForTimeout(1500);
+  console.log('dirty après ouverture', await p.evaluate(() => document.querySelector('#bSave').classList.contains('dirty')));
+  await p.setInputFiles('#fileIn', '/mnt/user-data/uploads/d628998c-chemins-osm-2026-11-06.rbosm'); await p.waitForTimeout(4000);
+  await p.evaluate(() => { window.__t = []; new MutationObserver(() => window.__t.push(document.querySelector('#toast').innerText)).observe(document.querySelector('#toast'), { childList: true, subtree: true, characterData: true }); });
+  await p.click('#bGen'); await p.waitForFunction(() => !document.querySelector('#modalBg.show'), null, { timeout: 170000 }).catch(() => {});
+  await p.waitForTimeout(800);
+  console.log('toasts', await p.evaluate(() => window.__t.filter(Boolean)));
+  console.log('dirty après gén', await p.evaluate(() => document.querySelector('#bSave').classList.contains('dirty')));
+  console.log('why', await p.evaluate(() => { const N = window.__rb.S.notes; return { total: N.length, avec: N.filter(n => n.why).length, ex: N.filter(n => n.why).slice(0, 6).map(n => n.why) }; }));
+  await p.screenshot({ path: '/tmp/why_dirty.png' });
+  // tooltip + bouton ?
+  console.log('title row', await p.evaluate(() => (document.querySelector('.rbr.row[title]') || {}).title));
+  await p.evaluate(() => document.querySelector('.rbr.row .acts button[data-a="why"]').click()); await p.waitForTimeout(300);
+  console.log('modal why', await p.evaluate(() => document.querySelector('#modal').innerText.slice(0, 200)));
+  await p.click('#modal button'); await p.waitForTimeout(200);
+  // import + suppression
+  await p.evaluate(() => window.__rb.editNote(window.__rb.S.notes[2].id)); await p.waitForTimeout(300);
+  console.log('ligne why dans éditeur', await p.evaluate(() => !!document.querySelector('.help.why')));
+  await p.click('#enTabs button[data-t="1"]');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FABJADq0cQG0nAAAAAElFTkSuQmCC', 'base64'); require('fs').writeFileSync('/tmp/sym.png', png);
+  await p.click('#eLexOpen').catch(() => {}); await p.setInputFiles('#eSymFile', '/tmp/sym.png'); await p.waitForTimeout(600);
+  console.log('mys', await p.evaluate(() => Object.keys(JSON.parse(localStorage.getItem("rbgen.mySyms")||"{}")).length), 'cats', await p.evaluate(() => [...document.querySelectorAll("#eLexTabs button")].map(x=>x.textContent).pop()));
+  await p.screenshot({ path: '/tmp/why_lex.png' });
+  await p.click('#eLexTabs button:last-child'); await p.screenshot({ path: '/tmp/why_lex.png' });
+  await p.click('#eLexDelBtn'); await p.click('#eLexGrid .lextile'); await p.waitForTimeout(400);
+  console.log('après suppr mys', await p.evaluate(() => Object.keys(JSON.parse(localStorage.getItem("rbgen.mySyms")||"{}")).length), 'LS', await p.evaluate(() => localStorage.getItem('rbgen.mySyms')), 'cats', await p.evaluate(() => [...document.querySelectorAll("#eLexTabs button")].some(x=>x.textContent==="Mes symboles")), 'symList', await p.evaluate(() => (window.__rb.S.notes[2].sym || []).length));
+  console.log('erreurs', errs.join('|') || 0); await b.close(); })();
