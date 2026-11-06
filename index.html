@@ -985,6 +985,16 @@ body.dragNote .leaflet-tooltip{display:none}
 .fs.ft i{display:block;font-style:normal;font-weight:400;font-size:.62em}
 .fs.ft b:first-child:not(:last-child){font-weight:800}
 .stin .fs.ft{background:transparent}
+
+.entabs{display:flex;border-bottom:1px solid rgba(0,0,0,.15);margin:0 0 12px;position:sticky;top:0;background:inherit;z-index:3}
+.entabs button{flex:1;border:0;background:none;padding:9px 2px;font:inherit;font-size:14px;color:#6b6558;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
+.entabs button.on{color:#1d1a14;font-weight:700;border-bottom-color:#1d1a14}
+.entabs button i{display:none;width:7px;height:7px;border-radius:50%;background:#d9531e;margin-left:5px;vertical-align:middle}
+.entabs button.has i{display:inline-block}
+.enp{display:none}.enp.on{display:block}
+
+#modalBg.top{align-items:flex-start;padding-top:24px;background:rgba(20,18,15,.25)}
+.modal h2{cursor:move;touch-action:none;user-select:none}
 </style>
 </head>
 <body>
@@ -992,7 +1002,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0611.1438</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0611.1721</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1019,7 +1029,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version v0.0611.1438</div>
+          <div class="ver">Version v0.0611.1721</div>
         </div>
       </div>
     </div>
@@ -4921,7 +4931,21 @@ function editNote(id, isNew) {
   const pre = n.auto !== false && !n.symLocked && S.settings.symAuto !== false ? noteView(n) : null, conv = !!(pre && pre.keys.length > lexKeys(n).length);
   const lockTxt = v => conv || n.symLocked ? v.replace(/\s+$/, '') : v.trim();      // note verrouillée : la 1re ligne peut rester vide (place de la direction)
   const body = `
+    <div class="entabs" id="enTabs"><button type="button" class="on" data-t="0">Note</button><button type="button" data-t="1">Dessin<i></i></button><button type="button" data-t="2">Waypoint<i></i></button><button type="button" data-t="3">Zone<i></i></button></div>
+    <div class="enp on" data-p="0">
     <div class="fld"><label for="eText">Texte de la note (1re ligne en gros)</label><textarea id="eText" rows="3">${esc(conv ? pre.lines.join('\n') : n.text)}</textarea></div>
+    <div class="fgrid">
+      <div class="fld"><label for="eCap">CAP (°)</label><input id="eCap" type="number" min="0" max="359" value="${n.cap == null ? '' : n.cap}"><button type="button" class="mbtn" id="eCapMeas" title="Enregistre la note puis mesure le cap sur la trace" style="margin-top:4px">📐 Mesurer</button></div>
+      <div class="fld"><label for="eDanger">Danger</label><select id="eDanger">${[0, 1, 2, 3].map(d => `<option value="${d}"${n.danger === d ? ' selected' : ''}>${d ? '!'.repeat(d) + ' (niveau ' + d + ')' : 'Aucun'}</option>`).join('')}</select></div>
+      <div class="fld"><label for="eDist">Distance (km)</label><input id="eDist" type="number" step="0.01" min="0" value="${km(n.s)}"></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="eShowCap"${n.showCap ? ' checked' : ''}> Afficher le CAP sur cette note</label>
+    <label class="chk"><input type="checkbox" id="eFuel"${n.fuel ? ' checked' : ''}> ⛽ Carburant (ravitaillement)</label>
+    </div>
+    <div class="enp" data-p="1">
+    <div class="fld" style="max-width:260px"><label for="eR">Rayon dessiné dans la tulipe (m)</label><input id="eR" type="number" min="20" max="150" step="5" value="${Math.round(n.tulip && n.tulip.R || S.settings.tulipR)}"></div>
+    <div class="help">Plus grand = la tulipe montre une zone plus large autour du carrefour.</div>
+    <button type="button" class="mbtn" id="eTulEdit" style="margin:0 0 8px">✏️ Modifier la tulipe (traits, points)</button>
     <div class="fld"><label>Symboles du lexique FIA <span style="font-weight:400;color:#8a8478">— sous la direction, dans la case description</span></label>
       <div class="stagehelp">Pose les symboles où tu veux : <b>glisse</b> un symbole dans la tulipe ou la case description, règle sa <b>taille</b> avec le curseur (ou la molette).</div>
       <div class="stlabels"><span>Tulipe</span><span>Description</span></div><div class="stage"><div class="stcase" id="stT" data-c="t"><div class="stm" id="stTm"></div><div class="stin" id="stTin"></div></div><div class="stcase" id="stD" data-c="d"><div class="stm" id="stDm"></div><div class="stin" id="stDin"></div></div></div>
@@ -4938,15 +4962,8 @@ function editNote(id, isNew) {
         <div id="eLexGrid" class="lexgrid"></div>
       </div>
     </div>
-    <div class="fgrid">
-      <div class="fld"><label for="eCap">CAP (°)</label><input id="eCap" type="number" min="0" max="359" value="${n.cap == null ? '' : n.cap}"><button type="button" class="mbtn" id="eCapMeas" title="Enregistre la note puis mesure le cap sur la trace" style="margin-top:4px">📐 Mesurer</button></div>
-      <div class="fld"><label for="eDanger">Danger</label><select id="eDanger">${[0, 1, 2, 3].map(d => `<option value="${d}"${n.danger === d ? ' selected' : ''}>${d ? '!'.repeat(d) + ' (niveau ' + d + ')' : 'Aucun'}</option>`).join('')}</select></div>
-      <div class="fld"><label for="eDist">Distance (km)</label><input id="eDist" type="number" step="0.01" min="0" value="${km(n.s)}"></div>
     </div>
-    <label class="chk"><input type="checkbox" id="eShowCap"${n.showCap ? ' checked' : ''}> Afficher le CAP sur cette note</label>
-    <div class="fld" style="max-width:260px"><label for="eR">Rayon dessiné dans la tulipe (m)</label><input id="eR" type="number" min="20" max="150" step="5" value="${Math.round(n.tulip && n.tulip.R || S.settings.tulipR)}"></div>
-    <div class="help">Plus grand = la tulipe montre une zone plus large autour du carrefour.</div>
-    <button type="button" class="mbtn" id="eTulEdit" style="margin:0 0 8px">✏️ Modifier la tulipe (traits, points)</button>
+    <div class="enp" data-p="2">
     <div class="fld"><label for="eWp">Point de passage / waypoint</label><select id="eWp">${WP_TYPES.map(([v, l]) => `<option value="${v}"${(wp.type || '') === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
     <div class="fgrid" id="eWpRad">
       <div class="fld"><label for="eName">Nom / n°</label><input id="eName" type="text" value="${esc(wp.name || '')}" placeholder="auto"></div>
@@ -4958,12 +4975,14 @@ function editNote(id, isNew) {
       <div class="fld" id="eDurF"><label for="eDur">Durée de neutralisation (min)</label><input id="eDur" type="number" min="0" value="${wp.dur || ''}"></div>
       <div class="fld" id="eWpSpF"><label for="eWpSp">Vitesse maxi (km/h, facultatif)</label><input id="eWpSp" type="number" min="1" value="${wp.speed || ''}"></div>
     </div>
+    <div class="help">Rayons du tableau FIM proposés par défaut (ouverture vide = WP toujours visible ou jamais ouvert), modifiables selon le règlement de ton épreuve.</div>
+    </div>
+    <div class="enp" data-p="3">
     <div class="fgrid" style="grid-template-columns:2fr 1fr">
       <div class="fld"><label for="eZone">Zone de vitesse</label><select id="eZone">${ZONE_TYPES.map(([v, l]) => `<option value="${v}"${(zone.type || '') === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
       <div class="fld" id="eSpeedF"><label for="eSpeed">Vitesse maxi (km/h)</label><input id="eSpeed" type="number" min="1" value="${zone.speed || ''}"></div>
     </div>
-    <label class="chk"><input type="checkbox" id="eFuel"${n.fuel ? ' checked' : ''}> ⛽ Carburant (ravitaillement)</label>
-    <div class="help">Rayons du tableau FIM proposés par défaut (ouverture vide = WP toujours visible ou jamais ouvert), modifiables selon le règlement de ton épreuve.</div>`;
+    </div>`;
   const m = openModal(isNew ? 'Nouvelle note' : `Note ${S.notes.indexOf(n) + 1} · ${km(n.s)} km`, body, [
     { label: 'Supprimer', cls: 'danger', onClick: () => { deleteNote(n.id); } }, 'sp',
     { label: 'Annuler', onClick: () => { if (isNew) { S.notes = S.notes.filter(x => x.id !== n.id); renderAll(); } } },
@@ -4997,8 +5016,17 @@ function editNote(id, isNew) {
           .catch(e => { console.error(e); toast('Impossible de redessiner la tulipe (' + (e.message || e) + ').', 'err'); });
       }
     } }
-  ], { onCancel: () => { if (isNew) { S.notes = S.notes.filter(x => x.id !== n.id); renderAll(); } } });
+  ], { top: true, onCancel: () => { if (isNew) { S.notes = S.notes.filter(x => x.id !== n.id); renderAll(); } } });
+  const tabDots = () => {      // pastille sur un onglet qui contient déjà quelque chose
+    const on = [false, !!(symList.length || lexSel.length || tp || n.tulipEdited), !!$('#eWp').value, !!$('#eZone').value];
+    document.querySelectorAll('#enTabs button').forEach((b, i) => b.classList.toggle('has', on[i]));
+  };
+  document.querySelectorAll('#enTabs button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#enTabs button').forEach(x => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.enp').forEach(x => x.classList.toggle('on', x.dataset.p === b.dataset.t)); tabDots();
+  });
   const upd = () => {
+    tabDots();
     const t = $('#eWp').value;
     $('#eWpRad').style.display = isRadiusWP(t) ? '' : 'none';
     $('#eOpen').parentElement.style.display = $('#eClear').parentElement.style.display = isRadiusWP(t) ? '' : 'none';
@@ -5335,9 +5363,26 @@ function openModal(title, body, buttons, opts) {
     mf.appendChild(el);
   }
   if (!buttons || !buttons.length) mf.style.display = 'none';
+  m.style.transform = ''; $('#modalBg').classList.toggle('top', !!(opts && opts.top));      // top : fenêtre ancrée en haut (sa position ne change pas quand son contenu change) et fond plus clair
   $('#modalBg').classList.add('show');
   return m;
 }
+// fenêtre déplaçable à la souris ou au doigt en tirant sur son titre (pour voir la carte derrière)
+(function () {
+  const m = $('#modal'); let d = null;
+  m.addEventListener('pointerdown', e => {
+    const h = e.target.closest('h2'); if (!h || e.button > 0) return;
+    const r = m.getBoundingClientRect(), tr = /translate\(([-\d.]+)px, ?([-\d.]+)px\)/.exec(m.style.transform || '');
+    d = { x: e.clientX, y: e.clientY, tx: tr ? +tr[1] : 0, ty: tr ? +tr[2] : 0, r }; h.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  m.addEventListener('pointermove', e => {
+    if (!d) return;
+    const dx = clamp(e.clientX - d.x, -d.r.left - d.r.width + 80, innerWidth - d.r.left - 80), dy = clamp(e.clientY - d.y, -d.r.top, innerHeight - d.r.top - 40);
+    m.style.transform = `translate(${Math.round(d.tx + dx)}px, ${Math.round(d.ty + dy)}px)`;
+  });
+  const end = () => { d = null; };
+  m.addEventListener('pointerup', end); m.addEventListener('pointercancel', end);
+})();
 function closeModal() { $('#modalBg').classList.remove('show'); }
 function cancelModal() { if (!$('#modalBg').classList.contains('show') || (modalOpts && modalOpts.noEsc)) return; const o = modalOpts; modalOpts = null; closeModal(); if (o && o.onCancel) o.onCancel(); }
 $('#modalBg').addEventListener('mousedown', e => { if (e.target.id === 'modalBg') cancelModal(); });

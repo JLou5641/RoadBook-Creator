@@ -314,3 +314,13 @@ body.dragNote .leaflet-tooltip{display:none}
 .fs.ft i{display:block;font-style:normal;font-weight:400;font-size:.62em}
 .fs.ft b:first-child:not(:last-child){font-weight:800}
 .stin .fs.ft{background:transparent}
+
+.entabs{display:flex;border-bottom:1px solid rgba(0,0,0,.15);margin:0 0 12px;position:sticky;top:0;background:inherit;z-index:3}
+.entabs button{flex:1;border:0;background:none;padding:9px 2px;font:inherit;font-size:14px;color:#6b6558;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
+.entabs button.on{color:#1d1a14;font-weight:700;border-bottom-color:#1d1a14}
+.entabs button i{display:none;width:7px;height:7px;border-radius:50%;background:#d9531e;margin-left:5px;vertical-align:middle}
+.entabs button.has i{display:inline-block}
+.enp{display:none}.enp.on{display:block}
+
+#modalBg.top{align-items:flex-start;padding-top:24px;background:rgba(20,18,15,.25)}
+.modal h2{cursor:move;touch-action:none;user-select:none}

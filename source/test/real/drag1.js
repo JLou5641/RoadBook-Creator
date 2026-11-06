@@ -1,0 +1,14 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1200, height: 900 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file).*/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.evaluate(t => window.__rb.loadText(t, 'a.gpx'), fs.readFileSync(path.join(__dirname, 'andorra.gpx'), 'utf8')); await p.waitForTimeout(500);
+  await p.evaluate(() => { const R = window.__rb; R.S.notes = [{ id: 'n1', s: 500, lat: R.S.ll[20][0], lon: R.S.ll[20][1], text: 'Test', kind: 'info', tulip: null, auto: false }]; R.renderAll(); R.editNote('n1'); });
+  await p.waitForTimeout(300);
+  const top = async () => (await p.locator('#modal').boundingBox()).y;
+  const t0 = await top(); await p.click('#enTabs button[data-t="1"]'); const t1 = await top(); await p.click('#enTabs button[data-t="2"]'); const t2 = await top();
+  const hb = await p.locator('#modal h2').boundingBox();
+  await p.mouse.move(hb.x + 40, hb.y + 10); await p.mouse.down(); await p.mouse.move(hb.x + 400, hb.y + 250, { steps: 6 }); await p.mouse.up();
+  const bb = await p.locator('#modal').boundingBox(); const t3 = bb.y;
+  console.log('haut onglets', t0, t1, t2, 'après glissement', Math.round(bb.x), Math.round(t3), 'erreurs', errs.join('|') || 0);
+  await p.screenshot({ path: '/home/claude/out/apercu-deplace.png' }); await b.close(); })();

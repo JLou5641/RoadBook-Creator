@@ -5,7 +5,7 @@ const { chromium } = require('playwright'); const fs = require('fs'), path = req
   await p.evaluate(t => window.__rb.loadText(t, 'a.gpx'), fs.readFileSync(path.join(__dirname, 'andorra.gpx'), 'utf8')); await p.waitForTimeout(600);
   await p.evaluate(() => { const R = window.__rb; R.S.notes = [{ id: 'n1', s: 500, lat: R.S.ll[20][0], lon: R.S.ll[20][1], text: 'Contrôle horaire\nbarrière à droite', kind: 'info', wp: { type: 'ch', limit: 25 }, tulip: null, auto: false }]; R.renderAll(); R.editNote('n1'); });
   await p.waitForTimeout(500);
-  await p.click('#stAddTx'); await p.fill('#stTxt', 'Attention gravier'); await p.waitForTimeout(100);
+  await p.click('#enTabs button[data-t="1"]'); await p.click('#stAddTx'); await p.fill('#stTxt', 'Attention gravier'); await p.waitForTimeout(100);
   await p.check('#eTpos'); await p.waitForTimeout(200);
   // déplacer le texte principal
   const bb = await p.locator('#stD').boundingBox();

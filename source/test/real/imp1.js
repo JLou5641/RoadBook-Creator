@@ -5,7 +5,7 @@ const { chromium } = require('playwright'); const fs = require('fs'), path = req
   await p.evaluate(t => window.__rb.loadText(t, 'a.gpx'), fs.readFileSync(path.join(__dirname, 'andorra.gpx'), 'utf8')); await p.waitForTimeout(600);
   await p.evaluate(() => { const R = window.__rb; R.S.notes = [{ id: 'n1', s: 500, lat: R.S.ll[20][0], lon: R.S.ll[20][1], text: 'Test', kind: 'info', tulip: null, auto: false }]; R.renderAll(); R.editNote('n1'); });
   await p.waitForTimeout(400);
-  await p.setInputFiles('#eSymFile', '/mnt/user-data/uploads/67ef9b2d-image.png'); await p.waitForTimeout(600);
+  await p.click('#enTabs button[data-t="1"]'); await p.setInputFiles('#eSymFile', '/mnt/user-data/uploads/67ef9b2d-image.png'); await p.waitForTimeout(600);
   await p.click('#eLexOpen'); await p.click('#eLexTabs button:last-child'); await p.waitForTimeout(200);
   await p.screenshot({ path: '/home/claude/out/apercu-import.png' });
   await p.click('.mbtn.primary'); await p.waitForTimeout(400);

@@ -679,7 +679,21 @@ function editNote(id, isNew) {
   const pre = n.auto !== false && !n.symLocked && S.settings.symAuto !== false ? noteView(n) : null, conv = !!(pre && pre.keys.length > lexKeys(n).length);
   const lockTxt = v => conv || n.symLocked ? v.replace(/\s+$/, '') : v.trim();      // note verrouillée : la 1re ligne peut rester vide (place de la direction)
   const body = `
+    <div class="entabs" id="enTabs"><button type="button" class="on" data-t="0">Note</button><button type="button" data-t="1">Dessin<i></i></button><button type="button" data-t="2">Waypoint<i></i></button><button type="button" data-t="3">Zone<i></i></button></div>
+    <div class="enp on" data-p="0">
     <div class="fld"><label for="eText">Texte de la note (1re ligne en gros)</label><textarea id="eText" rows="3">${esc(conv ? pre.lines.join('\n') : n.text)}</textarea></div>
+    <div class="fgrid">
+      <div class="fld"><label for="eCap">CAP (°)</label><input id="eCap" type="number" min="0" max="359" value="${n.cap == null ? '' : n.cap}"><button type="button" class="mbtn" id="eCapMeas" title="Enregistre la note puis mesure le cap sur la trace" style="margin-top:4px">📐 Mesurer</button></div>
+      <div class="fld"><label for="eDanger">Danger</label><select id="eDanger">${[0, 1, 2, 3].map(d => `<option value="${d}"${n.danger === d ? ' selected' : ''}>${d ? '!'.repeat(d) + ' (niveau ' + d + ')' : 'Aucun'}</option>`).join('')}</select></div>
+      <div class="fld"><label for="eDist">Distance (km)</label><input id="eDist" type="number" step="0.01" min="0" value="${km(n.s)}"></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="eShowCap"${n.showCap ? ' checked' : ''}> Afficher le CAP sur cette note</label>
+    <label class="chk"><input type="checkbox" id="eFuel"${n.fuel ? ' checked' : ''}> ⛽ Carburant (ravitaillement)</label>
+    </div>
+    <div class="enp" data-p="1">
+    <div class="fld" style="max-width:260px"><label for="eR">Rayon dessiné dans la tulipe (m)</label><input id="eR" type="number" min="20" max="150" step="5" value="${Math.round(n.tulip && n.tulip.R || S.settings.tulipR)}"></div>
+    <div class="help">Plus grand = la tulipe montre une zone plus large autour du carrefour.</div>
+    <button type="button" class="mbtn" id="eTulEdit" style="margin:0 0 8px">✏️ Modifier la tulipe (traits, points)</button>
     <div class="fld"><label>Symboles du lexique FIA <span style="font-weight:400;color:#8a8478">— sous la direction, dans la case description</span></label>
       <div class="stagehelp">Pose les symboles où tu veux : <b>glisse</b> un symbole dans la tulipe ou la case description, règle sa <b>taille</b> avec le curseur (ou la molette).</div>
       <div class="stlabels"><span>Tulipe</span><span>Description</span></div><div class="stage"><div class="stcase" id="stT" data-c="t"><div class="stm" id="stTm"></div><div class="stin" id="stTin"></div></div><div class="stcase" id="stD" data-c="d"><div class="stm" id="stDm"></div><div class="stin" id="stDin"></div></div></div>
@@ -696,15 +710,8 @@ function editNote(id, isNew) {
         <div id="eLexGrid" class="lexgrid"></div>
       </div>
     </div>
-    <div class="fgrid">
-      <div class="fld"><label for="eCap">CAP (°)</label><input id="eCap" type="number" min="0" max="359" value="${n.cap == null ? '' : n.cap}"><button type="button" class="mbtn" id="eCapMeas" title="Enregistre la note puis mesure le cap sur la trace" style="margin-top:4px">📐 Mesurer</button></div>
-      <div class="fld"><label for="eDanger">Danger</label><select id="eDanger">${[0, 1, 2, 3].map(d => `<option value="${d}"${n.danger === d ? ' selected' : ''}>${d ? '!'.repeat(d) + ' (niveau ' + d + ')' : 'Aucun'}</option>`).join('')}</select></div>
-      <div class="fld"><label for="eDist">Distance (km)</label><input id="eDist" type="number" step="0.01" min="0" value="${km(n.s)}"></div>
     </div>
-    <label class="chk"><input type="checkbox" id="eShowCap"${n.showCap ? ' checked' : ''}> Afficher le CAP sur cette note</label>
-    <div class="fld" style="max-width:260px"><label for="eR">Rayon dessiné dans la tulipe (m)</label><input id="eR" type="number" min="20" max="150" step="5" value="${Math.round(n.tulip && n.tulip.R || S.settings.tulipR)}"></div>
-    <div class="help">Plus grand = la tulipe montre une zone plus large autour du carrefour.</div>
-    <button type="button" class="mbtn" id="eTulEdit" style="margin:0 0 8px">✏️ Modifier la tulipe (traits, points)</button>
+    <div class="enp" data-p="2">
     <div class="fld"><label for="eWp">Point de passage / waypoint</label><select id="eWp">${WP_TYPES.map(([v, l]) => `<option value="${v}"${(wp.type || '') === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
     <div class="fgrid" id="eWpRad">
       <div class="fld"><label for="eName">Nom / n°</label><input id="eName" type="text" value="${esc(wp.name || '')}" placeholder="auto"></div>
@@ -716,12 +723,14 @@ function editNote(id, isNew) {
       <div class="fld" id="eDurF"><label for="eDur">Durée de neutralisation (min)</label><input id="eDur" type="number" min="0" value="${wp.dur || ''}"></div>
       <div class="fld" id="eWpSpF"><label for="eWpSp">Vitesse maxi (km/h, facultatif)</label><input id="eWpSp" type="number" min="1" value="${wp.speed || ''}"></div>
     </div>
+    <div class="help">Rayons du tableau FIM proposés par défaut (ouverture vide = WP toujours visible ou jamais ouvert), modifiables selon le règlement de ton épreuve.</div>
+    </div>
+    <div class="enp" data-p="3">
     <div class="fgrid" style="grid-template-columns:2fr 1fr">
       <div class="fld"><label for="eZone">Zone de vitesse</label><select id="eZone">${ZONE_TYPES.map(([v, l]) => `<option value="${v}"${(zone.type || '') === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
       <div class="fld" id="eSpeedF"><label for="eSpeed">Vitesse maxi (km/h)</label><input id="eSpeed" type="number" min="1" value="${zone.speed || ''}"></div>
     </div>
-    <label class="chk"><input type="checkbox" id="eFuel"${n.fuel ? ' checked' : ''}> ⛽ Carburant (ravitaillement)</label>
-    <div class="help">Rayons du tableau FIM proposés par défaut (ouverture vide = WP toujours visible ou jamais ouvert), modifiables selon le règlement de ton épreuve.</div>`;
+    </div>`;
   const m = openModal(isNew ? 'Nouvelle note' : `Note ${S.notes.indexOf(n) + 1} · ${km(n.s)} km`, body, [
     { label: 'Supprimer', cls: 'danger', onClick: () => { deleteNote(n.id); } }, 'sp',
     { label: 'Annuler', onClick: () => { if (isNew) { S.notes = S.notes.filter(x => x.id !== n.id); renderAll(); } } },
@@ -755,8 +764,17 @@ function editNote(id, isNew) {
           .catch(e => { console.error(e); toast('Impossible de redessiner la tulipe (' + (e.message || e) + ').', 'err'); });
       }
     } }
-  ], { onCancel: () => { if (isNew) { S.notes = S.notes.filter(x => x.id !== n.id); renderAll(); } } });
+  ], { top: true, onCancel: () => { if (isNew) { S.notes = S.notes.filter(x => x.id !== n.id); renderAll(); } } });
+  const tabDots = () => {      // pastille sur un onglet qui contient déjà quelque chose
+    const on = [false, !!(symList.length || lexSel.length || tp || n.tulipEdited), !!$('#eWp').value, !!$('#eZone').value];
+    document.querySelectorAll('#enTabs button').forEach((b, i) => b.classList.toggle('has', on[i]));
+  };
+  document.querySelectorAll('#enTabs button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#enTabs button').forEach(x => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.enp').forEach(x => x.classList.toggle('on', x.dataset.p === b.dataset.t)); tabDots();
+  });
   const upd = () => {
+    tabDots();
     const t = $('#eWp').value;
     $('#eWpRad').style.display = isRadiusWP(t) ? '' : 'none';
     $('#eOpen').parentElement.style.display = $('#eClear').parentElement.style.display = isRadiusWP(t) ? '' : 'none';

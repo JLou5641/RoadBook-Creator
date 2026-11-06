@@ -13,9 +13,26 @@ function openModal(title, body, buttons, opts) {
     mf.appendChild(el);
   }
   if (!buttons || !buttons.length) mf.style.display = 'none';
+  m.style.transform = ''; $('#modalBg').classList.toggle('top', !!(opts && opts.top));      // top : fenêtre ancrée en haut (sa position ne change pas quand son contenu change) et fond plus clair
   $('#modalBg').classList.add('show');
   return m;
 }
+// fenêtre déplaçable à la souris ou au doigt en tirant sur son titre (pour voir la carte derrière)
+(function () {
+  const m = $('#modal'); let d = null;
+  m.addEventListener('pointerdown', e => {
+    const h = e.target.closest('h2'); if (!h || e.button > 0) return;
+    const r = m.getBoundingClientRect(), tr = /translate\(([-\d.]+)px, ?([-\d.]+)px\)/.exec(m.style.transform || '');
+    d = { x: e.clientX, y: e.clientY, tx: tr ? +tr[1] : 0, ty: tr ? +tr[2] : 0, r }; h.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  m.addEventListener('pointermove', e => {
+    if (!d) return;
+    const dx = clamp(e.clientX - d.x, -d.r.left - d.r.width + 80, innerWidth - d.r.left - 80), dy = clamp(e.clientY - d.y, -d.r.top, innerHeight - d.r.top - 40);
+    m.style.transform = `translate(${Math.round(d.tx + dx)}px, ${Math.round(d.ty + dy)}px)`;
+  });
+  const end = () => { d = null; };
+  m.addEventListener('pointerup', end); m.addEventListener('pointercancel', end);
+})();
 function closeModal() { $('#modalBg').classList.remove('show'); }
 function cancelModal() { if (!$('#modalBg').classList.contains('show') || (modalOpts && modalOpts.noEsc)) return; const o = modalOpts; modalOpts = null; closeModal(); if (o && o.onCancel) o.onCancel(); }
 $('#modalBg').addEventListener('mousedown', e => { if (e.target.id === 'modalBg') cancelModal(); });
