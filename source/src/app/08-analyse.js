@@ -200,7 +200,9 @@ function noteFromGroup(g, gr, prevS, nextS) {
   const surf = (entryCat === 'road') !== (exitCat === 'road');
   if (!jn.length && !surf) return null;
   // fourche : pas de note si ses branches ne sont pas toutes du même type (toutes goudronnées ou toutes non goudronnées) : route + chemin / sentier = pas de note
-  if (fork && !surf && arms.some(x => (x.b.way.cat === 'road') !== (entryCat === 'road'))) return null;
+  if (fork && !surf && !S.settings.mixY && arms.some(x => (x.b.way.cat === 'road') !== (entryCat === 'road'))) return null;
+  // T / croisement : si ma voie est la seule de son type (les autres branches sont d'un autre type), pas de note quand l'option est décochée
+  if (!fork && !surf && jn.length && !S.settings.mixT && Math.abs(a) > 50) { const oth = main.brs.filter(x => x !== main.entry && x !== main.exit); if (oth.length && oth.every(x => (x.b.way.cat === 'road') !== (entryCat === 'road'))) return null; }
   if (t1 === 'TD' && !surf && exitCat === entryCat && !S.settings.straight) return null;
   const lines = [t1];
   if (t1 !== 'TD' || exitCat !== entryCat) lines.push('sur ' + wayLabel(exitWay));

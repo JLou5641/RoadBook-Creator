@@ -17,7 +17,7 @@ async function loadFile(file) {
       if (o && o.type === 'rbgen-osm') { await importOsm(o); return; }
       if (!o || !o.ll) throw new Error('Projet illisible.');
       if (drawing) setDrawing(false);
-      restore(o); $('#rbName').value = S.name; renderAll(); renderTrack(true); setDirty(false);
+      restore(o); $('#rbName').value = S.name; HIST.length = 0; renderAll(); renderTrack(true); setDirty(false);
       toast('Projet ouvert.', 'ok'); return;
     }
     const g = parseGPX(txt);
@@ -546,6 +546,7 @@ $('#routeMode').onchange = e => { S.routeMode = e.target.value; save(); if (/^or
 $('#orsBtn').onclick = orsDialog;
 $('#bGen').onclick = generate;
 $('#bSave').onclick = saveProject;
+$('#bUndo').onclick = () => { if (drawing) undo(); else undoAll(); };
 $('#bExport').onclick = exportGPX;
 $('#bPrint').onclick = printRB;
 $('#rbName').addEventListener('input', e => { S.name = e.target.value; save(); });
@@ -576,6 +577,7 @@ $('#moreMenu').addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { if ($('#modalBg').classList.contains('show')) cancelModal(); else if (drawing) setDrawing(false); }
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName) || (e.target && e.target.isContentEditable);
+  if (!drawing && (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && !typing && !$('#modalBg').classList.contains('show')) { e.preventDefault(); undoAll(); }
   if (drawing && (e.ctrlKey || e.metaKey) && !typing && !$('#modalBg').classList.contains('show')) {
     const k = e.key.toLowerCase();
     if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); } else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
@@ -595,6 +597,7 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
   try { const raw = localStorage.getItem(LS_KEY); if (raw) { restore(JSON.parse(raw)); $('#rbName').value = S.name; } } catch (e) { console.warn(e); }
   $('#routeMode').value = S.routeMode;
   try { setDirty(localStorage.getItem('rbgen.dirty') === '1'); } catch (e) { }
+  if (S.notes.length || S.ll.length) histPush(JSON.stringify(snapshot()));
   renderRoadbook(); renderMarkers(); renderTrack(true); renderInfo();
 })();
 

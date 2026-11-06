@@ -1,7 +1,7 @@
 /* ============================================================
    2. État & sauvegarde
    ============================================================ */
-const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, lmOff: [], followLvl: 3, bends: true, offroad: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true, marksExport: true, showRO: true, showPI: true, showTR: true, arrows: true };
+const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, mixY: false, mixT: true, lmOff: [], followLvl: 3, bends: true, offroad: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true, marksExport: true, showRO: true, showPI: true, showTR: true, arrows: true };
 const S = {
   name: 'Mon roadbook', desc: '', src: '', ll: [], mm: null, ctrl: [], segs: [], notes: [], settings: { ...DEF_SETTINGS }, stages: [], marks: [], ele: null, timing: null,
   stale: false, routeMode: 'trekking', nextId: 1, sel: null
@@ -17,13 +17,29 @@ function snapshot() {
 }
 let dirty = false;
 function setDirty(v) { dirty = v; try { localStorage.setItem('rbgen.dirty', v ? '1' : ''); } catch (e) { } const b = document.getElementById('bSave'); if (b) { b.classList.toggle('dirty', v); b.title = v ? 'Modifications non sauvegardées dans un fichier : clique pour sauvegarder le projet' : 'Sauvegarder le projet en cours (fichier .json à rouvrir plus tard)'; } }
+/* Historique : un instantané du projet après chaque modification (40 max), pour le bouton « Annuler » */
+const HIST = [];
+function updUndo() { const b = document.getElementById('bUndo'); if (b) b.disabled = HIST.length < 2; }
+function histPush(str) { if (HIST.length && HIST[HIST.length - 1] === str) return; HIST.push(str); if (HIST.length > 40) HIST.shift(); updUndo(); }
+function doSave() {
+  const str = JSON.stringify(snapshot());
+  try { localStorage.setItem(LS_KEY, str); }
+  catch (e) { if (!saveWarned) { saveWarned = true; toast('Sauvegarde auto impossible (projet trop gros) : utilise « Sauvegarder ».'); } }
+  histPush(str);
+}
 function save() {
   setDirty(true);
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(snapshot())); }
-    catch (e) { if (!saveWarned) { saveWarned = true; toast('Sauvegarde auto impossible (projet trop gros) : utilise « Enregistrer le projet ».'); } }
-  }, 500);
+  saveTimer = setTimeout(doSave, 500);
+}
+function undoAll() {      // revient à l'état d'avant la dernière modification, où qu'elle ait été faite
+  clearTimeout(saveTimer); if (S.notes.length || S.ll.length) doSave();
+  if (HIST.length < 2) { toast('Rien à annuler.'); return; }
+  HIST.pop();
+  const g0 = G; restore(JSON.parse(HIST[HIST.length - 1])); if (g0 && !G) G = g0;
+  $('#rbName').value = S.name; $('#routeMode').value = S.routeMode;
+  renderAll(); renderTrack(); clearTimeout(saveTimer); doSave(); setDirty(true); updUndo();
+  toast('Modification annulée.');
 }
 function restore(o) {
   S.name = o.name || 'Mon roadbook'; S.desc = o.desc || ''; S.src = o.src || ''; S.ctrl = o.ctrl || []; S.segs = o.segs || [];

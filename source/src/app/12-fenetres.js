@@ -64,6 +64,8 @@ function openSettings() {
     <details class="setsec" open><summary>📝 Quelles notes créer <span class="setbadge">↻ à régénérer</span></summary>
 ${num('sMerge', 'Regrouper les notes à moins de (m)', s.merge, 5, 100)}
     ${chk('sStraight', 'Noter aussi les intersections où l’on continue tout droit', s.straight)}
+    ${chk('sMixY', 'Noter les fourches (Y) dont une branche est d’un autre type (route + chemin)', s.mixY)}
+    ${chk('sMixT', 'Noter les T et croisements dont les autres branches sont d’un autre type (route + chemin)', s.mixT)}
     <div class="fld"><label>Regroupement des notes sur une même route ou piste (FRO / FPP) : <b id="sFollowTxt">${['aucun', 'prudent', 'normal', 'large'][s.followLvl === undefined ? (s.followRoad === false ? 0 : 3) : s.followLvl]}</b>
       <input type="range" id="sFollow" style="width:100%;margin-top:4px" min="0" max="3" step="1" oninput="document.getElementById('sFollowTxt').textContent=['aucun','prudent','normal','large'][this.value]" value="${s.followLvl === undefined ? (s.followRoad === false ? 0 : 3) : s.followLvl}"></label>
       <div class="help">0 aucun · 1 prudent : seulement les notes « direction + sur route » · 2 normal : le nom de la rue ne compte plus · 3 large : les repères secondaires (haie, antenne, clôture…) ne coupent plus la série. Les STOP, ponts, passages à niveau, villages, ronds-points et changements de numéro de route coupent toujours.</div></div>
@@ -101,7 +103,7 @@ ${num('sR', 'Rayon dessiné dans la tulipe (m)', s.tulipR, 25, 120)}
       const g = (id, d, a, b) => { const v = parseFloat($('#' + id).value); return isFinite(v) ? clamp(v, a, b) : d; };
       const same = o => JSON.stringify(Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {}));      // comparaison sans tenir compte de l'ordre des champs
       const before = same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0, arrows: 0 });
-      S.settings = { sv: DEF_SETTINGS.sv, data: /^(osm|ign|ignd)$/.test($('#sData').value) ? $('#sData').value : 'vt', tol: g('sTol', 40, 0, 100), water: $('#sWater').checked, bld: $('#sBld').checked, pois: $('#sPois').checked, landmarks: $('#sLand').checked, merge: g('sMerge', 30, 5, 100), tulipR: g('sR', 50, 25, 120), straight: $('#sStraight').checked,
+      S.settings = { sv: DEF_SETTINGS.sv, data: /^(osm|ign|ignd)$/.test($('#sData').value) ? $('#sData').value : 'vt', tol: g('sTol', 40, 0, 100), water: $('#sWater').checked, bld: $('#sBld').checked, pois: $('#sPois').checked, landmarks: $('#sLand').checked, merge: g('sMerge', 30, 5, 100), tulipR: g('sR', 50, 25, 120), straight: $('#sStraight').checked, mixY: $('#sMixY').checked, mixT: $('#sMixT').checked,
         followLvl: +$('#sFollow').value, lmOff: [...document.querySelectorAll('.lmchk')].filter(c => !c.checked).map(c => c.dataset.lm), goudron: $('#sGoudron').checked, bends: $('#sBends').checked, offroad: $('#sOffroad').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showRO: $('#sRO').checked, showPI: $('#sPI').checked, showTR: $('#sTR').checked, showCap: $('#sCap').checked };
       afterSettings(before === same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0, arrows: 0 }));
     } }]);

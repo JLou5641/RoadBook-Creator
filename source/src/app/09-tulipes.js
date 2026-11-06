@@ -141,26 +141,29 @@ const f1 = v => v.toFixed(1);
 const ROUTE_C = '#0000FF';            // parcours à suivre : bleu pur (distinct du bleu ciel des cours d'eau), le reste en noir
 function freeSyms(list, c, W, H) {       // symboles posés librement : x, y = centre en % de la case, h = hauteur en % de la case
   let o = '';
-  for (const q of list || []) { if (q.c === c && q.tx != null) { o += ftSVG(q, W, H); continue; } const S = FIA_LEX[q.k]; if (!S || q.c !== c) continue; const h = q.h / 100 * H, w = h * S.w / S.h; o += `<image x="${f1(q.x / 100 * W - w / 2)}" y="${f1(q.y / 100 * H - h / 2)}" width="${f1(w)}" height="${f1(h)}" href="${S.d}" xlink:href="${S.d}"/>`; }
+  for (const q of list || []) { if (q.c === c && q.tx != null) { o += ftSVG(q, W, H); continue; } const S = FIA_LEX[q.k]; if (!S || q.c !== c) continue; const h = q.h / 100 * H, w = h * S.w / S.h; o += `<image${q.rot ? ` transform="rotate(${q.rot} ${f1(q.x / 100 * W)} ${f1(q.y / 100 * H)})"` : ''} x="${f1(q.x / 100 * W - w / 2)}" y="${f1(q.y / 100 * H - h / 2)}" width="${f1(w)}" height="${f1(h)}" href="${S.d}" xlink:href="${S.d}"/>`; }
   return o;
 }
+const BDW = (bd, d) => bd === 'on' ? 700 : bd === 'off' ? 400 : d;      // gras : 'on' / 'off' / par défaut
+const fsExtra = q => (q.rot ? `transform:translate(-50%,-50%) rotate(${q.rot}deg);` : '') + (q.col ? `color:${q.col};` : '');
+const tst = (n, d) => { const st = []; if (n.tcol) st.push('color:' + n.tcol); if (n.tbold) st.push('font-weight:' + BDW(n.tbold, d)); return st.length ? ` style="${st.join(';')}"` : ''; };      // couleur / gras du texte principal
 function freeLayer(list, c) {            // même chose en HTML, pour le roadbook à l'écran et à l'impression
   const a = (list || []).filter(q => q.c === c && (FIA_LEX[q.k] || q.tx != null));
-  return a.map(q => q.tx != null ? `<div class="fs ft" style="left:${q.x}%;top:${q.y}%;font-size:calc(var(--u) * ${q.h})">${ftInner(q)}</div>`
-    : `<img class="fs" src="${FIA_LEX[q.k].d}" alt="" style="left:${q.x}%;top:${q.y}%;height:${q.h}%">`).join('');
+  return a.map(q => q.tx != null ? `<div class="fs ft" style="left:${q.x}%;top:${q.y}%;font-size:calc(var(--u) * ${q.h});${fsExtra(q)}">${ftInner(q)}</div>`
+    : `<img class="fs" src="${FIA_LEX[q.k].d}" alt="" style="left:${q.x}%;top:${q.y}%;height:${q.h}%;${fsExtra(q)}">`).join('');
 }
 // textes libres : { tx, c, x, y, h } — h = hauteur des lettres en % de la case ; le texte principal déplacé (n.tpos) en est un aussi : 1re ligne en gros, les autres plus petites
 const txLines = q => String(q.tx).split('\n');
 const ftSize = (q, i) => q.main ? (i ? .62 : 1) : 1;
 function ftInner(q) {
-  return txLines(q).map((l, i) => q.main ? (i ? `<i>${esc(l)}</i>` : `<b>${esc(l)}</b>`) : `<b>${esc(l)}</b>`).join('');
+  return txLines(q).map((l, i) => q.main ? (i ? `<i style="font-weight:${BDW(q.bd, 400)}">${esc(l)}</i>` : `<b style="font-weight:${BDW(q.bd, 800)}">${esc(l)}</b>`) : `<b style="font-weight:${BDW(q.bd, 700)}">${esc(l)}</b>`).join('');
 }
 function ftSVG(q, W, H) {
   const FF = 'Arial Narrow, Roboto Condensed, Arial, sans-serif', L = txLines(q), base = q.h / 100 * H;
   const sz = L.map((_, i) => base * ftSize(q, i)), tot = sz.reduce((t, v) => t + v * 1.1, 0);
   let y = q.y / 100 * H - tot / 2, o = '';
-  L.forEach((l, i) => { if (l.trim()) o += `<text x="${f1(q.x / 100 * W)}" y="${f1(y + sz[i] * 0.88)}" text-anchor="middle" font-family="${FF}" font-weight="${q.main && i ? 400 : 700}" font-size="${f1(sz[i])}" fill="#000">${esc(l)}</text>`; y += sz[i] * 1.1; });
-  return o;
+  L.forEach((l, i) => { if (l.trim()) o += `<text x="${f1(q.x / 100 * W)}" y="${f1(y + sz[i] * 0.88)}" text-anchor="middle" font-family="${FF}" font-weight="${BDW(q.bd, q.main && i ? 400 : 700)}" font-size="${f1(sz[i])}" fill="${q.col || '#000'}">${esc(l)}</text>`; y += sz[i] * 1.1; });
+  return q.rot ? `<g transform="rotate(${q.rot} ${f1(q.x / 100 * W)} ${f1(q.y / 100 * H)})">${o}</g>` : o;
 }
 // « trait-point » (remise à zéro du trip) entre l'entrée et la sortie : toujours orienté pareil, à environ 135° du sens de marche (vers le bas),
 // à droite ou à gauche du parcours selon la place libre (réglage manuel possible : t.resetSide = 'r' | 'l')
@@ -300,7 +303,7 @@ function notesSVG(n) {
   let y = 10;
   const head = lines[0] ? wrapText(lines[0], 12).slice(0, 2) : [];
   const fs = Math.max(34, Math.min(64, Math.floor(372 / (0.55 * Math.max(1, ...head.join(' ').split(' ').map(w => w.length))))));      // un long nom d'un seul mot est réduit pour tenir dans l'image
-  const title = () => { for (const l of head) { y += 66; s += `<text x="16" y="${y}" font-family="${FF}" font-weight="bold" font-size="${fs}" fill="#000">${esc(l)}</text>`; } y += 8; };
+  const title = () => { for (const l of head) { y += 66; s += `<text x="16" y="${y}" font-family="${FF}" font-weight="${n.tbold === 'off' ? 400 : 700}" font-size="${fs}" fill="${n.tcol || '#000'}">${esc(l)}</text>`; } y += 8; };
   const symbols = () => {                // symboles en rangées : sous la direction, ou avant le nom pour une note « info »
     if (!lk.length) return;
     const GAP = 10, MAXW = W - 32, rowsAt = ih => { let r = 1, x = 16; for (const k of lk) { const w = Math.min(MAXW, ih * FIA_LEX[k].w / FIA_LEX[k].h); if (x > 16 && x + w > 16 + MAXW) { r++; x = 16; } x += w + GAP; } return r; };
@@ -320,10 +323,10 @@ function notesSVG(n) {
   if (info) { symbols(); title(); } else { title(); symbols(); }
   outer: for (const l0 of lines.slice(1)) for (const l of wrapText(l0, 21)) {
     if (y + 44 > H - 8) break outer;
-    y += 44; s += `<text x="16" y="${y}" font-family="${FF}" font-size="40" fill="#000">${esc(l)}</text>`;
+    y += 44; s += `<text x="16" y="${y}" font-family="${FF}" font-size="40"${n.tbold === 'on' ? ' font-weight="700"' : ''} fill="${n.tcol || '#000'}">${esc(l)}</text>`;
   }
   if (n.wp && /^(dss|dt|ch)$/.test(n.wp.type) && n.wp.limit > 0) s += `<text x="${W - 14}" y="40" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="42" fill="#E00000">T:${n.wp.limit}</text>`;      // temps limite en rouge (le lecteur ne le connaît pas)
-  return s + freeSyms((n.sym || []).concat(n.tpos && NV.lines.some(Boolean) ? [{ ...n.tpos, tx: NV.lines.join('\n'), main: 1, c: 'd' }] : []), 'd', W, H) + '</svg>';
+  return s + freeSyms((n.sym || []).concat(n.tpos && NV.lines.some(Boolean) ? [{ ...n.tpos, tx: NV.lines.join('\n'), main: 1, c: 'd', col: n.tcol, bd: n.tbold }] : []), 'd', W, H) + '</svg>';
 }
 const WP_TYPES = [
   ['', 'Aucun'], ['wpv', 'WPV — visible'], ['wpm', 'WPM — masqué'], ['wps', 'WPS — sécurité'], ['wpe', 'WPE — éclipse'],
@@ -549,7 +552,7 @@ function fitLines(lines, dg, cap, symH, bot) {  // lignes secondaires qui tienne
 }
 function rowInner(n, i, par, f, screen) {
   const t = n.wp && n.wp.type, zt = n.zone && n.zone.type, NV = noteView(n), lines = n.tpos ? [] : NV.lines;      // texte principal déplacé : il est dessiné à part, comme un symbole
-  const mainFree = n.tpos && !n.noMain && NV.lines.some(Boolean) ? [{ ...n.tpos, tx: NV.lines.join('\n'), main: 1, c: 'd' }] : [];
+  const mainFree = n.tpos && !n.noMain && NV.lines.some(Boolean) ? [{ ...n.tpos, tx: NV.lines.join('\n'), main: 1, c: 'd', col: n.tcol, bd: n.tbold }] : [];
   const bg = (t && WP_BG[t]) || (zt === 'fz' ? WP_BG.fz : zt ? WP_BG.dz : null)
     || (/^(dn|fn|dt|ft)$/.test(t || '') ? '#D8D8D8' : null)      // seul un DZ colore la case en orange : une limite saisie sur DN / DT / DSS ne change pas le fond
     || (f.green ? '#A0D080' : '#fff');
@@ -569,7 +572,7 @@ function rowInner(n, i, par, f, screen) {
   const lx = lk.length ? `<div class="lx" style="--lh:${lh}cqw">${lk.map(k => `<img src="${FIA_LEX[k].d}" alt="${esc(FIA_LEX[k].l)}" title="${esc(FIA_LEX[k].l)}">`).join('')}</div>` : '';
   return `<div class="k k1" style="background:${bg}"><div class="tot">${kmFr(n.s)}</div><div class="bl"><div class="par">${kmFr(par)}</div>${f.close ? ARROW_SVG : ''}</div>${sym}<div class="br"><div class="num">${i + 1}</div></div></div>`
     + `<div class="k k2">${tulipSVG(n.tulip, 200)}${freeLayer(n.sym, 't')}${t === 'cp' ? '<div class="cpf"></div>' : ''}</div>`
-    + `<div class="k k3${signs.length ? ' hs' : cap ? ' hc' : ''}">${big}${top}${n.kind === 'info' ? lx : ''}<div class="t1">${esc(lines[0] || '')}</div>${n.kind === 'info' ? '' : lx}${freeLayer((n.sym || []).concat(mainFree), 'd')}<div class="t2">${esc(fitLines(lines, !!(dg || tl), !!(cap || signs.length), lk.length ? lr * (lh + 0.6) - 0.6 : 0, signs.length ? 12.4 : 0).join('\n'))}</div>${cap}${sg}`
+    + `<div class="k k3${signs.length ? ' hs' : cap ? ' hc' : ''}">${big}${top}${n.kind === 'info' ? lx : ''}<div class="t1"${tst(n, 800)}>${esc(lines[0] || '')}</div>${n.kind === 'info' ? '' : lx}${freeLayer((n.sym || []).concat(mainFree), 'd')}<div class="t2"${tst(n, 400)}>${esc(fitLines(lines, !!(dg || tl), !!(cap || signs.length), lk.length ? lr * (lh + 0.6) - 0.6 : 0, signs.length ? 12.4 : 0).join('\n'))}</div>${cap}${sg}`
     + (screen && (!n.auto || n.moved) ? '<div class="man">manuelle</div>' : '')
     + (screen ? `<div class="acts">${n.why ? '<button data-a="why" title="Pourquoi cette note ?">?</button>' : ''}<button data-a="edit" title="Modifier la note">✎</button><button data-a="del" title="Supprimer la note">🗑</button></div>` : '') + `</div>`
     + (f.zone ? `<div class="fr zone${f.zTop ? ' zt' : ''}${f.zBot ? ' zb' : ''}"></div>` : '') + (f.red ? '<div class="fr red"></div>' : '');
@@ -697,6 +700,10 @@ function editNote(id, isNew) {
       <div class="fld"><label for="eDanger">Danger</label><select id="eDanger">${[0, 1, 2, 3].map(d => `<option value="${d}"${n.danger === d ? ' selected' : ''}>${d ? '!'.repeat(d) + ' (niveau ' + d + ')' : 'Aucun'}</option>`).join('')}</select></div>
       <div class="fld"><label for="eDist">Distance (km)</label><input id="eDist" type="number" step="0.01" min="0" value="${km(n.s)}"></div>
     </div>
+    <div class="fgrid">
+      <div class="fld"><label for="eTcol">Couleur du texte</label><div style="display:flex;gap:6px;align-items:center"><input type="color" id="eTcol" value="${n.tcol || '#000000'}" style="width:54px;height:36px;padding:2px"><button type="button" class="mbtn" id="eTcolRst" title="Revenir au noir">Noir</button></div></div>
+      <div class="fld"><label for="eTbold">Gras</label><select id="eTbold"><option value="">Normal (1re ligne en gras)</option><option value="on"${n.tbold === 'on' ? ' selected' : ''}>Tout en gras</option><option value="off"${n.tbold === 'off' ? ' selected' : ''}>Rien en gras</option></select></div>
+    </div>
     <label class="chk"><input type="checkbox" id="eShowCap"${n.showCap ? ' checked' : ''}> Afficher le CAP sur cette note</label>
     <label class="chk"><input type="checkbox" id="eFuel"${n.fuel ? ' checked' : ''}> ⛽ Carburant (ravitaillement)</label>
     </div>
@@ -708,6 +715,8 @@ function editNote(id, isNew) {
       <div class="stagehelp">Pose les symboles où tu veux : <b>glisse</b> un symbole dans la tulipe ou la case description, règle sa <b>taille</b> avec le curseur (ou la molette).</div>
       <div class="stlabels"><span>Tulipe</span><span>Description</span></div><div class="stage"><div class="stcase" id="stT" data-c="t"><div class="stm" id="stTm"></div><div class="stin" id="stTin"></div></div><div class="stcase" id="stD" data-c="d"><div class="stm" id="stDm"></div><div class="stin" id="stDin"></div></div></div>
       <div class="strow"><label>Taille <input type="range" id="stSize" min="4" max="60" value="16" disabled></label><button type="button" class="mbtn" id="stDel" disabled>Retirer ce symbole</button></div>
+      <div class="strow"><label>Rotation <input type="range" id="stRot" min="-180" max="180" step="5" value="0" disabled></label><button type="button" class="mbtn" id="stRot0" disabled>0°</button></div>
+      <div class="strow"><label>Couleur du texte <input type="color" id="stCol" value="#000000" disabled style="width:46px;height:30px;padding:2px"></label><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="stBd" checked disabled> Gras</label></div>
       <div class="strow"><button type="button" class="mbtn" id="stFront" disabled>Mettre en avant-plan</button><button type="button" class="mbtn" id="stBack" disabled>Mettre en arrière-plan</button></div>
       <div class="strow"><button type="button" class="mbtn" id="stAddTx">＋ Texte</button><input id="stTxt" type="text" placeholder="Texte sélectionné" disabled style="flex:1;min-width:0"></div>
       <div class="strow"><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="eTpos"${n.tpos ? ' checked' : ''}> Texte principal déplaçable et redimensionnable</label></div>
@@ -764,8 +773,10 @@ function editNote(id, isNew) {
       if (n.zone && zt !== 'fz') { const v = parseInt($('#eSpeed').value, 10); if (v > 0) n.zone.speed = v; }
       n.fuel = $('#eFuel').checked;
       n.lex = lexSel.slice(); if (!n.lex.length) delete n.lex;
-      n.sym = symList.filter(q => q.tx == null || String(q.tx).trim()).map(q => { const o = { ...q }; delete o.sized; return o; }); if (!n.sym.length) delete n.sym;
-      if (tp) n.tpos = { x: tp.x, y: tp.y, h: tp.h }; else delete n.tpos;
+      n.sym = symList.filter(q => q.tx == null || String(q.tx).trim()).map(q => { const o = { ...q }; delete o.sized; if (!o.rot) delete o.rot; if (!o.col) delete o.col; if (!o.bd) delete o.bd; return o; }); if (!n.sym.length) delete n.sym;
+      if (tp) { n.tpos = { x: tp.x, y: tp.y, h: tp.h }; if (tp.rot) n.tpos.rot = tp.rot; } else delete n.tpos;
+      if (tcol) n.tcol = tcol; else delete n.tcol;
+      if ($('#eTbold').value) n.tbold = $('#eTbold').value; else delete n.tbold;
       n.edited = true; renderAll();
       const R = clamp(parseFloat($('#eR').value) || 0, 20, 150), curR = n.tulip && n.tulip.R || S.settings.tulipR;
       if (Math.abs(R - curR) >= 1) {
@@ -797,6 +808,7 @@ function editNote(id, isNew) {
   };
   // symboles du lexique : sélection (clic = retirer) et palette (clic = ajouter / retirer)
   const lexSel = lexKeys(n), symList = (n.sym || []).filter(q => FIA_LEX[q.k] || q.tx != null).map(q => ({ ...q }));
+  let tcol = n.tcol || null;
   let tp = n.tpos ? { ...n.tpos, main: 1, c: 'd' } : null;
   if (conv) {      // symboles automatiques → symboles libres de la case description, rangés comme dans le roadbook (rangée sous le texte), que l'on peut ensuite déplacer, agrandir ou rétrécir
     const man = lexKeys(n), auto = pre.keys.filter(k => !man.includes(k) && FIA_LEX[k]), L0 = pre.lines[0] || '';
@@ -857,14 +869,17 @@ function editNote(id, isNew) {
     $('#stSize').disabled = !symSel; $('#stDel').disabled = $('#stFront').disabled = $('#stBack').disabled = !symSel || !!symSel.main;
     const isTx = !!symSel && symSel.tx != null && !symSel.main; $('#stTxt').disabled = !isTx; if (document.activeElement !== $('#stTxt')) $('#stTxt').value = isTx ? symSel.tx : '';
     if (symSel) $('#stSize').value = symSel.h;
+    const tx = !!symSel && symSel.tx != null && !symSel.main;
+    $('#stRot').disabled = $('#stRot0').disabled = !symSel; $('#stRot').value = symSel ? symSel.rot || 0 : 0;
+    $('#stCol').disabled = $('#stBd').disabled = !tx; $('#stCol').value = tx && symSel.col ? symSel.col : '#000000'; $('#stBd').checked = !tx || symSel.bd !== 'off';
   };
-  const placeEl = (el, q) => { el.style.left = q.x + '%'; el.style.top = q.y + '%'; if (q.tx != null) el.style.fontSize = `calc(var(--u) * ${q.h})`; else el.style.height = q.h + '%'; };
+  const placeEl = (el, q) => { el.style.left = q.x + '%'; el.style.top = q.y + '%'; el.style.transform = 'translate(-50%,-50%)' + (q.rot ? ` rotate(${q.rot}deg)` : ''); el.style.color = q.col || ''; if (q.tx != null) el.style.fontSize = `calc(var(--u) * ${q.h})`; else el.style.height = q.h + '%'; };
   function renderStage() {
     // fond des deux cases = le vrai rendu du roadbook (même fonction que la ligne de la note), avec les valeurs en cours de saisie ;
     // les symboles libres sont dessinés par-dessus, à part, pour pouvoir être déplacés
     const cv = $('#eCap').value, cap = cv === '' ? null : norm360(Math.round(+cv)) % 360, wt = $('#eWp').value;
-    const tmp = { ...n, symLocked: conv || n.symLocked, text: lockTxt($('#eText').value), cap, showCap: $('#eShowCap').checked && cap != null, danger: +$('#eDanger').value, wp: wt ? { type: wt } : null, lex: lexSel.slice(), sym: [], tpos: tp, noMain: true };
-    if (tp) tp.tx = noteView(tmp).lines.join('\n');
+    const tmp = { ...n, symLocked: conv || n.symLocked, text: lockTxt($('#eText').value), cap, showCap: $('#eShowCap').checked && cap != null, danger: +$('#eDanger').value, wp: wt ? { type: wt } : null, lex: lexSel.slice(), sym: [], tpos: tp, noMain: true, tcol: tcol || undefined, tbold: $('#eTbold').value || undefined };
+    if (tp) { tp.tx = noteView(tmp).lines.join('\n'); tp.col = tcol || undefined; tp.bd = $('#eTbold').value || undefined; }
     const real = `<div class="rbr">${rowInner(tmp, 0, 0, { zone: false, endSp: null, close: false, green: false, red: false }, false)}</div>`;
     $('#stTm').innerHTML = real; $('#stDm').innerHTML = real; $('#stTin').innerHTML = ''; $('#stDin').innerHTML = '';
     (tp && tp.tx.trim() ? symList.concat([tp]) : symList).forEach((q, i) => {
@@ -890,6 +905,13 @@ function editNote(id, isNew) {
     });
     syncCtl();
   }
+  $('#stRot').oninput = () => { if (!symSel) return; symSel.rot = +$('#stRot').value; renderStage(); };
+  $('#stRot0').onclick = () => { if (!symSel) return; symSel.rot = 0; renderStage(); };
+  $('#stCol').oninput = () => { if (symSel && symSel.tx != null && !symSel.main) { symSel.col = $('#stCol').value === '#000000' ? undefined : $('#stCol').value; renderStage(); } };
+  $('#stBd').onchange = () => { if (symSel && symSel.tx != null && !symSel.main) { symSel.bd = $('#stBd').checked ? undefined : 'off'; renderStage(); } };
+  $('#eTcol').oninput = () => { tcol = $('#eTcol').value === '#000000' ? null : $('#eTcol').value; renderStage(); };
+  $('#eTcolRst').onclick = () => { tcol = null; $('#eTcol').value = '#000000'; renderStage(); };
+  $('#eTbold').onchange = () => renderStage();
   $('#stSize').oninput = () => { if (!symSel) return; symSel.h = +$('#stSize').value; symSel.sized = 1; renderStage(); };
   $('#stFront').onclick = () => { if (!symSel) return; symList.splice(symList.indexOf(symSel), 1); symList.push(symSel); renderStage(); };     // l'ordre de la liste = ordre de superposition
   $('#stBack').onclick = () => { if (!symSel) return; symList.splice(symList.indexOf(symSel), 1); symList.unshift(symSel); renderStage(); };

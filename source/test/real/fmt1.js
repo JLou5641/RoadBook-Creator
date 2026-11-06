@@ -1,0 +1,24 @@
+const { chromium } = require('playwright'); const path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1300, height: 950 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file)(?!https:\/\/data\.geopf\.fr).*/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.setInputFiles('#fileIn', '/mnt/user-data/uploads/458e641c-1er_trac__RB_MORVAN.json'); await p.waitForTimeout(1500);
+  const id = await p.evaluate(() => window.__rb.S.notes[3].id);
+  await p.evaluate(id => window.__rb.editNote(id), id); await p.waitForTimeout(400);
+  await p.evaluate(() => { const c = document.querySelector('#eTcol'); c.value = '#d00000'; c.dispatchEvent(new Event('input')); const s = document.querySelector('#eTbold'); s.value = 'on'; s.dispatchEvent(new Event('change')); });
+  await p.click('#enTabs button[data-t="1"]');
+  // ajouter un texte libre, le colorer, le faire tourner ; puis un symbole du lexique tourné
+  await p.click('#stAddTx'); await p.fill('#stTxt', 'Attention');
+  await p.evaluate(() => { const c = document.querySelector('#stCol'); c.value = '#0050ff'; c.dispatchEvent(new Event('input')); const r = document.querySelector('#stRot'); r.value = 30; r.dispatchEvent(new Event('input')); });
+  await p.click('#eLexOpen'); await p.click('#eLexGrid .lextile'); await p.waitForTimeout(200);
+  await p.evaluate(() => { const r = document.querySelector('#stRot'); r.value = 90; r.dispatchEvent(new Event('input')); });
+  await p.screenshot({ path: '/tmp/fmt_edit.png' });
+  await p.click('#modal .primary, .mbtn.primary'); await p.waitForTimeout(800);
+  const o = await p.evaluate(id => { const n = window.__rb.S.notes.find(x => x.id === id); return { tcol: n.tcol, tbold: n.tbold, sym: n.sym.map(q => ({ tx: q.tx, col: q.col, rot: q.rot, k: q.k })) }; }, id);
+  console.log(JSON.stringify(o));
+  const svg = await p.evaluate(id => { const r = window.__rb.notesSVG(window.__rb.S.notes.find(x => x.id === id)); let t = typeof r === 'string' ? r : JSON.stringify(r); for (const m of t.matchAll(/href="data:image\/svg\+xml[^"]*"/g)) { try { t += decodeURIComponent(m[0]); } catch (e) { } } return t; }, id); console.log(svg.length, (svg.match(/<text[^>]*>/g) || []).join(' ').slice(0, 400), (svg.match(/<g [^>]*>/g) || []).join(' '));
+  console.log('svg rotate', /rotate\(30/.test(svg), /rotate\(90/.test(svg), /#d00000/.test(svg), /#0050ff/.test(svg));
+  const row = await p.evaluate(id => { const r = document.querySelector(`.rbr.row[data-id="${id}"]`); r.scrollIntoView(); return r.innerHTML.match(/class="t1"[^>]*>/)[0] + ' | ' + /rotate\(30deg\)/.test(r.innerHTML) + /rotate\(90deg\)/.test(r.innerHTML); }, id);
+  console.log(row);
+  await p.screenshot({ path: '/tmp/fmt_row.png' });
+  console.log('erreurs', errs.join('|') || 0); await b.close(); })();
