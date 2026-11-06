@@ -6,11 +6,9 @@ async function generate() {
   if (drawing) setDrawing(false);
   if (!T) { toast('Charge une trace GPX ou dessine un parcours d’abord.', 'err'); return; }
   if (routing) { toast('Patiente, l’itinéraire est encore en calcul…'); return; }
-  const edited = S.notes.filter(n => n.auto && n.edited && !n.moved).length;
-  if (edited) {
-    ask('Régénérer le roadbook ?', `Les notes automatiques vont être recalculées : <b>${edited} note${edited > 1 ? 's' : ''} modifiée${edited > 1 ? 's' : ''}</b> à la main ser${edited > 1 ? 'ont' : 'a'} remplacée${edited > 1 ? 's' : ''}. Les notes ajoutées à la main sont gardées.`, 'Régénérer', runGenerate);
-  } else runGenerate();
+  runGenerate();
 }
+const keepOnRegen = n => !n.auto || n.moved || n.edited || n.wp || n.zone || n.fuel || (n.sym && n.sym.length) || (n.lex && n.lex.length) || n.tpos || n.tulipEdited || n.symLocked;
 async function runGenerate() {
   cancelGen = false;
   const m = openModal('Génération du roadbook', `<div id="pTxt">Préparation…</div><div class="prog"><div id="pBar"></div></div>`, [{ label: 'Annuler', onClick: () => { cancelGen = true; } }], { noEsc: true });
@@ -38,8 +36,9 @@ async function runGenerate() {
     prog('Dessin des tulipes…', 0.95); await sleep(10);
     const bends = detectBends(jn);
     bends.push(...detectOffroad([...jn, ...bends]));
-    const manual = S.notes.filter(n => !n.auto || n.moved);
-    const all = [startNote(), ...jn, ...bends, endNote()].sort((a, b) => a.s - b.s);
+    const manual = S.notes.filter(keepOnRegen);      // notes ajoutées, déplacées ou modifiées à la main (texte, symboles, waypoint, zone, danger, tulipe, cap…) : jamais supprimées
+    const kept = new Set(manual.map(n => n.kind));
+    const all = [...(kept.has('start') ? [] : [startNote()]), ...jn, ...bends, ...(kept.has('end') ? [] : [endNote()])].filter(n => !manual.some(m => m.kind !== 'start' && m.kind !== 'end' && n.kind !== 'start' && n.kind !== 'end' && Math.abs(m.s - n.s) < 30)).sort((a, b) => a.s - b.s);      // on ne recrée pas une note automatique juste à côté d'une note gardée
     let rep = null;
     if (S.settings.pois || S.settings.landmarks) { prog('Ajout des repères (gués, ponts, villages…)', 0.97); await sleep(10); rep = osmExtras(G, all); }
     addTrackNames(all);

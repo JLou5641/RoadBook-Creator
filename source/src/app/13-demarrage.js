@@ -545,6 +545,7 @@ $('#bErase').onclick = () => setTool('erase');
 $('#routeMode').onchange = e => { S.routeMode = e.target.value; save(); if (/^ors:/.test(S.routeMode) && !orsKey()) orsDialog(); };
 $('#orsBtn').onclick = orsDialog;
 $('#bGen').onclick = generate;
+$('#bSave').onclick = saveProject;
 $('#bExport').onclick = exportGPX;
 $('#bPrint').onclick = printRB;
 $('#rbName').addEventListener('input', e => { S.name = e.target.value; save(); });
