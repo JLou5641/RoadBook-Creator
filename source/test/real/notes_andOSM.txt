@@ -1,0 +1,101 @@
+0.00 start Départ
+0.04 bend Épingle à D
+0.47 junction Lég. à G | sur route
+0.67 junction Lég. à G | sur route
+0.88 junction À G | sur route | Carrer Mossèn Lluis Pujol
+0.93 junction Lég. à D | sur rue
+1.02 junction TD | Carrer de Cedre
+1.10 junction À D | sur route | Passatge de Cedre
+1.16 junction À G | sur route | Avinguda d'Enclar
+1.47 junction TD
+1.62 junction TD
+1.85 junction À G | sur route | Carrer Gil Torres
+2.02 bend Épingle à D
+2.15 bend Épingle à G
+2.29 bend Épingle à D
+2.52 info Entrée Andorra la Vella
+2.72 junction Lég. à G | sur route
+2.87 junction Lég. à G | sur route | Carrer Ciutat de Valls
+3.06 junction Lég. à D | sur route
+3.18 junction TD
+3.35 junction TD | Avinguda del Princep Benlloch
+3.64 junction Lég. à D | sur rue | Église à D | Carrer Mossèn Tremosa
+3.77 junction À D | sur rue
+3.85 junction Lég. à G | sur route
+3.97 junction TD | Avinguda Meritxell
+4.05 junction Serrer à D | sur route
+4.34 junction Lég. à D | sur route | Pont
+4.41 junction TD
+4.48 junction TD
+4.56 junction À D | sur rue
+4.65 junction TD
+4.69 junction TD
+4.74 junction À D | sur rue | Carrer Maria Plà
+4.80 junction À G | sur rue | Avinguda del Fener
+4.91 junction À D | sur route | Vial de la Uniò
+4.95 junction Rond-point | 1re sortie | sur sentier
+4.98 info Sortie Andorra la Vella
+5.07 junction À D | sur sentier
+5.20 bend Virage serré à D
+5.27 info Sous ligne HT
+5.38 info Sous ligne HT
+5.70 junction Lég. à D | sur route CG-2 | Début goudron
+6.01 info Station-service à D
+6.41 junction Rond-point | 1re sortie | sur route CG-2
+6.74 junction Rond-point | 1re sortie | sur route CG-2
+6.79 junction TD
+6.98 junction Serrer à G | sur route CG-2
+7.00 info Pont
+7.32 info Sous pont | Pont
+7.40 junction TD
+7.52 junction Serrer à D | sur route | Pont
+7.57 junction Rond-point | 2e sortie | sur route
+7.68 junction TD
+7.83 junction TD
+8.17 info Station-service à D | Station-service à G
+8.70 junction Serrer à D | sur route CG-2
+8.73 junction Rond-point | 1re sortie | sur route CG-2
+8.79 junction TD
+9.08 junction Serrer à G | sur route CG-2
+9.30 info Tunnel
+9.50 junction Rond-point | 1re sortie | sur route
+10.09 junction TD
+10.23 junction TD
+10.31 junction Serrer à D | sur sentier | Fin goudron
+10.50 junction À G | sur route | Début goudron
+10.54 junction À D | sur rue
+10.70 junction TD
+10.79 junction À G | sur rue
+10.84 junction TD
+10.88 junction TD
+10.99 junction TD
+11.07 junction À D | sur route
+11.25 junction À G | sur route | Hameau les Bons
+11.34 junction TD
+11.46 junction TD
+11.52 junction À D | sur sentier | Fin goudron | Église à G
+11.75 junction À G | sur route CG-2 | Début goudron
+12.46 junction Serrer à D | sur route CG-2
+13.38 info Sous ligne HT
+13.46 junction Rond-point | 1re sortie | sur route CG-2
+13.84 junction Serrer à D | sur route CG-2 | Pont
+14.52 junction Serrer à G | sur route | Pont
+14.63 junction À G | sur route CG-2
+15.23 junction Serrer à G | sur route CG-2
+15.30 junction Lég. à G | sur route CG-2
+15.67 junction Lég. à G | sur rue
+15.76 junction TD
+15.83 junction Serrer à G | sur rue
+15.86 junction Serrer à D | sur rue
+15.92 junction Lég. à D | sur rue
+15.97 junction Serrer à D | sur rue
+16.03 junction TD
+16.08 junction TD | Pont
+16.94 junction Épingle à G | sur route
+17.25 bend Épingle à D
+17.37 bend Épingle à G
+17.52 info Sous ligne HT
+17.85 junction TD
+17.94 bend Épingle à D | Hameau el Forn
+18.31 bend Épingle à G
+18.41 end Arrivée

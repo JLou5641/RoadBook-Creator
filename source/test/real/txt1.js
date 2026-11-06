@@ -1,0 +1,20 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1400, height: 1000 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file).*/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.evaluate(t => window.__rb.loadText(t, 'a.gpx'), fs.readFileSync(path.join(__dirname, 'andorra.gpx'), 'utf8')); await p.waitForTimeout(600);
+  await p.evaluate(() => { const R = window.__rb; R.S.notes = [{ id: 'n1', s: 500, lat: R.S.ll[20][0], lon: R.S.ll[20][1], text: 'Contrôle horaire\nbarrière à droite', kind: 'info', wp: { type: 'ch', limit: 25 }, tulip: null, auto: false }]; R.renderAll(); R.editNote('n1'); });
+  await p.waitForTimeout(500);
+  await p.click('#stAddTx'); await p.fill('#stTxt', 'Attention gravier'); await p.waitForTimeout(100);
+  await p.check('#eTpos'); await p.waitForTimeout(200);
+  // déplacer le texte principal
+  const bb = await p.locator('#stD').boundingBox();
+  const m = p.locator('#stDin .fs.ft').first(); const mb = await m.boundingBox();
+  await p.mouse.move(mb.x + mb.width / 2, mb.y + mb.height / 2); await p.mouse.down(); await p.mouse.move(bb.x + bb.width * .5, bb.y + bb.height * .3, { steps: 5 }); await p.mouse.up();
+  const t = p.locator('#stTin .fs.ft').first(); const tb = await t.boundingBox(); const bt = await p.locator('#stT').boundingBox();
+  await p.mouse.move(tb.x + tb.width / 2, tb.y + tb.height / 2); await p.mouse.down(); await p.mouse.move(bb.x + bb.width * .5, bb.y + bb.height * .82, { steps: 5 }); await p.mouse.up();
+  await p.screenshot({ path: '/home/claude/out/apercu-txt-editeur.png' });
+  await p.click('.mbtn.primary'); await p.waitForTimeout(400);
+  const r = await p.evaluate(async () => { const R = window.__rb, n = R.S.notes[0]; return { tpos: n.tpos, sym: n.sym, svg: R.notesSVG(n).replace(/data:[^"]*/g, 'D').slice(0, 1500) }; });
+  console.log(JSON.stringify(r, null, 1)); console.log('erreurs', errs.join('|') || 0);
+  await p.screenshot({ path: '/home/claude/out/apercu-txt-page.png' }); await b.close(); })();

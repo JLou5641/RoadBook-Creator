@@ -141,12 +141,26 @@ const f1 = v => v.toFixed(1);
 const ROUTE_C = '#0000FF';            // parcours à suivre : bleu pur (distinct du bleu ciel des cours d'eau), le reste en noir
 function freeSyms(list, c, W, H) {       // symboles posés librement : x, y = centre en % de la case, h = hauteur en % de la case
   let o = '';
-  for (const q of list || []) { const S = FIA_LEX[q.k]; if (!S || q.c !== c) continue; const h = q.h / 100 * H, w = h * S.w / S.h; o += `<image x="${f1(q.x / 100 * W - w / 2)}" y="${f1(q.y / 100 * H - h / 2)}" width="${f1(w)}" height="${f1(h)}" href="${S.d}" xlink:href="${S.d}"/>`; }
+  for (const q of list || []) { if (q.c === c && q.tx != null) { o += ftSVG(q, W, H); continue; } const S = FIA_LEX[q.k]; if (!S || q.c !== c) continue; const h = q.h / 100 * H, w = h * S.w / S.h; o += `<image x="${f1(q.x / 100 * W - w / 2)}" y="${f1(q.y / 100 * H - h / 2)}" width="${f1(w)}" height="${f1(h)}" href="${S.d}" xlink:href="${S.d}"/>`; }
   return o;
 }
 function freeLayer(list, c) {            // même chose en HTML, pour le roadbook à l'écran et à l'impression
-  const a = (list || []).filter(q => q.c === c && FIA_LEX[q.k]);
-  return a.map(q => `<img class="fs" src="${FIA_LEX[q.k].d}" alt="" style="left:${q.x}%;top:${q.y}%;height:${q.h}%">`).join('');
+  const a = (list || []).filter(q => q.c === c && (FIA_LEX[q.k] || q.tx != null));
+  return a.map(q => q.tx != null ? `<div class="fs ft" style="left:${q.x}%;top:${q.y}%;font-size:calc(var(--u) * ${q.h})">${ftInner(q)}</div>`
+    : `<img class="fs" src="${FIA_LEX[q.k].d}" alt="" style="left:${q.x}%;top:${q.y}%;height:${q.h}%">`).join('');
+}
+// textes libres : { tx, c, x, y, h } — h = hauteur des lettres en % de la case ; le texte principal déplacé (n.tpos) en est un aussi : 1re ligne en gros, les autres plus petites
+const txLines = q => String(q.tx).split('\n');
+const ftSize = (q, i) => q.main ? (i ? .62 : 1) : 1;
+function ftInner(q) {
+  return txLines(q).map((l, i) => q.main ? (i ? `<i>${esc(l)}</i>` : `<b>${esc(l)}</b>`) : `<b>${esc(l)}</b>`).join('');
+}
+function ftSVG(q, W, H) {
+  const FF = 'Arial Narrow, Roboto Condensed, Arial, sans-serif', L = txLines(q), base = q.h / 100 * H;
+  const sz = L.map((_, i) => base * ftSize(q, i)), tot = sz.reduce((t, v) => t + v * 1.1, 0);
+  let y = q.y / 100 * H - tot / 2, o = '';
+  L.forEach((l, i) => { if (l.trim()) o += `<text x="${f1(q.x / 100 * W)}" y="${f1(y + sz[i] * 0.88)}" text-anchor="middle" font-family="${FF}" font-weight="${q.main && i ? 400 : 700}" font-size="${f1(sz[i])}" fill="#000">${esc(l)}</text>`; y += sz[i] * 1.1; });
+  return o;
 }
 // « trait-point » (remise à zéro du trip) entre l'entrée et la sortie : toujours orienté pareil, à environ 135° du sens de marche (vers le bas),
 // à droite ou à gauche du parcours selon la place libre (réglage manuel possible : t.resetSide = 'r' | 'l')
@@ -281,7 +295,7 @@ function wrapText(str, n) {
 function notesSVG(n) {
   // Texte seul : le lecteur de roadbook ajoute lui-même le CAP (encadré jaune), les dangers et les cadres FIM.
   const W = 400, H = 300, FF = 'Arial Narrow, Roboto Condensed, Arial, sans-serif';
-  const NV = noteView(n), lines = NV.lines, lk = NV.keys, info = n.kind === 'info';      // lk : symboles du lexique FIA (automatiques et posés à la main)
+  const NV = noteView(n), lines = n.tpos ? [] : NV.lines, lk = NV.keys, info = n.kind === 'info';      // lk : symboles du lexique FIA (automatiques et posés à la main)
   let s = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#fff"/>`;
   let y = 10;
   const head = lines[0] ? wrapText(lines[0], 12).slice(0, 2) : [];
@@ -308,12 +322,12 @@ function notesSVG(n) {
     if (y + 44 > H - 8) break outer;
     y += 44; s += `<text x="16" y="${y}" font-family="${FF}" font-size="40" fill="#000">${esc(l)}</text>`;
   }
-  if (n.wp && /^(dss|dt)$/.test(n.wp.type) && n.wp.limit > 0) s += `<text x="${W - 14}" y="40" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="42" fill="#E00000">T:${n.wp.limit}</text>`;      // temps limite en rouge (le lecteur ne le connaît pas)
-  return s + freeSyms(n.sym, 'd', W, H) + '</svg>';
+  if (n.wp && /^(dss|dt|ch)$/.test(n.wp.type) && n.wp.limit > 0) s += `<text x="${W - 14}" y="40" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="42" fill="#E00000">T:${n.wp.limit}</text>`;      // temps limite en rouge (le lecteur ne le connaît pas)
+  return s + freeSyms((n.sym || []).concat(n.tpos && NV.lines.some(Boolean) ? [{ ...n.tpos, tx: NV.lines.join('\n'), main: 1, c: 'd' }] : []), 'd', W, H) + '</svg>';
 }
 const WP_TYPES = [
   ['', 'Aucun'], ['wpv', 'WPV — visible'], ['wpm', 'WPM — masqué'], ['wps', 'WPS — sécurité'], ['wpe', 'WPE — éclipse'],
-  ['wpc', 'WPC — contrôle'], ['wpn', 'WPN — navigation'], ['wpp', 'WPP — passage'], ['cp', 'CP — contrôle de passage'], ['dss', 'DSS — départ spéciale'], ['ass', 'ASS — arrivée spéciale'],
+  ['wpc', 'WPC — contrôle'], ['wpn', 'WPN — navigation'], ['wpp', 'WPP — passage'], ['cp', 'CP — contrôle de passage'], ['ch', 'CH — contrôle horaire (liaison)'], ['dss', 'DSS — départ spéciale'], ['ass', 'ASS — arrivée spéciale'],
   ['dn', 'DN — début neutralisation'], ['fn', 'FN — fin neutralisation'], ['dt', 'DT — début liaison'], ['ft', 'FT — fin liaison']
 ];
 const ZONE_TYPES = [['', 'Aucune'], ['dz', 'DZ — début de zone'], ['fz', 'FZ — fin de zone'], ['fzdz', 'FZ + DZ — fin d’une zone et début de la suivante']];
@@ -339,7 +353,9 @@ function speedSign(sp, barred) {
     + (s ? `<text x="50" y="${(50 + fs * 0.36).toFixed(1)}" font-family="Arial,Helvetica,sans-serif" font-weight="700" text-anchor="middle" font-size="${fs}" fill="#000"${fit}>${s}</text>` : '')
     + (barred ? `<path d="M81 19L19 81" stroke="${SPEED_RING}" stroke-width="8" stroke-linecap="round"/>` : '') + '</svg>';
 }
-const SYM_ALT = { dnv: 'DN', dtv: 'DT', fuel: 'Carburant' };
+const SYM_ALT = { dnv: 'DN', dtv: 'DT', ch: 'CH', fuel: 'Carburant' };
+// CH (contrôle horaire) : symbole du lexique FIM (chronomètre, image fournie par l'utilisateur)
+FIM_SYM.ch = { w: 128, h: 128, d: 'data:image/png;base64,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' };
 const symImg = k => ({ a: FIM_SYM[k].w / FIM_SYM[k].h, h: `<img class="sym" src="${FIM_SYM[k].d}" alt="${SYM_ALT[k] || k.toUpperCase()}">` });
 const symSign = (sp, barred) => ({ a: 1, h: speedSign(sp, barred) });
 function noteSymbols(n, f) {     // ordre du lexique : waypoint, FZ + panneau barré, DZ + panneau, carburant
@@ -355,7 +371,7 @@ function noteSymbols(n, f) {     // ordre du lexique : waypoint, FZ + panneau ba
 }
 function noteSigns(n, f) {       // panneaux de limitation de vitesse : en bas à droite de la 3e case (et non plus dans la 1re)
   const t = n.wp && n.wp.type, zt = n.zone && n.zone.type, out = [];
-  if (/^(dn|dt|dss)$/.test(t || '') && n.wp.speed && !zt) out.push(speedSign(n.wp.speed));
+  if (/^(dn|dt|dss|ch)$/.test(t || '') && n.wp.speed && !zt) out.push(speedSign(n.wp.speed));
   if ((zt === 'fz' || zt === 'fzdz') && f.endSp) out.push(speedSign(f.endSp, true));
   if ((zt === 'dz' || zt === 'fzdz') && n.zone.speed) out.push(speedSign(n.zone.speed));
   return out;
@@ -424,7 +440,7 @@ const AUTO_SYM = [      // [ligne de texte, () → { keys: symboles, text: texte
   [/^(?:Voie ferrée|Passage à niveau)$/, () => ({ keys: ['rail'] })],
   [/^Grille à bétail(?: \(privé\))?$/, () => ({ keys: ['cattlegate'] })],
   [/^(?:Portail|Barrière|Portail coulissant|Barrière pivotante)( \(privé\))?$/, m => ({ keys: ['fencegate'], text: m[1] ? 'privé' : '' })],
-  [/^STOP$/, () => ({ keys: ['stop'] })],
+  [/^STOP$/, () => ({ keys: ['stoproad'] })],      // STOP routier relevé dans OSM / IGN → panneau octogonal (le « stop » rond du lexique FIA reste pour les liaisons, CH… posé à la main)
   [/^Début goudron$/, () => ({ keys: ['tarmac'], grp: 'nav' })],
   [/^Fin goudron$/, () => ({ keys: ['track'], grp: 'nav' })],
   [/^Antenne(?: à ([DG]))?$/, m => ({ keys: ['antenna', ...sideSym(m[1])] })],
@@ -532,7 +548,8 @@ function fitLines(lines, dg, cap, symH, bot) {  // lignes secondaires qui tienne
   return out;
 }
 function rowInner(n, i, par, f, screen) {
-  const t = n.wp && n.wp.type, zt = n.zone && n.zone.type, NV = noteView(n), lines = NV.lines;
+  const t = n.wp && n.wp.type, zt = n.zone && n.zone.type, NV = noteView(n), lines = n.tpos ? [] : NV.lines;      // texte principal déplacé : il est dessiné à part, comme un symbole
+  const mainFree = n.tpos && !n.noMain && NV.lines.some(Boolean) ? [{ ...n.tpos, tx: NV.lines.join('\n'), main: 1, c: 'd' }] : [];
   const bg = (t && WP_BG[t]) || (zt === 'fz' ? WP_BG.fz : zt ? WP_BG.dz : null)
     || (/^(dn|fn|dt|ft)$/.test(t || '') ? '#D8D8D8' : null)      // seul un DZ colore la case en orange : une limite saisie sur DN / DT / DSS ne change pas le fond
     || (f.green ? '#A0D080' : '#fff');
@@ -540,7 +557,7 @@ function rowInner(n, i, par, f, screen) {
   const sg = signs.length ? `<div class="sg" style="--h:${signs.length > 1 ? 8 : 10.5}cqw">${signs.join('')}</div>` : '';
   const dg = n.danger && t !== 'wps' ? `<div class="dg">${'!'.repeat(n.danger)}</div>` : '';
   const big = /^(dss|ass)$/.test(t || '') ? `<div class="wpbig">${t.toUpperCase()}</div>` : '';      // DSS / ASS : le sigle en grand au milieu de la 3e case (le symbole de la 1re case n'a plus le mot)
-  const tl = /^(dss|dt)$/.test(t || '') && n.wp.limit > 0 ? `<div class="tl">T:${n.wp.limit}</div>` : '';      // temps limite : texte rouge en haut de la 3e case
+  const tl = /^(dss|dt|ch)$/.test(t || '') && n.wp.limit > 0 ? `<div class="tl">T:${n.wp.limit}</div>` : '';      // temps limite : texte rouge en haut de la 3e case
   const top = dg || tl ? `<div class="k3top">${dg}${tl}</div>` : '';
   const cap = n.showCap && n.cap != null ? `<div class="cap">${Math.round(n.cap) % 360}°</div>` : '';
   // symboles du lexique : on les réduit si besoin pour qu'ils tiennent entre la direction et l'encadré du CAP
@@ -552,7 +569,7 @@ function rowInner(n, i, par, f, screen) {
   const lx = lk.length ? `<div class="lx" style="--lh:${lh}cqw">${lk.map(k => `<img src="${FIA_LEX[k].d}" alt="${esc(FIA_LEX[k].l)}" title="${esc(FIA_LEX[k].l)}">`).join('')}</div>` : '';
   return `<div class="k k1" style="background:${bg}"><div class="tot">${kmFr(n.s)}</div><div class="bl"><div class="par">${kmFr(par)}</div>${f.close ? ARROW_SVG : ''}</div>${sym}<div class="br"><div class="num">${i + 1}</div></div></div>`
     + `<div class="k k2">${tulipSVG(n.tulip, 200)}${freeLayer(n.sym, 't')}${t === 'cp' ? '<div class="cpf"></div>' : ''}</div>`
-    + `<div class="k k3${signs.length ? ' hs' : cap ? ' hc' : ''}">${big}${top}${n.kind === 'info' ? lx : ''}<div class="t1">${esc(lines[0] || '')}</div>${n.kind === 'info' ? '' : lx}${freeLayer(n.sym, 'd')}<div class="t2">${esc(fitLines(lines, !!(dg || tl), !!(cap || signs.length), lk.length ? lr * (lh + 0.6) - 0.6 : 0, signs.length ? 12.4 : 0).join('\n'))}</div>${cap}${sg}`
+    + `<div class="k k3${signs.length ? ' hs' : cap ? ' hc' : ''}">${big}${top}${n.kind === 'info' ? lx : ''}<div class="t1">${esc(lines[0] || '')}</div>${n.kind === 'info' ? '' : lx}${freeLayer((n.sym || []).concat(mainFree), 'd')}<div class="t2">${esc(fitLines(lines, !!(dg || tl), !!(cap || signs.length), lk.length ? lr * (lh + 0.6) - 0.6 : 0, signs.length ? 12.4 : 0).join('\n'))}</div>${cap}${sg}`
     + (screen && (!n.auto || n.moved) ? '<div class="man">manuelle</div>' : '')
     + (screen ? `<div class="acts"><button data-a="edit" title="Modifier la note">✎</button><button data-a="del" title="Supprimer la note">🗑</button></div>` : '') + `</div>`
     + (f.zone ? `<div class="fr zone${f.zTop ? ' zt' : ''}${f.zBot ? ' zb' : ''}"></div>` : '') + (f.red ? '<div class="fr red"></div>' : '');
@@ -632,6 +649,28 @@ async function redrawTulip(n, R) {
     n.tulip = t;
   } finally { S.settings.tulipR = oldR; }
 }
+// symboles importés par l'utilisateur : catégorie « Mes symboles », mémorisés dans le navigateur (bibliothèque) ET dans le fichier projet
+const MYS = {};
+function regMySyms(o) {
+  for (const [k, v] of Object.entries(o || {})) if (v && v.d) { MYS[k] = v; FIA_LEX[k] = { c: 'Mes symboles', l: v.l, en: v.l, w: v.w, h: v.h, d: v.d }; }
+  if (Object.keys(MYS).length && !FIA_CATS.includes('Mes symboles')) FIA_CATS.push('Mes symboles');
+}
+try { regMySyms(JSON.parse(localStorage.getItem('rbgen.mySyms') || '{}')); } catch (e) { }
+function saveMySyms() { try { localStorage.setItem('rbgen.mySyms', JSON.stringify(MYS)); } catch (e) { toast('Bibliothèque de symboles pleine : le symbole reste dans le projet seulement.'); } }
+async function importSymbol(file) {      // image → PNG de 160 px max, fond blanc uni retiré (à partir des bords)
+  const url = URL.createObjectURL(file), im = new Image();
+  await new Promise((ok, ko) => { im.onload = ok; im.onerror = () => ko(new Error('Image illisible')); im.src = url; });
+  const sc = Math.min(1, 160 / Math.max(im.naturalWidth, im.naturalHeight)), w = Math.max(1, Math.round(im.naturalWidth * sc)), h = Math.max(1, Math.round(im.naturalHeight * sc));
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const cx = cv.getContext('2d'); cx.drawImage(im, 0, 0, w, h); URL.revokeObjectURL(url);
+  const img = cx.getImageData(0, 0, w, h), D = img.data, white = i => D[i + 3] > 200 && D[i] > 235 && D[i + 1] > 235 && D[i + 2] > 235;
+  const seen = new Uint8Array(w * h), q = [];
+  for (let x = 0; x < w; x++) q.push(x, (h - 1) * w + x); for (let y = 0; y < h; y++) q.push(y * w, y * w + w - 1);
+  while (q.length) { const p = q.pop(); if (seen[p] || !white(p * 4)) continue; seen[p] = 1; D[p * 4 + 3] = 0; const x = p % w; if (x > 0) q.push(p - 1); if (x < w - 1) q.push(p + 1); if (p >= w) q.push(p - w); if (p < w * (h - 1)) q.push(p + w); }
+  cx.putImageData(img, 0, 0);
+  const k = 'my_' + Date.now().toString(36), l = (file.name || 'Mon symbole').replace(/\.[^.]+$/, '').slice(0, 40) || 'Mon symbole';
+  regMySyms({ [k]: { l, w, h, d: cv.toDataURL('image/png') } }); saveMySyms(); save();
+  return k;
+}
 function editNote(id, isNew) {
   const n = S.notes.find(x => x.id === id); if (!n) return;
   normNote(n);
@@ -644,10 +683,13 @@ function editNote(id, isNew) {
     <div class="fld"><label>Symboles du lexique FIA <span style="font-weight:400;color:#8a8478">— sous la direction, dans la case description</span></label>
       <div class="stagehelp">Pose les symboles où tu veux : <b>glisse</b> un symbole dans la tulipe ou la case description, règle sa <b>taille</b> avec le curseur (ou la molette).</div>
       <div class="stlabels"><span>Tulipe</span><span>Description</span></div><div class="stage"><div class="stcase" id="stT" data-c="t"><div class="stm" id="stTm"></div><div class="stin" id="stTin"></div></div><div class="stcase" id="stD" data-c="d"><div class="stm" id="stDm"></div><div class="stin" id="stDin"></div></div></div>
-      <div class="strow"><label>Taille <input type="range" id="stSize" min="4" max="90" value="16" disabled></label><button type="button" class="mbtn" id="stDel" disabled>Retirer ce symbole</button></div>
+      <div class="strow"><label>Taille <input type="range" id="stSize" min="4" max="60" value="16" disabled></label><button type="button" class="mbtn" id="stDel" disabled>Retirer ce symbole</button></div>
       <div class="strow"><button type="button" class="mbtn" id="stFront" disabled>Mettre en avant-plan</button><button type="button" class="mbtn" id="stBack" disabled>Mettre en arrière-plan</button></div>
+      <div class="strow"><button type="button" class="mbtn" id="stAddTx">＋ Texte</button><input id="stTxt" type="text" placeholder="Texte sélectionné" disabled style="flex:1;min-width:0"></div>
+      <div class="strow"><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="eTpos"${n.tpos ? ' checked' : ''}> Texte principal déplaçable et redimensionnable</label></div>
       <div id="eLexSel" class="lexsel"></div>
       <button type="button" id="eLexOpen" class="mbtn lexadd">＋ Ajouter des symboles</button>
+      <button type="button" id="eSymImp" class="mbtn lexadd" title="Importer une image (PNG, JPG, SVG) : le fond blanc est retiré">📥 Importer mon symbole</button><input type="file" id="eSymFile" accept="image/*" hidden>
       <div id="eLexPal" class="lexpal" hidden>
         <input id="eLexQ" type="search" placeholder="Chercher : pont, trou, clôture, kpL…" autocomplete="off">
         <div id="eLexTabs" class="lextabs">${FIA_CATS.map((c, i) => `<button type="button" data-c="${esc(c)}"${i ? '' : ' class="on"'}>${esc(c)}</button>`).join('')}</div>
@@ -695,15 +737,16 @@ function editNote(id, isNew) {
         n.wp = { type: t, name: $('#eName').value.trim() };
         if (isRadiusWP(t)) { const o = parseInt($('#eOpen').value, 10), c = parseInt($('#eClear').value, 10); if (o > 0) n.wp.open = o; if (c > 0) n.wp.clear = c; }
         if (t === 'dn') { const d = parseInt($('#eDur').value, 10); if (d >= 0) n.wp.dur = d; }
-        if (/^(dss|dt)$/.test(t)) { const v = parseInt($('#eLim').value, 10); if (v > 0) n.wp.limit = v; }
-        if (t === 'dn' || t === 'dt' || t === 'dss') { const v = parseInt($('#eWpSp').value, 10); if (v > 0) n.wp.speed = v; }
+        if (/^(dss|dt|ch)$/.test(t)) { const v = parseInt($('#eLim').value, 10); if (v > 0) n.wp.limit = v; }
+        if (t === 'dn' || t === 'dt' || t === 'dss' || t === 'ch') { const v = parseInt($('#eWpSp').value, 10); if (v > 0) n.wp.speed = v; }
       }
       const zt = $('#eZone').value;
       n.zone = zt ? { type: zt } : null;
       if (n.zone && zt !== 'fz') { const v = parseInt($('#eSpeed').value, 10); if (v > 0) n.zone.speed = v; }
       n.fuel = $('#eFuel').checked;
       n.lex = lexSel.slice(); if (!n.lex.length) delete n.lex;
-      n.sym = symList.map(q => ({ ...q })); if (!n.sym.length) delete n.sym;
+      n.sym = symList.filter(q => q.tx == null || String(q.tx).trim()).map(q => { const o = { ...q }; delete o.sized; return o; }); if (!n.sym.length) delete n.sym;
+      if (tp) n.tpos = { x: tp.x, y: tp.y, h: tp.h }; else delete n.tpos;
       n.edited = true; renderAll();
       const R = clamp(parseFloat($('#eR').value) || 0, 20, 150), curR = n.tulip && n.tulip.R || S.settings.tulipR;
       if (Math.abs(R - curR) >= 1) {
@@ -718,14 +761,15 @@ function editNote(id, isNew) {
     $('#eWpRad').style.display = isRadiusWP(t) ? '' : 'none';
     $('#eOpen').parentElement.style.display = $('#eClear').parentElement.style.display = isRadiusWP(t) ? '' : 'none';
     $('#eDurF').style.display = t === 'dn' ? '' : 'none';
-    $('#eWpSpF').style.display = /^(dn|dt|dss)$/.test(t) ? '' : 'none';
-    $('#eLimF').style.display = /^(dss|dt)$/.test(t) ? '' : 'none';
-    $('#eWpX').style.display = /^(dn|dt|dss)$/.test(t) ? '' : 'none';
+    $('#eWpSpF').style.display = /^(dn|dt|dss|ch)$/.test(t) ? '' : 'none';
+    $('#eLimF').style.display = /^(dss|dt|ch)$/.test(t) ? '' : 'none';
+    $('#eWpX').style.display = /^(dn|dt|dss|ch)$/.test(t) ? '' : 'none';
     $('#eSpeedF').style.display = $('#eZone').value && $('#eZone').value !== 'fz' ? '' : 'none';
     if (isRadiusWP(t) && !$('#eOpen').value && !$('#eClear').value) { $('#eOpen').value = WP_DEF[t][0] || ''; $('#eClear').value = WP_DEF[t][1] || ''; }
   };
   // symboles du lexique : sélection (clic = retirer) et palette (clic = ajouter / retirer)
-  const lexSel = lexKeys(n), symList = (n.sym || []).filter(q => FIA_LEX[q.k]).map(q => ({ ...q }));
+  const lexSel = lexKeys(n), symList = (n.sym || []).filter(q => FIA_LEX[q.k] || q.tx != null).map(q => ({ ...q }));
+  let tp = n.tpos ? { ...n.tpos, main: 1, c: 'd' } : null;
   if (conv) {      // symboles automatiques → symboles libres de la case description, rangés comme dans le roadbook (rangée sous le texte), que l'on peut ensuite déplacer, agrandir ou rétrécir
     const man = lexKeys(n), auto = pre.keys.filter(k => !man.includes(k) && FIA_LEX[k]), L0 = pre.lines[0] || '';
     const h = pre.lines.length ? 22 : 30, extra = pre.lines.slice(1).reduce((t, l) => t + textRows(l), 0);
@@ -748,6 +792,16 @@ function editNote(id, isNew) {
       : '<div class="help" style="margin:6px 0">Aucun symbole trouvé.</div>';
     $('#eLexTabs').classList.toggle('dim', !!q);
   };
+  $('#eSymImp').onclick = () => $('#eSymFile').click();
+  $('#eSymFile').onchange = async () => {
+    const f = $('#eSymFile').files[0]; $('#eSymFile').value = ''; if (!f) return;
+    try {
+      const k = await importSymbol(f);
+      symSel = { k, c: lastCase, x: 50, y: 50, h: 16 }; symList.push(symSel);      // posé tout de suite au centre ; il reste dans l'onglet « Mes symboles »
+      $('#eLexTabs').innerHTML = FIA_CATS.map((c, i) => `<button type="button" data-c="${esc(c)}"${c === lexCat ? ' class="on"' : ''}>${esc(c)}</button>`).join('');
+      renderLex(); renderStage(); toast('Symbole importé : « ' + FIA_LEX[k].l + ' ».');
+    } catch (e) { toast('Import impossible : ' + e.message); }
+  };
   $('#eLexOpen').onclick = () => { const p = $('#eLexPal'); p.hidden = !p.hidden; $('#eLexOpen').textContent = p.hidden ? '＋ Ajouter des symboles' : 'Fermer la liste des symboles'; if (!p.hidden) $('#eLexQ').focus(); };
   $('#eLexTabs').onclick = e => { const b = e.target.closest('button[data-c]'); if (!b) return; lexCat = b.dataset.c; $('#eLexQ').value = ''; $('#eLexTabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); renderLex(); };
   $('#eLexQ').oninput = renderLex;
@@ -758,38 +812,50 @@ function editNote(id, isNew) {
   // zone de placement : deux cases carrées, les symboles se glissent (même d'une case à l'autre) et se redimensionnent
   const caseEl = c => c === 't' ? $('#stTin') : $('#stDin');
   let lastCase = 't';
-  const syncCtl = () => { $('#stSize').disabled = $('#stDel').disabled = $('#stFront').disabled = $('#stBack').disabled = !symSel; if (symSel) $('#stSize').value = symSel.h; };
-  const placeEl = (el, q) => { el.style.left = q.x + '%'; el.style.top = q.y + '%'; el.style.height = q.h + '%'; };
+  const syncCtl = () => {
+    $('#stSize').disabled = !symSel; $('#stDel').disabled = $('#stFront').disabled = $('#stBack').disabled = !symSel || !!symSel.main;
+    const isTx = !!symSel && symSel.tx != null && !symSel.main; $('#stTxt').disabled = !isTx; if (document.activeElement !== $('#stTxt')) $('#stTxt').value = isTx ? symSel.tx : '';
+    if (symSel) $('#stSize').value = symSel.h;
+  };
+  const placeEl = (el, q) => { el.style.left = q.x + '%'; el.style.top = q.y + '%'; if (q.tx != null) el.style.fontSize = `calc(var(--u) * ${q.h})`; else el.style.height = q.h + '%'; };
   function renderStage() {
     // fond des deux cases = le vrai rendu du roadbook (même fonction que la ligne de la note), avec les valeurs en cours de saisie ;
     // les symboles libres sont dessinés par-dessus, à part, pour pouvoir être déplacés
     const cv = $('#eCap').value, cap = cv === '' ? null : norm360(Math.round(+cv)) % 360, wt = $('#eWp').value;
-    const tmp = { ...n, symLocked: conv || n.symLocked, text: lockTxt($('#eText').value), cap, showCap: $('#eShowCap').checked && cap != null, danger: +$('#eDanger').value, wp: wt ? { type: wt } : null, lex: lexSel.slice(), sym: [] };
+    const tmp = { ...n, symLocked: conv || n.symLocked, text: lockTxt($('#eText').value), cap, showCap: $('#eShowCap').checked && cap != null, danger: +$('#eDanger').value, wp: wt ? { type: wt } : null, lex: lexSel.slice(), sym: [], tpos: tp, noMain: true };
+    if (tp) tp.tx = noteView(tmp).lines.join('\n');
     const real = `<div class="rbr">${rowInner(tmp, 0, 0, { zone: false, endSp: null, close: false, green: false, red: false }, false)}</div>`;
     $('#stTm').innerHTML = real; $('#stDm').innerHTML = real; $('#stTin').innerHTML = ''; $('#stDin').innerHTML = '';
-    symList.forEach((q, i) => {
-      const im = document.createElement('img'); im.src = FIA_LEX[q.k].d; im.className = 'fs' + (q === symSel ? ' sel' : ''); im.draggable = false; im.title = FIA_LEX[q.k].l; placeEl(im, q);
+    (tp && tp.tx.trim() ? symList.concat([tp]) : symList).forEach((q, i) => {
+      let im;
+      if (q.tx != null) { im = document.createElement('div'); im.className = 'fs ft' + (q === symSel ? ' sel' : ''); im.innerHTML = ftInner(q); im.title = q.main ? 'Texte principal' : 'Texte'; }
+      else { im = document.createElement('img'); im.src = FIA_LEX[q.k].d; im.className = 'fs' + (q === symSel ? ' sel' : ''); im.draggable = false; im.title = FIA_LEX[q.k].l; }
+      placeEl(im, q);
       im.addEventListener('pointerdown', e => {
         e.preventDefault(); symSel = q; im.setPointerCapture(e.pointerId); syncCtl();
         document.querySelectorAll('#stTin .fs, #stDin .fs').forEach(x => x.classList.toggle('sel', x === im));
         const move = ev => {
           const rt = $('#stT').getBoundingClientRect(), rd = $('#stD').getBoundingClientRect();
           const inside = r => ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom;
-          const c = inside(rt) ? 't' : inside(rd) ? 'd' : q.c, r = c === 't' ? rt : rd;
+          const c = q.main ? 'd' : inside(rt) ? 't' : inside(rd) ? 'd' : q.c, r = c === 't' ? rt : rd;
           if (c !== q.c) { q.c = c; caseEl(c).appendChild(im); }
           q.x = Math.round(clamp((ev.clientX - r.left) / r.width * 100, 0, 100) * 10) / 10; q.y = Math.round(clamp((ev.clientY - r.top) / r.height * 100, 0, 100) * 10) / 10; placeEl(im, q);
         };
         const c0 = q.c, up = () => { im.removeEventListener('pointermove', move); im.removeEventListener('pointerup', up); lastCase = q.c; if (q.c !== c0) renderStage(); };
         im.addEventListener('pointermove', move); im.addEventListener('pointerup', up);
       });
-      im.addEventListener('wheel', e => { e.preventDefault(); q.h = clamp(Math.round(q.h * (e.deltaY < 0 ? 1.08 : 0.93) * 10) / 10, 4, 90); placeEl(im, q); symSel = q; syncCtl(); }, { passive: false });
+      im.addEventListener('wheel', e => { e.preventDefault(); q.h = clamp(Math.round(q.h * (e.deltaY < 0 ? 1.08 : 0.93) * 10) / 10, 4, 90); q.sized = 1; placeEl(im, q); symSel = q; syncCtl(); }, { passive: false });
       caseEl(q.c).appendChild(im);
     });
     syncCtl();
   }
-  $('#stSize').oninput = () => { if (!symSel) return; symSel.h = +$('#stSize').value; renderStage(); };
+  $('#stSize').oninput = () => { if (!symSel) return; symSel.h = +$('#stSize').value; symSel.sized = 1; renderStage(); };
   $('#stFront').onclick = () => { if (!symSel) return; symList.splice(symList.indexOf(symSel), 1); symList.push(symSel); renderStage(); };     // l'ordre de la liste = ordre de superposition
   $('#stBack').onclick = () => { if (!symSel) return; symList.splice(symList.indexOf(symSel), 1); symList.unshift(symSel); renderStage(); };
+  $('#stAddTx').onclick = () => { symSel = { tx: 'Texte', c: lastCase, x: 50, y: 50, h: 14 }; symList.push(symSel); renderStage(); $('#stTxt').focus(); $('#stTxt').select(); };
+  $('#stTxt').oninput = () => { if (symSel && symSel.tx != null && !symSel.main) { symSel.tx = $('#stTxt').value; if (!symSel.sized) symSel.h = Math.min(14, Math.max(5, Math.floor(176 / Math.max(4, ...symSel.tx.split('\n').map(l => l.length))))); renderStage(); } };
+  $('#eTpos').onchange = () => { if ($('#eTpos').checked) { const L = noteView({ ...n, symLocked: conv || n.symLocked, text: lockTxt($('#eText').value), tpos: null }).lines, mx = Math.max(4, ...L.map((l, i) => l.length * (i ? .62 : 1)));
+    tp = { main: 1, c: 'd', x: 50, y: 28, h: Math.min(16, Math.max(5, Math.floor(176 / mx))) }; symSel = tp; } else { if (symSel === tp) symSel = null; tp = null; } renderStage(); };
   $('#stDel').onclick = () => { if (!symSel) return; symList.splice(symList.indexOf(symSel), 1); symSel = null; renderStage(); };
   $('#stT').onclick = $('#stD').onclick = e => { if (!e.target.classList.contains('fs')) { symSel = null; renderStage(); } };
   $('#eCapMeas').onclick = () => { m.querySelector('.mbtn.primary').click(); measureForNote(n, true); };

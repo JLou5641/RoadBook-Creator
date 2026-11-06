@@ -1,0 +1,11 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1400, height: 800 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file).*/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.evaluate(t => window.__rb.loadText(t, 'a.gpx'), fs.readFileSync(path.join(__dirname, 'andorra.gpx'), 'utf8')); await p.waitForTimeout(600);
+  await p.evaluate(() => { const R = window.__rb, L = R.S.ll; const mk = (id, s, i, text, extra) => ({ id, s, lat: L[i][0], lon: L[i][1], text, kind: 'info', tulip: null, ...extra });
+    R.S.notes = [mk('a', 500, 20, 'STOP'), mk('b', 900, 40, 'Liaison', { auto: false, lex: ['stop'] }), mk('c', 1300, 60, 'Cédez le passage')]; R.renderAll(); });
+  await p.waitForTimeout(500);
+  const svg = await p.evaluate(() => window.__rb.notesSVG(window.__rb.S.notes[0]).includes('stoproad') || window.__rb.notesSVG(window.__rb.S.notes[0]).split('<image').length - 1);
+  console.log('svg images', svg, 'erreurs', errs.join('|') || 0);
+  await p.screenshot({ path: '/home/claude/out/apercu-stop.png', clip: { x: 930, y: 400, width: 470, height: 400 } }); await b.close(); })();

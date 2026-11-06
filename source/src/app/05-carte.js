@@ -27,10 +27,17 @@ function layerFor(key) {
   if (!myLayerObjs.has(c.id)) myLayerObjs.set(c.id, L.tileLayer(c.url, { maxNativeZoom: c.max || 18, maxZoom: Math.max(19, c.max || 18), attribution: esc(c.name) }));
   return myLayerObjs.get(c.id);
 }
+let baseLevel = {}; try { baseLevel = JSON.parse(localStorage.getItem('rbgen.baseLevel') || '{}') || {}; } catch (_) {}
+/* Curseur d'intensité du fond : 10 % à 100 % (atténuation), mémorisé pour chaque fond */
+function applyBaseLevel() {
+  const v = clamp(+baseLevel[curLayerKey] || 100, 10, 100);
+  $('#baseLvl').value = v; $('#baseLvlTxt').textContent = v + ' %'; curLayer.setOpacity(v / 100);
+}
 function setBaseLayer(key) {
   const lay = layerFor(key) || LAYERS.topo; if (!layerFor(key)) key = 'topo';
   if (curLayer !== lay) { map.removeLayer(curLayer); curLayer = lay.addTo(map); }
   curLayerKey = key; $('#layerSel').value = key;
+  applyBaseLevel();
   try { localStorage.setItem('rbgen.layer', key); } catch (_) {}
 }
 function rebuildLayerSelect() {
@@ -69,6 +76,43 @@ function openMyLayers(pre, err) {
     rebuildLayerSelect(); openMyLayers();
   }));
 }
+/* ---------- Heatmap : une seule liste regroupant les couches de fréquentation / sentiers, superposées au fond ---------- */
+const HEAT = {
+  lidar: L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png&LAYER=IGNF_LIDAR-HD_MNT_ELEVATION.ELEVATIONGRIDCOVERAGE.SHADOW&STYLE=normal', { maxNativeZoom: 18, maxZoom: 19, zIndex: 5, className: 'mult', attribution: '© IGN – LiDAR HD' }),
+  ombrage: L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png&LAYER=ELEVATION.ELEVATIONGRIDCOVERAGE.SHADOW&STYLE=estompage_grayscale', { maxNativeZoom: 15, maxZoom: 19, zIndex: 5, className: 'mult', attribution: '© IGN – Estompage' }),
+  pentes: L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png&LAYER=GEOGRAPHICALGRIDSYSTEMS.SLOPES.MOUNTAIN&STYLE=normal', { maxNativeZoom: 17, maxZoom: 19, zIndex: 5, opacity: 0.6, attribution: '© IGN – Pentes' }),
+  onf: L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png&LAYER=FORETS.PUBLIQUES&STYLE=FORETS%20PUBLIQUES%20ONF', { maxNativeZoom: 16, maxZoom: 19, zIndex: 5, opacity: 0.8, attribution: '© IGN / ONF – Forêts publiques' }),
+  prsf: L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png&LAYER=PROTECTEDAREAS.PRSF&STYLE=POINT%20RENCONTRE%20SECOURS%20FORET', { maxNativeZoom: 17, maxZoom: 19, zIndex: 6, attribution: '© IGN / ONF – Points de secours en forêt' }),
+  porteur: L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png&LAYER=IGNF_ACCESSIBILITE-PHYSIQUE-FORETS-PORTEUR&STYLE=normal', { maxNativeZoom: 17, maxZoom: 19, zIndex: 5, opacity: 0.8, attribution: '© IGN – Accessibilité des forêts (portage)' }),
+  skidder: L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png&LAYER=IGNF_ACCESSIBILITE-PHYSIQUE-FORETS-SKIDDER&STYLE=normal', { maxNativeZoom: 17, maxZoom: 19, zIndex: 5, opacity: 0.8, attribution: '© IGN – Accessibilité des forêts (débardage)' }),
+  gps: L.tileLayer('https://gps.tile.openstreetmap.org/lines/{z}/{x}/{y}.png', { maxNativeZoom: 19, maxZoom: 19, zIndex: 5, opacity: 0.85, attribution: 'Traces GPS © contributeurs OpenStreetMap' }),
+  hiking: L.tileLayer('https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png', { maxNativeZoom: 18, maxZoom: 19, zIndex: 5, opacity: 0.85, attribution: 'Sentiers © Waymarked Trails' }),
+  mtb: L.tileLayer('https://tile.waymarkedtrails.org/mtb/{z}/{x}/{y}.png', { maxNativeZoom: 18, maxZoom: 19, zIndex: 5, opacity: 0.85, attribution: 'VTT © Waymarked Trails' }),
+  cycling: L.tileLayer('https://tile.waymarkedtrails.org/cycling/{z}/{x}/{y}.png', { maxNativeZoom: 18, maxZoom: 19, zIndex: 5, opacity: 0.85, attribution: 'Vélo © Waymarked Trails' })
+};
+let curHeat = '';
+const HEAT_BASE = { gps: .85, hiking: .85, mtb: .85, cycling: .85, onf: .8, porteur: .8, skidder: .8, pentes: .6, lidar: 1, ombrage: 1, prsf: 1 };
+let heatLevel = {}; try { heatLevel = JSON.parse(localStorage.getItem('rbgen.heatLevel') || '{}') || {}; } catch (_) {}
+/* Curseur d'intensité : 10 % à 100 % = atténuation (transparence) */
+function applyHeatLevel() {
+  const lay = HEAT[curHeat]; if (!lay) { $('#heatLvlBox').style.display = 'none'; return; }
+  const v = clamp(+heatLevel[curHeat] || 100, 10, 100), base = HEAT_BASE[curHeat] || 1;
+  $('#heatLvlBox').style.display = ''; $('#heatLvl').value = v; $('#heatLvlTxt').textContent = v + ' %';
+  lay.setOpacity(Math.min(1, base * v / 100));
+}
+function setHeat(key) {
+  if (!HEAT[key]) key = '';
+  if (curHeat && HEAT[curHeat]) map.removeLayer(HEAT[curHeat]);
+  curHeat = key; if (key) HEAT[key].addTo(map);
+  $('#heatSel').value = key; try { localStorage.setItem('rbgen.heat', key); } catch (_) {}
+  applyHeatLevel();
+}
+$('#heatLvl').addEventListener('input', e => { if (!curHeat) return; heatLevel[curHeat] = +e.target.value; try { localStorage.setItem('rbgen.heatLevel', JSON.stringify(heatLevel)); } catch (_) {} applyHeatLevel(); });
+$('#heatLvlTxt').addEventListener('dblclick', () => { if (curHeat) { delete heatLevel[curHeat]; applyHeatLevel(); } });
+$('#heatSel').addEventListener('change', e => setHeat(e.target.value));
+try { setHeat(localStorage.getItem('rbgen.heat') || ''); } catch (_) {}
+$('#baseLvl').addEventListener('input', e => { baseLevel[curLayerKey] = +e.target.value; try { localStorage.setItem('rbgen.baseLevel', JSON.stringify(baseLevel)); } catch (_) {} applyBaseLevel(); });
+$('#baseLvlTxt').addEventListener('dblclick', () => { delete baseLevel[curLayerKey]; applyBaseLevel(); });
 $('#layerSel').addEventListener('change', e => {
   const v = e.target.value;
   if (v === '__my') { e.target.value = curLayerKey; openMyLayers(); return; }
@@ -79,6 +123,7 @@ let showRad = true; try { showRad = localStorage.getItem('rbgen.radii') !== '0';
 $('#radChk').checked = showRad;
 $('#radChk').addEventListener('change', e => { showRad = e.target.checked; try { localStorage.setItem('rbgen.radii', showRad ? '1' : '0'); } catch (_) {} renderRadii(); });
 try { const l = localStorage.getItem('rbgen.layer'); if (l) setBaseLayer(l); } catch (_) {}
+applyBaseLevel();
 
 const casing = L.polyline([], { color: '#fff', weight: 8, opacity: 0.85, interactive: false }).addTo(map);
 const line = L.polyline([], { color: '#e4572e', weight: 4.5, opacity: 0.95, interactive: false }).addTo(map);
@@ -397,3 +442,52 @@ map.on('mousedown', e => { if (drawing) strokeStart(e.containerPoint, e.latlng);
 map.on('mousemove', e => { if (drawing) strokeMove(e.containerPoint, e.latlng); });
 window.addEventListener('mouseup', () => { if (pendingIns && !stroke) { pendingIns = null; map.dragging.enable(); } else strokeEnd(); });
 
+
+/* ---------- Recherche d'un lieu (en haut à gauche de la carte) : géocodeur IGN (France) + Photon / OpenStreetMap (monde) ---------- */
+{
+  const box = $('#placeBox'), inp = $('#placeInp'), list = $('#placeList');
+  let pin = null, seq = 0, timer = null;
+  const goTo = (lat, lon, label, zoom) => {
+    map.setView([lat, lon], Math.max(map.getZoom(), zoom || 14));
+    if (pin) map.removeLayer(pin);
+    pin = L.marker([lat, lon], { interactive: false, keyboard: false, title: label }).addTo(map);
+    setTimeout(() => { if (pin) { map.removeLayer(pin); pin = null; } }, 15000);
+    list.style.display = 'none'; inp.blur();
+  };
+  const parseCoords = q => {
+    const m = q.trim().replace(/,/g, ' ').replace(/\s+/g, ' ').match(/^(-?\d{1,2}(?:\.\d+)?) (-?\d{1,3}(?:\.\d+)?)$/);
+    if (!m) return null; const a = +m[1], b = +m[2];
+    return Math.abs(a) <= 90 && Math.abs(b) <= 180 ? [a, b] : null;
+  };
+  const fj = (url, ms) => { const c = new AbortController(), t = setTimeout(() => c.abort(), ms); return fetch(url, { signal: c.signal }).then(r => { clearTimeout(t); if (!r.ok) throw new Error(r.status); return r.json(); }); };
+  async function search(q) {
+    const my = ++seq, co = parseCoords(q);
+    if (co) { show([{ label: `Coordonnées ${co[0]}, ${co[1]}`, sub: 'Aller à ce point', lat: co[0], lon: co[1] }]); return; }
+    list.innerHTML = '<div class="pl-info">Recherche…</div>'; list.style.display = 'block';
+    const c = map.getCenter();
+    const [a, b] = await Promise.allSettled([
+      fj('https://data.geopf.fr/geocodage/search?limit=6&q=' + encodeURIComponent(q), 8000),
+      fj(`https://photon.komoot.io/api/?limit=6&lang=fr&lat=${c.lat.toFixed(3)}&lon=${c.lng.toFixed(3)}&q=${encodeURIComponent(q)}`, 8000)
+    ]);
+    if (my !== seq) return;
+    const out = [];
+    if (a.status === 'fulfilled') for (const f of a.value.features || []) out.push({ label: f.properties.label, sub: f.properties.context || f.properties.type || '', lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0], z: f.properties.type === 'street' || f.properties.type === 'housenumber' ? 16 : 14 });
+    if (b.status === 'fulfilled') for (const f of b.value.features || []) {
+      const P = f.properties, lat = f.geometry.coordinates[1], lon = f.geometry.coordinates[0];
+      if (out.some(o => Math.abs(o.lat - lat) < 0.01 && Math.abs(o.lon - lon) < 0.01)) continue;
+      out.push({ label: P.name || P.street || q, sub: [P.city || P.county, P.state, P.country].filter(Boolean).join(', '), lat, lon, z: 13 });
+    }
+    show(out, a.status === 'rejected' && b.status === 'rejected');
+  }
+  function show(items, failed) {
+    list.innerHTML = '';
+    if (!items.length) { list.innerHTML = `<div class="pl-info">${failed ? 'Recherche indisponible (pas de connexion ?)' : 'Aucun résultat'}</div>`; list.style.display = 'block'; return; }
+    items.slice(0, 8).forEach(it => { const d = document.createElement('div'); d.className = 'pl-it'; d.innerHTML = `<b>${esc(it.label)}</b><span>${esc(it.sub || '')}</span>`; d.addEventListener('mousedown', e => { e.preventDefault(); goTo(it.lat, it.lon, it.label, it.z); }); list.appendChild(d); });
+    list._first = items[0]; list.style.display = 'block';
+  }
+  inp.addEventListener('input', () => { clearTimeout(timer); const q = inp.value.trim(); if (q.length < 2) { list.style.display = 'none'; return; } timer = setTimeout(() => search(q), 350); });
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); const f = list._first; if (f && list.style.display !== 'none') goTo(f.lat, f.lon, f.label, f.z); else if (inp.value.trim().length > 1) search(inp.value.trim()); } if (e.key === 'Escape') { list.style.display = 'none'; inp.blur(); } });
+  inp.addEventListener('focus', () => { if (list.children.length) list.style.display = 'block'; });
+  inp.addEventListener('blur', () => setTimeout(() => { list.style.display = 'none'; }, 150));
+  L.DomEvent.disableClickPropagation(box); L.DomEvent.disableScrollPropagation(box);
+}

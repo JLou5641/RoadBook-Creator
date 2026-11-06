@@ -1,0 +1,13 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1400, height: 1000 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file).*/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.evaluate(t => window.__rb.loadText(t, 'a.gpx'), fs.readFileSync(path.join(__dirname, 'andorra.gpx'), 'utf8')); await p.waitForTimeout(600);
+  await p.evaluate(() => { const R = window.__rb; R.S.notes = [{ id: 'n1', s: 500, lat: R.S.ll[20][0], lon: R.S.ll[20][1], text: 'Test', kind: 'info', tulip: null, auto: false }]; R.renderAll(); R.editNote('n1'); });
+  await p.waitForTimeout(400);
+  await p.setInputFiles('#eSymFile', '/mnt/user-data/uploads/67ef9b2d-image.png'); await p.waitForTimeout(600);
+  await p.click('#eLexOpen'); await p.click('#eLexTabs button:last-child'); await p.waitForTimeout(200);
+  await p.screenshot({ path: '/home/claude/out/apercu-import.png' });
+  await p.click('.mbtn.primary'); await p.waitForTimeout(400);
+  const r = await p.evaluate(async () => { const R = window.__rb; return { sym: R.S.notes[0].sym.map(q => q.k), lib: Object.keys(JSON.parse(localStorage.getItem('rbgen.mySyms') || '{}')), proj: Object.keys(JSON.parse(localStorage.getItem('rbgen.v1')||'{}').mySyms||{}), svgImg: R.notesSVG(R.S.notes[0]).split('<image').length - 1 }; });
+  console.log(JSON.stringify(r), 'erreurs', errs.join('|') || 0); await b.close(); })();

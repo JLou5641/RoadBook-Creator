@@ -1,0 +1,11 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1400, height: 900 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file).*/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.evaluate(t => window.__rb.loadText(t, 'a.gpx'), fs.readFileSync(path.join(__dirname, 'andorra.gpx'), 'utf8')); await p.waitForTimeout(600);
+  await p.evaluate(() => { const R = window.__rb; R.S.notes = [{ id: 'n1', s: 500, lat: R.S.ll[20][0], lon: R.S.ll[20][1], text: 'Contrôle horaire', kind: 'info', wp: { type: 'ch', limit: 25, speed: 50 }, tulip: null }, { id: 'n2', s: 900, lat: R.S.ll[40][0], lon: R.S.ll[40][1], text: 'Sans temps', kind: 'info', wp: { type: 'ch' }, tulip: null }]; R.renderAll && R.renderAll(); });
+  await p.waitForTimeout(500);
+  const gpx = await p.evaluate(async () => await window.__rb.buildGPX());
+  const w = gpx.split('<wpt').slice(1, 3).map(x => (x.match(/<extensions>[\s\S]*?<\/extensions>/) || [''])[0].replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '[img]').replace(/\s+/g, ' '));
+  console.log(w.join('\n')); console.log('erreurs', errs.join('|') || 0);
+  await p.screenshot({ path: process.argv[2] }); await b.close(); })();

@@ -1,0 +1,23 @@
+0.00 start Départ
+0.55 junction TD
+0.73 junction TD
+0.82 junction À G | sur piste
+0.85 junction Serrer à G | sur piste
+1.24 junction Serrer à D | sur piste
+1.67 junction TD
+1.73 junction Serrer à G | sur piste
+1.88 junction TD
+2.03 junction Lég. à D | sur piste
+2.53 junction TD | sur rue | Début goudron | Entrée Weikenreuth
+2.60 junction À G | sur rue | Weikenreuther Straße
+2.64 info Sortie Weikenreuth
+2.69 junction À D | sur rue | Hameau Weikenreuth
+2.76 junction Serrer à D | sur sentier | Fin goudron
+2.96 junction Lég. à D | sur piste
+3.03 junction TD
+3.11 junction À G | sur route | Début goudron
+3.42 junction Lég. à D | sur route | Entrée Hahnenhof
+3.53 junction À G | sur rue | Hameau Hahnenhof | Hahnenhof
+3.56 info Sortie Hahnenhof
+3.60 junction À D | sur route B 85 | Kulmbacher Straße
+4.04 end Arrivée

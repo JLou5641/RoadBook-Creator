@@ -44,7 +44,11 @@ async function buildGPX(onProg) {
         if (isNumberedWP(t)) wpCount++;
         ex.push(`<openrally:${t === 'cp' ? 'checkpoint' : t}${attrs(n.wp.open, n.wp.clear, n.wp.name || (isNumberedWP(t) ? String(wpCount) : ''))}/>`);
       }
-      if ((t === 'dn' || t === 'dt' || t === 'dss') && n.wp.speed) speed = n.wp.speed;
+      if (t === 'ch') {      // CH : marqueur « checkpoint » vide (aucun rayon) ; le temps limite de la liaison part de ce CH jusqu'au contrôle horaire suivant
+        ex.push('<openrally:checkpoint/>');
+        if (n.wp.limit > 0) ex.push(`<openrally:timecontrol allowed="${Math.round(n.wp.limit)}"/>`);
+      }
+      if ((t === 'dn' || t === 'dt' || t === 'dss' || t === 'ch') && n.wp.speed) speed = n.wp.speed;
     }
     if (n.zone) {
       const z = n.zone.type, [o, c] = WP_DEF.dz;

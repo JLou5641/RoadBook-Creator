@@ -391,17 +391,19 @@ function altDialog() {
 function view3D() {
   if (!eleValid()) return;
   const m = openModal('Aperçu 3D', `<canvas id="c3" width="640" height="400" style="width:100%;background:#f3efe4;border-radius:8px;cursor:grab;touch-action:none"></canvas>
-    <label style="display:block;margin-top:6px">Relief exagéré ×<input type="range" id="ex3" min="1" max="15" value="5" style="vertical-align:middle"> <span id="exv">5</span> · glisse pour tourner</label>`, ['sp', { label: 'Fermer', cls: 'primary' }]);
+    <label style="display:block;margin-top:6px">Relief exagéré ×<input type="range" id="ex3" min="1" max="15" value="5" style="vertical-align:middle"> <span id="exv">5</span></label>
+    <label style="display:block;margin-top:4px">Zoom <input type="range" id="zm3" min="0.5" max="12" step="0.1" value="1" style="vertical-align:middle"> <span id="zmv">1</span> × <button type="button" id="zr3" style="margin-left:6px">Recentrer</button></label>
+    <div class="help" style="margin:4px 0 0">Glisse pour tourner · molette ou pincement pour zoomer · Maj + glisser (ou deux doigts) pour déplacer · double-clic : recentrer.</div>`, ['sp', { label: 'Fermer', cls: 'primary' }]);
   const cv = m.querySelector('#c3'), cx = cv.getContext('2d'), W = cv.width, H = cv.height;
   const N = Math.min(500, Math.max(20, Math.round(T.L / 60))), P = [];
   for (let k = 0; k <= N; k++) { const s = T.L * k / N, p = pointAt(s); P.push([p[0], p[1], eleAt(Math.min(s, S.ele.step * (S.ele.v.length - 1)))]); }
   const mx = P.reduce((a, p) => a + p[0], 0) / P.length, my = P.reduce((a, p) => a + p[1], 0) / P.length, z0 = Math.min(...P.map(p => p[2])), z1 = Math.max(...P.map(p => p[2]));
   const ext = Math.max(1, ...P.map(p => Math.hypot(p[0] - mx, p[1] - my)));
-  let yaw = 0.6, pitch = 0.9, ex = 5;
+  let yaw = 0.6, pitch = 0.9, ex = 5, zm = 1, panX = 0, panY = 0;
   const draw = () => {
     cx.clearRect(0, 0, W, H);
-    const sc = Math.min(W, H) * 0.62 / ext, cy_ = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp_ = Math.sin(pitch);
-    const proj = (x, y, z) => { const a = (x - mx) * cy_ - (y - my) * sy, b = (x - mx) * sy + (y - my) * cy_; return [W / 2 + a * sc, H * 0.55 + (-b * sp_ + -(z - z0) * ex * cp + (z1 - z0) * ex * cp / 2) * sc]; };
+    const sc = Math.min(W, H) * 0.62 / ext * zm, cy_ = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp_ = Math.sin(pitch);
+    const proj = (x, y, z) => { const a = (x - mx) * cy_ - (y - my) * sy, b = (x - mx) * sy + (y - my) * cy_; return [W / 2 + panX + a * sc, H * 0.55 + panY + (-b * sp_ + -(z - z0) * ex * cp + (z1 - z0) * ex * cp / 2) * sc]; };
     cx.lineWidth = 2; cx.strokeStyle = 'rgba(0,0,0,.18)'; cx.beginPath();
     P.forEach((p, i) => { const q = proj(p[0], p[1], z0); i ? cx.lineTo(q[0], q[1]) : cx.moveTo(q[0], q[1]); }); cx.stroke();
     cx.strokeStyle = 'rgba(0,0,0,.08)'; cx.beginPath(); P.forEach((p, i) => { if (i % 6) return; const a = proj(p[0], p[1], z0), b = proj(p[0], p[1], p[2]); cx.moveTo(a[0], a[1]); cx.lineTo(b[0], b[1]); }); cx.stroke();
@@ -410,10 +412,32 @@ function view3D() {
     const s0 = proj(P[0][0], P[0][1], P[0][2]), e0 = proj(P[P.length - 1][0], P[P.length - 1][1], P[P.length - 1][2]);
     cx.fillStyle = '#2f9e44'; cx.beginPath(); cx.arc(s0[0], s0[1], 6, 0, 7); cx.fill(); cx.fillStyle = '#c0392b'; cx.beginPath(); cx.arc(e0[0], e0[1], 6, 0, 7); cx.fill();
   };
-  let drag = null;
-  cv.onpointerdown = e => { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; };
-  cv.onpointermove = e => { if (!drag) return; yaw += (e.clientX - drag[0]) * 0.01; pitch = clamp(pitch + (e.clientY - drag[1]) * 0.01, 0.1, 1.45); drag = [e.clientX, e.clientY]; draw(); };
-  cv.onpointerup = () => { drag = null; cv.style.cursor = 'grab'; };
+  const ptr = new Map(); let last = null, pinch = null;
+  const setZoom = (z, fx, fy) => {      // zoom centré sur le point (fx, fy) du canevas (par défaut le centre)
+    z = clamp(z, 0.5, 12); fx = fx == null ? W / 2 : fx; fy = fy == null ? H * 0.55 : fy;
+    const r = z / zm; panX = fx - W / 2 - (fx - W / 2 - panX) * r; panY = fy - H * 0.55 - (fy - H * 0.55 - panY) * r;
+    zm = z; m.querySelector('#zm3').value = z; m.querySelector('#zmv').textContent = z.toFixed(1); draw();
+  };
+  const reset3 = () => { panX = panY = 0; setZoom(1); };
+  const cpos = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height]; };
+  cv.onpointerdown = e => { ptr.set(e.pointerId, [e.clientX, e.clientY]); last = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; if (ptr.size === 2) { const [p1, p2] = [...ptr.values()]; pinch = { d: Math.hypot(p1[0] - p2[0], p1[1] - p2[1]), c: [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2] }; } };
+  cv.onpointermove = e => {
+    if (!ptr.has(e.pointerId)) return; ptr.set(e.pointerId, [e.clientX, e.clientY]);
+    if (ptr.size >= 2 && pinch) {
+      const [p1, p2] = [...ptr.values()], d = Math.hypot(p1[0] - p2[0], p1[1] - p2[1]), c = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2], r = cv.getBoundingClientRect(), k = W / r.width;
+      panX += (c[0] - pinch.c[0]) * k; panY += (c[1] - pinch.c[1]) * k;
+      setZoom(zm * d / (pinch.d || d), (c[0] - r.left) * k, (c[1] - r.top) * (H / r.height)); pinch = { d, c }; return;
+    }
+    if (!last) return; const dx = e.clientX - last[0], dy = e.clientY - last[1]; last = [e.clientX, e.clientY];
+    if (e.shiftKey || e.buttons === 2 || e.buttons === 4) { const r = cv.getBoundingClientRect(); panX += dx * W / r.width; panY += dy * H / r.height; }
+    else { yaw += dx * 0.01; pitch = clamp(pitch + dy * 0.01, 0.1, 1.45); }
+    draw();
+  };
+  cv.onpointerup = cv.onpointercancel = e => { ptr.delete(e.pointerId); pinch = null; last = ptr.size ? [...ptr.values()][0] : null; if (!ptr.size) cv.style.cursor = 'grab'; };
+  cv.addEventListener('wheel', e => { e.preventDefault(); const q = cpos(e); setZoom(zm * Math.exp(-e.deltaY * 0.0015), q[0], q[1]); }, { passive: false });
+  cv.addEventListener('contextmenu', e => e.preventDefault());
+  cv.ondblclick = reset3; m.querySelector('#zr3').onclick = reset3;
+  m.querySelector('#zm3').oninput = e => setZoom(+e.target.value);
   m.querySelector('#ex3').oninput = e => { ex = +e.target.value; m.querySelector('#exv').textContent = ex; draw(); };
   draw();
 }

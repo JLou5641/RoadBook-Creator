@@ -182,13 +182,14 @@ function noteFromGroup(g, gr, prevS, nextS) {
   const main = (jn.length ? jn : gr).reduce((m, x) => turn(x) > turn(m) ? x : m);
   const hIn = first.hIn, hOut = last.hOut, a = angDiff(hIn, hOut);
   // fourche : une autre branche part presque dans la même direction
-  let fork = null;
+  let fork = null, arms = [];
   const myRel = angDiff(main.hIn, main.hOut);
   if (Math.abs(a) <= 50 && Math.abs(myRel) <= 50) {
     let best = null;
     for (const x of main.brs) {
       if (x === main.entry || x === main.exit) continue;
       const r = angDiff(main.hIn, x.bear);
+      if (Math.abs(r) <= 55 && Math.abs(r - myRel) < 80) arms.push(x);      // branches de la fourche
       if (Math.abs(r) <= 55 && Math.abs(r - myRel) < 80 && (best === null || Math.abs(r - myRel) < Math.abs(best - myRel))) best = r;
     }
     if (best !== null && Math.abs(best - myRel) > 8) fork = myRel > best ? 'D' : 'G';
@@ -197,6 +198,8 @@ function noteFromGroup(g, gr, prevS, nextS) {
   const t1 = dirPhrase(a, fork);
   const surf = (entryCat === 'road') !== (exitCat === 'road');
   if (!jn.length && !surf) return null;
+  // fourche : pas de note si ses branches ne sont pas toutes du même type (toutes goudronnées ou toutes non goudronnées) : route + chemin / sentier = pas de note
+  if (fork && !surf && arms.some(x => (x.b.way.cat === 'road') !== (entryCat === 'road'))) return null;
   if (t1 === 'TD' && !surf && exitCat === entryCat && !S.settings.straight) return null;
   const lines = [t1];
   if (t1 !== 'TD' || exitCat !== entryCat) lines.push('sur ' + wayLabel(exitWay));
@@ -452,7 +455,7 @@ function followRoad(notes, lvl) {
   };
   const secInfo = n => lvl >= 3 && n.kind === 'info' && !n.wp && !n.danger && (n.text || '').split('\n').filter(Boolean).every(x => SECOND_RE.test(x));
   // même route : même numéro (les noms de rue peuvent changer le long d'une départementale), sinon même nom ; ce qui est inconnu ne gêne pas
-  const ok = (acc, x) => acc.ref && x.ref ? acc.ref === x.ref : (lvl >= 2 || !acc.name || !x.name || acc.name === x.name);      // niveau 2 et plus : seul un numéro de route différent compte, pas le nom de la rue
+  const ok = (acc, x) => acc.ref && x.ref ? acc.ref === x.ref : acc.name && x.name ? acc.name === x.name : !acc.name === !x.name;      // deux numéros différents = autre route ; un numéro qui manque d'un côté ne coupe pas à lui seul : on compare alors les noms (nom différent, ou qui apparaît / disparaît = on a quitté la route) ; ni numéro ni nom des deux côtés : même route
   const add = (acc, x) => ({ ref: acc.ref || x.ref, name: acc.name || x.name });
   const out = []; let removed = 0;
   for (let i = 0; i < notes.length; i++) {
