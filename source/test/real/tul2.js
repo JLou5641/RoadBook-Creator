@@ -1,0 +1,28 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+const mock = require('./mock'); const [dbFile, gpxFile] = process.argv.slice(2);
+const db = mock.load(path.join(__dirname, dbFile));
+(async () => {
+  const browser = await chromium.launch(); const page = await browser.newPage({ viewport: { width: 1300, height: 1000 } });
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  await page.route(/overpass|kumi|private\.coffee|mail\.ru/, r => { const body = decodeURIComponent((r.request().postData() || '').replace(/^data=/, '').replace(/\+/g, ' ')); r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mock.run(db, body)) }); });
+  await page.route(/tile|arcgisonline/, r => r.abort());
+  await page.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html'));
+  await page.evaluate(() => localStorage.clear()); await page.reload();
+  await page.evaluate(t => window.__rb.loadText(t, 't.gpx'), fs.readFileSync(path.join(__dirname, gpxFile), 'utf8')); await page.waitForTimeout(300);
+  await page.evaluate(() => window.__rb.generate());
+  await page.waitForFunction(() => !document.querySelector('#modalBg').classList.contains('show'), null, { timeout: 120000 }); await page.waitForTimeout(500);
+  const id = await page.evaluate(() => window.__rb.S.notes.find(n => n.kind === 'junction' && n.tulip && n.tulip.route.length >= 3 && (n.tulip.others || []).length >= 2).id);
+  await page.evaluate(id => window.__rb.tulipEditor(window.__rb.S.notes.find(n => n.id === id)), id); await page.waitForTimeout(300);
+  const hit = await page.$('#tulOv path[data-k="r"]'); const len = await hit.evaluate(p => p.getTotalLength());
+  const at = f => hit.evaluate((p, l) => { const q = p.getPointAtLength(l), m = p.getScreenCTM(); return [q.x * m.a + m.e, q.y * m.d + m.f]; }, len * f);
+  let [x, y] = await at(0.8); await page.mouse.click(x, y); await page.waitForTimeout(200);
+  console.log('barre entrée/sortie visible', await page.$eval('#tulBarR', e => e.style.display !== 'none'));
+  await page.click('#tulBarR [data-e="road"]'); await page.click('#tulBarR [data-x="trail"]'); await page.check('#tulReset'); await page.waitForTimeout(200);
+  await page.screenshot({ path: '/home/claude/out/apercu-tulipe-entree-sortie.png' });
+  await page.click('.mbtn.primary'); await page.waitForTimeout(200); await page.click('.mbtn.primary:has-text("Appliquer")'); await page.waitForTimeout(300);
+  console.log(await page.evaluate(id => { const t = window.__rb.S.notes.find(n => n.id === id).tulip; return JSON.stringify({ sp: t.sp, reset: t.reset, c: t.route.map(q => q.c[0]).join('') }); }, id));
+  await page.screenshot({ path: '/home/claude/out/apercu-tulipe-entree-sortie-note.png' });
+  const png = await page.evaluate(async id => { const R = window.__rb; const n = R.S.notes.find(n => n.id === id); return R.tulipSVG(n.tulip, 300).includes('r="2.5" fill="#000"'); }, id);
+  console.log('trait-point dans le SVG exporté', png);
+  console.log(errs.join('\n') || 'aucune erreur JS'); await browser.close();
+})();

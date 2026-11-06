@@ -1,0 +1,80 @@
+0.00 start Départ
+0.64 junction TD
+0.82 junction TD
+1.00 junction Lég. à D | sur piste
+1.24 junction Lég. à G | sur piste
+1.33 junction Serrer à D | sur piste
+1.83 junction TD
+1.88 junction TD
+2.04 junction TD
+2.18 junction À D | sur piste
+2.25 junction TD
+2.29 junction À G | sur piste
+2.84 info Entrée Altenplos
+2.88 junction Lég. à G | sur rue | Début goudron | Schulstraße
+2.96 junction TD
+3.03 junction TD
+3.15 junction TD
+3.27 junction TD
+3.31 junction Lég. à G | sur route | Sortie Altenplos | Pont
+3.56 junction À D | sur route
+3.60 junction À G | sur route
+3.71 junction À D | sur route | Entrée Neuenplos
+3.80 info Sortie Neuenplos
+3.88 junction TD | sur piste | Fin goudron | Hameau Neuenplos
+4.11 junction TD
+4.21 junction Serrer à G | sur piste
+4.36 junction TD
+4.71 junction À G | sur piste
+4.87 junction TD
+4.96 junction Serrer à D | sur piste
+5.06 junction TD
+5.22 junction À D | sur piste
+5.39 junction Serrer à G | sur piste
+5.53 junction Serrer à D | sur piste
+5.65 junction Serrer à G | sur piste
+5.70 junction À G | sur piste
+5.98 junction TD
+6.07 junction TD
+6.13 junction À D | sur piste
+6.18 junction À G | sur piste
+6.33 junction Serrer à D | sur piste
+6.61 junction TD
+6.73 junction À G | sur piste
+6.86 junction Serrer à D | sur piste
+7.56 junction Lég. à D | sur route | Début goudron
+7.71 junction Lég. à G | sur route
+7.88 junction TD
+8.20 junction TD | Hameau Untergräfenthal
+8.29 junction TD
+8.63 junction À D | sur route | Hameau Eselslohe
+8.71 junction À G | sur piste | Fin goudron
+9.12 junction Serrer à G | sur piste
+9.17 junction Lég. à G | sur piste
+9.55 junction Épingle à D | sur route KU 14 | Début goudron
+10.45 junction TD
+10.50 junction À G | sur piste | Fin goudron
+10.85 junction Lég. à G | Voie ferrée | sur route St 2183 | Début goudron | Hauptstraße
+10.89 junction Lég. à G | sur route St 2183 | Entrée Harsdorf
+10.92 junction TD
+11.01 junction À D | sur route
+11.09 junction TD
+11.18 junction TD
+11.27 junction TD | Sortie Harsdorf
+11.41 info Sous pont
+11.55 junction TD
+11.84 info Entrée Haselbach
+12.00 info Sortie Haselbach
+12.15 junction TD
+12.28 info Entrée Zettmeisel
+12.46 junction À D | sur route
+12.67 junction À G | sur piste | Fin goudron
+12.70 junction TD
+12.78 info Sortie Zettmeisel
+13.06 junction Lég. à G | sur piste
+13.21 junction À D | sur piste
+13.81 junction Lég. à D | sur route | Début goudron
+14.05 junction TD
+14.26 junction À D | sur route
+14.82 info Entrée Lettenhof
+15.07 end Arrivée

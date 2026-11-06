@@ -1,0 +1,10 @@
+const { chromium } = require('playwright'); const path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1200, height: 760 } }); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+  await p.route(/^(?!file).*/, r => /data\.geopf\.fr/.test(r.request().url()) ? r.continue() : r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.fill('#placeInp', 'Foix'); await p.waitForTimeout(3500);
+  await p.screenshot({ path: process.argv[2], clip: { x: 0, y: 60, width: 520, height: 330 } });
+  await p.keyboard.press('Enter'); await p.waitForTimeout(800);
+  console.log('centre', await p.evaluate(() => { const c = window.__rb.map.getCenter(); return [c.lat.toFixed(3), c.lng.toFixed(3), window.__rb.map.getZoom()]; }));
+  await p.fill('#placeInp', '42.5, 1.5'); await p.waitForTimeout(800); await p.keyboard.press('Enter'); await p.waitForTimeout(500);
+  console.log('coord', await p.evaluate(() => { const c = window.__rb.map.getCenter(); return [c.lat.toFixed(2), c.lng.toFixed(2)]; }), 'erreurs', errs.length); await b.close(); })();

@@ -50,6 +50,7 @@
   <main>
     <div id="mapwrap">
       <div id="map"></div>
+      <div id="placeBox"><input id="placeInp" type="search" placeholder="🔍 Lieu, adresse ou coordonnées…" autocomplete="off" aria-label="Chercher un lieu"><div id="placeList"></div></div>
       <div class="mapbox" id="layerBox">
         <select id="layerSel" aria-label="Fond de carte">
           <option value="topo">🗻 OpenTopoMap</option>
@@ -61,6 +62,26 @@
           <option value="ortho">🇫🇷 Photos aériennes IGN (France)</option>
           <option value="esritopo">🏔️ Esri Topo (monde)</option>
         </select>
+        <div><label class="heatlvl" title="Glisse vers la gauche pour atténuer le fond de carte. Double-clic sur le pourcentage : remettre à 100 %.">Intensité du fond <input type="range" id="baseLvl" min="10" max="100" step="5" value="100"> <span id="baseLvlTxt">100 %</span></label></div>
+        <select id="heatSel" aria-label="Heatmap et couches" title="Couches par-dessus le fond : où les gens passent, sentiers balisés, relief et forêts (France)">
+          <option value="">🔥 Heatmap / couches : aucune</option>
+          <optgroup label="Fréquentation et sentiers">
+            <option value="gps">🔥 Traces GPS (OpenStreetMap)</option>
+            <option value="hiking">🥾 Sentiers de randonnée balisés</option>
+            <option value="mtb">🚵 Itinéraires VTT balisés</option>
+            <option value="cycling">🚴 Itinéraires vélo balisés</option>
+          </optgroup>
+          <optgroup label="Relief et forêts (France, IGN)">
+            <option value="lidar">🌲 LiDAR HD : relief sans les arbres</option>
+            <option value="ombrage">⛰️ Ombrage du relief (flou en zoom serré)</option>
+            <option value="pentes">📐 Pentes fortes (≥ 30°, montagne)</option>
+            <option value="onf">🌳 Forêts publiques (ONF)</option>
+            <option value="prsf">🆘 Points de secours en forêt (PRSF)</option>
+            <option value="porteur">🚜 Accessibilité forêts : portage</option>
+            <option value="skidder">🪵 Accessibilité forêts : débardage</option>
+          </optgroup>
+        </select>
+        <div id="heatLvlBox" style="display:none"><label class="heatlvl" title="Glisse vers la gauche pour atténuer la couche. Double-clic sur le pourcentage : remettre à 100 %.">Intensité <input type="range" id="heatLvl" min="10" max="100" step="5" value="100"> <span id="heatLvlTxt">100 %</span></label></div>
         <label class="radlab" title="Cercle d’ouverture (bleu, pointillé) et cercle de validation (violet) autour de chaque waypoint"><input type="checkbox" id="radChk"> ◎ Rayons des waypoints <span class="radkey"><i class="ro"></i> ouverture <i class="rc"></i> validation</span></label>
       </div>
       <div class="mapbox" id="measBox">

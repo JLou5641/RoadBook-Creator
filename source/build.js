@@ -8,7 +8,7 @@ const parts = {
   '/*LEAFLET_CSS*/': rd('leaflet/dist/leaflet.css').replace(/url\(images\/[^)]+\)/g, 'none'),
   '/*APP_CSS*/': rd('src/app.css'),
   '/*LEAFLET_JS*/': rd('leaflet/dist/leaflet.js').replace(/\/\/# sourceMappingURL=.*$/m, ''),
-  '/*APP_JS*/': rd('src/fimsym.js') + '\n' + rd('src/fialex.js') + '\n' + rd('src/extrasym.js') + '\n' + rd('src/vt.js') + '\n' + rd('src/ign.js') + '\n' + rd('src/app.js'),
+  '/*APP_JS*/': rd('src/fimsym.js') + '\n' + rd('src/fialex.js') + '\n' + rd('src/extrasym.js') + '\n' + rd('src/vt.js') + '\n' + rd('src/ign.js') + '\n' + fs.readdirSync(path.join(d, 'src', 'app')).filter(f => /\.js$/.test(f)).sort().map(f => rd('src/app/' + f)).join(''),
 };
 for (const [k, v] of Object.entries(parts)) {
   if (/<\/script/i.test(v) && k.includes('JS')) throw new Error('</script> trouvé dans ' + k);

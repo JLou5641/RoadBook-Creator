@@ -1,0 +1,25 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+const mock = require('./mock'); const [dbFile, gpxFile, tag] = process.argv.slice(2);
+const db = mock.load(path.join(__dirname, dbFile));
+(async () => {
+  const browser = await chromium.launch(); const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  const errs = []; page.on('pageerror', e => errs.push(e.message)); page.on('console', m => { if (m.type() === 'log' || m.type() === 'warn') errs.push(m.text()); });
+  let q = 0;
+  await page.route(/overpass|kumi|private\.coffee|mail\.ru/, r => { q++; const body = decodeURIComponent((r.request().postData() || '').replace(/^data=/, '').replace(/\+/g, ' ')); r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mock.run(db, body)) }); });
+  await page.route(/tile|arcgisonline/, r => r.abort());
+  await page.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html'));
+  await page.evaluate(() => localStorage.clear()); await page.reload();
+  await page.evaluate(t => window.__rb.loadText(t, 't.gpx'), fs.readFileSync(path.join(__dirname, gpxFile), 'utf8')); await page.waitForTimeout(300);
+  await page.evaluate(() => window.__rb.generate());
+  await page.waitForFunction(() => !document.querySelector('#modalBg').classList.contains('show'), null, { timeout: 120000 });
+  await page.waitForTimeout(500);
+  const info = await page.evaluate(() => { const G = window.__rb.G; let j = 0; if (G) for (const n of G.nodes.values()) if (n.br.length >= 3) j++; return { ways: G ? G.ways.length : 0, nodes: G ? G.nodes.size : 0, junctionNodes: j, notes: window.__rb.S.notes.map(n => (n.s / 1000).toFixed(2) + ' ' + n.text.replace(/\n/g, ' | ')) }; });
+  console.log('requêtes', q, 'voies', info.ways, 'noeuds', info.nodes, 'carrefours OSM', info.junctionNodes);
+  console.log(info.notes.join('\n'));
+  const html = await page.evaluate(() => window.__rb.S.notes.map((n, i) => `<div style="display:inline-block;margin:4px;text-align:center;font:11px sans-serif;width:150px">${window.__rb.tulipSVG(n.tulip, 150)}<br>${i + 1}. ${(n.s / 1000).toFixed(2)} ${n.text.replace(/\n/g, ' / ')}</div>`).join(''));
+  const p2 = await browser.newPage({ viewport: { width: 1300, height: 700 } }); await p2.setContent(`<body style="background:#bbb;margin:4px">${html}</body>`);
+  await p2.screenshot({ path: path.join(__dirname, 'tulips_' + (tag || 'x') + '.png'), fullPage: true });
+  await page.screenshot({ path: path.join(__dirname, 'app_' + (tag || 'x') + '.png') });
+  console.log(errs.slice(0, 10).join('\n'));
+  await browser.close();
+})().catch(e => { console.error(e); process.exit(1); });

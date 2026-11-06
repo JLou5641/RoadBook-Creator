@@ -1,0 +1,34 @@
+// Symboles libres : ajout dans une case, glisser d'une case à l'autre, taille, enregistrement, affichage, export
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+const TD = '/home/claude/vt/tiles_bay';
+(async () => {
+  const browser = await chromium.launch(); const page = await browser.newPage({ viewport: { width: 1500, height: 1500 }, deviceScaleFactor: 1.3 });
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  await page.route(/overpass|kumi|private\.coffee|mail\.ru|tile\.|arcgisonline|geopf|opentopomap|cyclosm/, r => r.abort());
+  await page.route(/openfreemap|data\.gouv\.fr/, r => { const m = /\/(\d+)\/(\d+)\/(\d+)\.pbf/.exec(r.request().url()), f = m && path.join(TD, m[2], m[3] + '.pbf'); if (!f || !fs.existsSync(f)) return r.fulfill({ status: 404, body: '' }); r.fulfill({ status: 200, body: fs.readFileSync(f) }); });
+  await page.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html'));
+  await page.evaluate(async () => { localStorage.clear(); await new Promise(r => { const q = indexedDB.deleteDatabase('rbgen-osm'); q.onsuccess = q.onerror = q.onblocked = r; }); }); await page.reload();
+  await page.evaluate(t => window.__rb.loadText(t, 't.gpx'), fs.readFileSync(path.join(__dirname, 'bayreuth_long.gpx'), 'utf8')); await page.waitForTimeout(300);
+  await page.evaluate(() => window.__rb.generate());
+  await page.waitForFunction(() => !document.querySelector('#modalBg').classList.contains('show'), null, { timeout: 120000 });
+  await page.evaluate(() => document.querySelectorAll('#toast div').forEach(d => d.remove()));
+  await page.evaluate(i => document.querySelectorAll('#rb .row')[i].dispatchEvent(new MouseEvent('dblclick', { bubbles: true })), 51); await page.waitForTimeout(200);
+  await page.click('#eLexOpen'); await page.click('#eLexTabs button[data-c="Sur la piste"]');
+  await page.selectOption('#eLexCase', 't'); await page.click('#eLexGrid button[data-k="bump"]');
+  await page.selectOption('#eLexCase', 'd'); await page.click('#eLexGrid button[data-k="ditch"]');
+  const im = await page.$('#stDin .fs'); const b = await im.boundingBox(), t = await (await page.$('#stT')).boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); await page.mouse.move(t.x + t.width * 0.78, t.y + t.height * 0.2, { steps: 8 }); await page.mouse.up();
+  await page.fill('#stSize', '30'); await page.dispatchEvent('#stSize', 'input');
+  console.log('symboles dans la tulipe :', (await page.$$('#stTin .fs')).length, '· dans la description :', (await page.$$('#stDin .fs')).length);
+  await page.evaluate(() => { document.querySelector('.modal').scrollTop = 0; });
+  await (await page.$('.modal')).screenshot({ path: '/tmp/free_dialog.png' });
+  await page.click('.mbtn.primary'); await page.waitForTimeout(300);
+  console.log(JSON.stringify(await page.evaluate(() => window.__rb.S.notes[51].sym)));
+  await page.evaluate(() => { document.querySelector('#side').style.width = '520px'; document.querySelector('#side').style.maxWidth = '520px'; document.querySelectorAll('#toast div').forEach(d => d.remove()); });
+  const rows = await page.$$('#rb .row'); await rows[51].evaluate(e => e.scrollIntoView({ block: 'center' })); await page.waitForTimeout(200);
+  await rows[51].screenshot({ path: '/tmp/free_row.png' });
+  const gpx = await page.evaluate(() => window.__rb.buildGPX()); fs.writeFileSync(path.join(__dirname, 'free.gpx'), gpx);
+  const T = [...gpx.matchAll(/<openrally:tulip><!\[CDATA\[data:image\/png;base64,([A-Za-z0-9+/=]+)\]\]>/g)].map(m => m[1])[51];
+  fs.writeFileSync('/tmp/free_tulip.png', Buffer.from(T, 'base64'));
+  console.log(errs.join('\n') || 'aucune erreur JS'); await browser.close();
+})().catch(e => { console.error(e); process.exit(1); });

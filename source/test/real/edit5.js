@@ -1,0 +1,26 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+(async () => {
+  const b = await chromium.launch(); const page = await (await b.newContext({ viewport: { width: 1400, height: 900 } })).newPage();
+  const errs = []; page.on('pageerror', e => errs.push('ERREUR ' + e.message));
+  await page.route(/tile\./, r => r.abort());
+  await page.route(/open-meteo/, r => { const u = new URL(r.request().url()); const lat = u.searchParams.get('latitude').split(',').map(Number); r.fulfill({ contentType: 'application/json', headers: {'access-control-allow-origin':'*'}, body: JSON.stringify({ elevation: lat.map((la, i) => 180 + (47.38 - la) * 3000 + 40 * Math.sin(la * 900) + (i === 37 ? 300 : 0)) }) }); });
+  await page.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await page.waitForTimeout(500);
+  await page.evaluate(t => window.__rb.loadText(t, 'u.gpx'), fs.readFileSync('/tmp/igntest/user.gpx', 'utf8')); await page.waitForTimeout(600);
+  await page.evaluate(() => { const S = window.__rb.S; for (const q of [0.4, 0.7]) { const p = S.ll[Math.floor(S.ll.length * q)]; window.__rb.addStage({ lat: p[0], lng: p[1] }); } });
+  await page.evaluate(() => window.__rb.altDialog()); await page.waitForTimeout(200);
+  await page.click('.mbtn:has-text("Calculer")'); await page.waitForTimeout(1500);
+  const mx = () => page.evaluate(() => Math.max(...window.__rb.S.ele.v));
+  console.log('maxi brut', Math.round(await mx()));
+  await page.click('.mbtn:has-text("Nettoyer")'); await page.waitForTimeout(300); console.log('maxi nettoyé', Math.round(await mx()));
+  await page.fill('#alStart', '2026-11-07T08:30'); await page.dispatchEvent('#alStart', 'change'); await page.waitForTimeout(200);
+  await page.fill('.alSS[data-i="1"]', '20'); await page.dispatchEvent('.alSS[data-i="1"]', 'change'); await page.waitForTimeout(200);
+  await page.check('#alExp'); await page.waitForTimeout(300);
+  await page.screenshot({ path: '/tmp/igntest/edit5_alt.png' });
+  console.log((await page.innerText('.stTab')).replace(/\s+/g, ' '));
+  const gpx = await page.evaluate(() => window.__rb.buildGPX());
+  const pts = gpx.match(/<trkpt[^>]*>.*?<\/trkpt>/g) || [];
+  console.log('trkpt horodatés', pts.length, pts[0], pts[pts.length - 1]);
+  await page.click('.mbtn:has-text("Vue 3D")'); await page.waitForTimeout(400);
+  await page.screenshot({ path: '/tmp/igntest/edit5_3d.png' });
+  console.log(errs.join('\n') || 'aucune erreur JS'); await b.close();
+})().catch(e => { console.error(e); process.exit(1); });

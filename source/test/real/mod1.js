@@ -1,0 +1,21 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+const [gpxFile] = process.argv.slice(2);
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1300, height: 900 } });
+  const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/brouter|routing\.openstreetmap|tile|arcgisonline|overpass|kumi|private\.coffee|mail\.ru/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.evaluate(t => window.__rb.loadText(t, 't.gpx'), fs.readFileSync(path.join(__dirname, gpxFile), 'utf8')); await p.waitForTimeout(500);
+  const before = await p.evaluate(() => window.__rb.S.ll.map(q => [q[0], q[1]]));
+  await p.click('#bDraw'); await p.waitForTimeout(300);
+  const lab = await p.$$eval('.modal button, #modal button, button', bs => bs.map(x => x.textContent.trim()).filter(t => /Modifier cette trace/.test(t)));
+  await p.click('button.mbtn.primary'); await p.waitForTimeout(600);
+  const r = await p.evaluate(() => { const S = window.__rb.S; return { ll: S.ll.map(q => [q[0], q[1]]), nctrl: S.ctrl.length, mode: S.routeMode, sel: document.querySelector('#routeMode').value }; });
+  // longueur et écart maximal entre l'ancienne et la nouvelle trace
+  const near = (pt, arr) => { let m = 1e9; for (const q of arr) { const d = Math.hypot((pt[0] - q[0]) * 110540, (pt[1] - q[1]) * 111320 * Math.cos(pt[0] * Math.PI / 180)); if (d < m) m = d; } return m; };
+  let mx = 0; for (let i = 0; i < before.length; i += 7) mx = Math.max(mx, near(before[i], r.ll));
+  console.log('points avant', before.length, 'après', r.ll.length, 'points de contrôle', r.nctrl, '| écart max', mx.toFixed(2), 'm | menu', r.sel);
+  await p.evaluate(async () => { window.__rb.reverseCtrl(); }); await p.waitForTimeout(500);
+  const rv = await p.evaluate(() => window.__rb.S.ll.map(q => [q[0], q[1]]));
+  let mx2 = 0; for (let i = 0; i < before.length; i += 7) mx2 = Math.max(mx2, near(before[i], rv));
+  console.log('inversion : points', rv.length, 'écart max', mx2.toFixed(2), 'm ; premier point = ancien dernier :', JSON.stringify(rv[0]) === JSON.stringify(before[before.length - 1]));
+  console.log(errs.length ? errs.join('\n') : 'aucune erreur JS'); await b.close(); })();

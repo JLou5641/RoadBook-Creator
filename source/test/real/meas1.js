@@ -1,0 +1,21 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+(async () => {
+  const b = await chromium.launch(); const page = await (await b.newContext({ viewport: { width: 1400, height: 900 } })).newPage();
+  const errs = []; page.on('pageerror', e => errs.push('ERREUR ' + e.message));
+  await page.route(/tile\.|arcgis|geopf|opentopomap|cyclosm|brouter|openstreetmap\.de|overpass|openfreemap/, r => r.abort());
+  await page.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await page.waitForTimeout(500);
+  await page.evaluate(t => window.__rb.loadText(t, 'c.gpx'), fs.readFileSync('/tmp/igntest/corner.gpx', 'utf8')); await page.waitForTimeout(600);
+  console.log('liste', JSON.stringify(await page.evaluate(() => window.__rb.bendList(30, 30, 30).map(b => ({ s: Math.round(b.s), inn: Math.round(b.inn), out: Math.round(b.out), ang: Math.round(b.ang) })))));
+  await page.evaluate(() => window.__rb.openMeasure()); await page.waitForTimeout(300);
+  console.log('lignes liste', await page.$$eval('.measRow', e => e.map(x => x.textContent.replace(/\s+/g, ' '))));
+  await page.click('.measRow'); await page.waitForTimeout(500);
+  console.log('résultat', (await page.innerText('#measRes')).replace(/\s+/g, ' '));
+  await page.screenshot({ path: '/tmp/igntest/meas1.png' });
+  await page.click('#measApply'); await page.waitForTimeout(500);
+  console.log('cap champ', await page.inputValue('#eCap'));
+  await page.click('.mbtn.primary'); await page.waitForTimeout(300);
+  console.log('notes', await page.evaluate(() => window.__rb.S.notes.map(n => [Math.round(n.s), n.cap, n.showCap])));
+  await page.evaluate(() => window.__rb.openMeasure()); await page.waitForTimeout(300);
+  console.log('liste après', await page.$$eval('.measRow', e => e.map(x => x.textContent.replace(/\s+/g, ' '))));
+  console.log(errs.join('\n') || 'aucune erreur JS'); await b.close();
+})().catch(e => { console.error(e); process.exit(1); });
