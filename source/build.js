@@ -15,9 +15,9 @@ for (const [k, v] of Object.entries(parts)) {
   html = html.replace(k, () => v);
 }
 // étiquette de version (heure de Paris), visible en bas du menu ⋯ pour vérifier qu'on a le bon fichier
-const now = new Date(), P = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(now).reduce((o, x) => (o[x.type] = x.value, o), {});
+const now = new Date(), P = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', year: '2-digit', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(now).reduce((o, x) => (o[x.type] = x.value, o), {});
 const stamp = `${P.day}/${P.month} ${P.hour}h${P.minute}`;
-const version = `v0.${P.day}${P.month}.${P.hour}${P.minute}`;      // v0. + jour et mois + heure et minutes (Paris)
+const version = `v0.${P.year}${P.month}${P.day}.${P.hour}${P.minute}`;      // v0.AAMMJJ.HHMM (heure de Paris)
 html = html.replace(/<!--BUILD_STAMP-->/g, stamp).replace(/<!--VERSION-->/g, version);
 const out = path.join(d, 'dist', 'generateur-roadbook.html');
 fs.mkdirSync(path.dirname(out), { recursive: true });
