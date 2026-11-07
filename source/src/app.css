@@ -336,3 +336,4 @@ body.dragNote .leaflet-tooltip{display:none}
 .help.why{background:#fff7e0;border:1px solid #e8d7a0;border-radius:6px;padding:6px 8px;margin:0 0 10px;color:#5a5240}
 .lexdel{margin:4px 0 8px}
 .lextile.del{border-color:#c0392b;background:#fdecea}
+@media (pointer:coarse){.tulbar button{font-size:14px;padding:9px 11px;min-height:40px}}

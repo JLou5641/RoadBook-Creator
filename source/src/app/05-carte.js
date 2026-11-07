@@ -307,8 +307,9 @@ function tulipEditor(n, keep) {
     <div class="tulbar" id="tulBar">
       <span id="tulTypes"><button type="button" data-t="road">Route</button> <button type="button" data-t="track">Piste</button> <button type="button" data-t="trail">Hors piste</button></span>
       <span class="tsep"></span>
-      <button type="button" id="tulDelPt">Retirer le point</button><button type="button" id="tulDelLn">🗑 Supprimer le trait</button><button type="button" id="tulNew">＋ Nouveau trait</button>
+      <button type="button" id="tulDelPt">➖ Retirer le point</button><button type="button" id="tulSimp" title="Réduit le nombre de points du trait choisi en gardant sa forme (clique plusieurs fois pour simplifier davantage)">✂️ Simplifier</button><button type="button" id="tulDelLn">🗑 Supprimer le trait</button><button type="button" id="tulNew">＋ Nouveau trait</button>
     </div>
+    <div class="help" id="tulCnt" style="margin:-2px 0 6px"></div>
     <div class="tulbar" id="tulBarR" style="display:none">
       <div class="trow"><b>Entrée</b><button type="button" data-e="road">Route</button><button type="button" data-e="track">Piste</button><button type="button" data-e="trail">Hors piste</button></div>
       <div class="trow"><b>Sortie</b><button type="button" data-x="road">Route</button><button type="button" data-x="track">Piste</button><button type="button" data-x="trail">Hors piste</button></div>
@@ -323,12 +324,12 @@ function tulipEditor(n, keep) {
   const paint = () => {
     bg.innerHTML = tulipSVG(d, 440);
     let o = '';
-    const line = (k, pts, on) => { if (pts.length < 2) return ''; return (on ? `<path d="${pathD(pts)}" fill="none" stroke="#e4572e" stroke-opacity=".4" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>` : '') + `<path data-k="${k}" d="${pathD(pts)}" fill="none" stroke="transparent" stroke-width="4.5" stroke-linecap="round" style="pointer-events:stroke;cursor:pointer"/>`; };
+    const line = (k, pts, on) => { if (pts.length < 2) return ''; return (on ? `<path d="${pathD(pts)}" fill="none" stroke="#e4572e" stroke-opacity=".4" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>` : '') + `<path data-k="${k}" d="${pathD(pts)}" fill="none" stroke="transparent" stroke-width="7" stroke-linecap="round" style="pointer-events:stroke;cursor:pointer"/>`; };
     d.others.forEach((ot, i) => { o += line(i, ot.p, sel === i); });
     if (d.route.length >= 2) o += line('r', arr('r'), sel === 'r');
     const hp = nw ? arr('new') : sel != null ? arr(sel) : [];
     if (nw && nw.p.length >= 2) o += `<path d="${pathD(nw.p)}" fill="none" stroke="#e4572e" stroke-width="1.2" stroke-dasharray="2 1.5" pointer-events="none"/>`;
-    hp.forEach((p, i) => { const q = toS(p); o += `<circle data-pt="${i}" cx="${f1(q[0])}" cy="${f1(q[1])}" r="${i === ip ? 3.1 : 2.3}" fill="${i === ip ? '#e4572e' : '#fff'}" stroke="#e4572e" stroke-width="1" style="cursor:grab"/>`; });
+    hp.forEach((p, i) => { const q = toS(p); o += `<circle data-pt="${i}" cx="${f1(q[0])}" cy="${f1(q[1])}" r="${i === ip ? 3.3 : 2.6}" fill="${i === ip ? '#e4572e' : '#fff'}" stroke="#e4572e" stroke-width="1" style="cursor:grab"/><circle data-pt="${i}" cx="${f1(q[0])}" cy="${f1(q[1])}" r="5" fill="transparent"/>`; });
     ov.innerHTML = o; ui();
   };
   const ui = () => {
@@ -343,6 +344,8 @@ function tulipEditor(n, keep) {
     m.querySelectorAll('#tulSide [data-sd]').forEach(b => b.classList.toggle('on', b.dataset.sd === (d.resetSide || 'auto')));
     m.querySelector('#tulDelPt').disabled = ip < 0 || (!nw && len <= 2);
     m.querySelector('#tulDelLn').disabled = nw || sel == null || sel === 'r';
+    m.querySelector('#tulSimp').disabled = !!nw || sel == null || len <= 2;
+    m.querySelector('#tulCnt').textContent = nw ? 'Nouveau trait : ' + nw.p.length + ' point' + (nw.p.length > 1 ? 's' : '') : sel != null ? (sel === 'r' ? 'Parcours (bleu)' : 'Trait choisi') + ' : ' + len + ' points' + (ip >= 0 ? ' · point ' + (ip + 1) + ' sélectionné' : ' · touche un point pour le choisir') : 'Touche un trait pour le choisir.';
     const bn = m.querySelector('#tulNew'); bn.textContent = nw ? '✔ Terminer le trait' : '＋ Nouveau trait'; bn.disabled = !!nw && nw.p.length < 2;
     hint.textContent = nw ? 'Clique sur le dessin pour poser les points du nouveau trait, choisis son type, puis « Terminer le trait ».' : sel === 'r' ? 'Parcours (trait bleu) : glisse ses points (le dernier est la pointe de la flèche). Choisis le type de l’entrée et de la sortie ; le trait-point se place au centre de la tulipe, à 135° du sens de marche.' : sel != null ? 'Trait choisi : glisse ses points, clique sur le trait pour en ajouter un, ou choisis son type.' : 'Aucun trait choisi.';
   };
@@ -380,6 +383,22 @@ function tulipEditor(n, keep) {
   m.querySelectorAll('#tulSide [data-sd]').forEach(b => b.onclick = () => { d.resetSide = b.dataset.sd === 'auto' ? null : b.dataset.sd; paint(); });
   m.querySelector('#tulReset').onchange = e => { if (e.target.checked && !ensureSplit()) { e.target.checked = false; return; } d.reset = e.target.checked; paint(); };
   m.querySelector('#tulDelPt').onclick = () => { if (ip < 0) return; delP(nw ? 'new' : sel, ip); ip = -1; paint(); };
+  const segD = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy, u = L2 ? clamp(((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2, 0, 1) : 0; return Math.hypot(p[0] - a[0] - u * dx, p[1] - a[1] - u * dy); };
+  const simp = (pts, tol, anch) => {      // Douglas-Peucker ; les points « ancres » (extrémités, séparation entrée / sortie) sont toujours gardés
+    const keepI = new Set([0, pts.length - 1, ...anch]), a = [...keepI].sort((x, y) => x - y);
+    const rec = (i, j) => { let mx = 0, ix = -1; for (let k = i + 1; k < j; k++) { const dd = segD(pts[k], pts[i], pts[j]); if (dd > mx) { mx = dd; ix = k; } } if (ix >= 0 && mx > tol) { keepI.add(ix); rec(i, ix); rec(ix, j); } };
+    for (let k = 0; k + 1 < a.length; k++) rec(a[k], a[k + 1]);
+    return [...keepI].sort((x, y) => x - y);
+  };
+  m.querySelector('#tulSimp').onclick = () => {
+    if (nw || sel == null) return; const pts = arr(sel); if (pts.length <= 2) return;
+    const anch = sel === 'r' && spOk() ? [d.sp] : []; let tol = Math.max(0.5, d.R * 0.012), idx = null;
+    for (let k = 0; k < 5; k++) { idx = simp(pts, tol, anch); if (idx.length < pts.length) break; tol *= 2; }
+    if (idx.length >= pts.length) { toast('Le trait a déjà le minimum de points.'); return; }
+    const before = pts.length;
+    if (sel === 'r') { const nd = d.sp; d.route = idx.map(i => d.route[i]); if (anch.length) d.sp = idx.indexOf(nd); } else d.others[sel].p = idx.map(i => pts[i]);
+    ip = -1; paint(); toast(before + ' → ' + idx.length + ' points');
+  };
   m.querySelector('#tulDelLn').onclick = () => { if (sel == null || sel === 'r') return; d.others.splice(sel, 1); sel = null; ip = -1; paint(); };
   m.querySelector('#tulNew').onclick = () => {
     if (!nw) { nw = { c: 'track', p: [] }; sel = null; ip = -1; }
