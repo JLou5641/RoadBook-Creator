@@ -166,12 +166,18 @@ main{flex:1;display:flex;min-height:0}
 #toast div.ok{background:var(--ok)}
 
 /* ---------- écrans étroits (tablette portrait) ---------- */
+#layerTog{display:none}
 @media (max-width:900px){
   main{flex-direction:column}
   #side{width:auto;max-width:none;height:48%;border-left:0;border-top:3px solid var(--ink)}
   .btn .lbl{display:none}
   .btn{padding:8px 10px}
   #rbName{width:140px}
+  /* téléphone : le panneau des couches est replié derrière un bouton, il ne cache plus la carte */
+  #layerTog{display:block;top:10px;right:10px;width:44px;height:44px;padding:0;font-size:22px;line-height:1;cursor:pointer}
+  #layerBox{display:none;top:62px;right:10px;left:10px;max-height:calc(100% - 72px);overflow:auto}
+  #layerBox.open{display:block}
+  #mapwrap #placeBox{width:calc(100% - 54px - 64px)}
 }
 
 /* ---------- impression : pages de 5 lignes FIM, bande de 144 mm ---------- */

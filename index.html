@@ -837,12 +837,18 @@ main{flex:1;display:flex;min-height:0}
 #toast div.ok{background:var(--ok)}
 
 /* ---------- écrans étroits (tablette portrait) ---------- */
+#layerTog{display:none}
 @media (max-width:900px){
   main{flex-direction:column}
   #side{width:auto;max-width:none;height:48%;border-left:0;border-top:3px solid var(--ink)}
   .btn .lbl{display:none}
   .btn{padding:8px 10px}
   #rbName{width:140px}
+  /* téléphone : le panneau des couches est replié derrière un bouton, il ne cache plus la carte */
+  #layerTog{display:block;top:10px;right:10px;width:44px;height:44px;padding:0;font-size:22px;line-height:1;cursor:pointer}
+  #layerBox{display:none;top:62px;right:10px;left:10px;max-height:calc(100% - 72px);overflow:auto}
+  #layerBox.open{display:block}
+  #mapwrap #placeBox{width:calc(100% - 54px - 64px)}
 }
 
 /* ---------- impression : pages de 5 lignes FIM, bande de 144 mm ---------- */
@@ -1008,7 +1014,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0611.1829</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0711.0722</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1036,7 +1042,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version v0.0611.1829</div>
+          <div class="ver">Version v0.0711.0722</div>
         </div>
       </div>
     </div>
@@ -1046,6 +1052,7 @@ body.dragNote .leaflet-tooltip{display:none}
     <div id="mapwrap">
       <div id="map"></div>
       <div id="placeBox"><input id="placeInp" type="search" placeholder="🔍 Lieu, adresse ou coordonnées…" autocomplete="off" aria-label="Chercher un lieu"><div id="placeList"></div></div>
+      <button class="mapbox" id="layerTog" type="button" title="Fond de carte et couches" aria-label="Fond de carte et couches">🗺️</button>
       <div class="mapbox" id="layerBox">
         <select id="layerSel" aria-label="Fond de carte">
           <option value="topo">🗻 OpenTopoMap</option>
@@ -6094,6 +6101,8 @@ function openMeasure() {
 function closeMeasure() { measOn = false; measBack = false; $('#measBox').classList.remove('show'); map.getContainer().classList.remove('cutting'); measLayer.clearLayers(); }
 $('#measX').onclick = closeMeasure;
 ['#measWi', '#measWo', '#measThr', '#measNo'].forEach(q => $(q).onchange = () => { renderMeasList(); if (measRes) showMeasure(measRes.s, measRes.target); });
+$('#layerTog').onclick = () => $('#layerBox').classList.toggle('open');
+map.on('click', () => $('#layerBox').classList.remove('open'));
 $('#bUndo').onclick = undo;
 $('#bCut').onclick = () => setTool('cut');
 $('#bRev').onclick = reverseCtrl;

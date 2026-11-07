@@ -1,0 +1,10 @@
+const { chromium } = require('playwright'); const path = require('path');
+(async () => { const b = await chromium.launch(); const c = await b.newContext({ viewport: { width: 400, height: 860 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }); const p = await c.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file)(?!https:\/\/data\.geopf\.fr).*/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.setInputFiles('#fileIn', '/mnt/user-data/uploads/458e641c-1er_trac__RB_MORVAN.json'); await p.waitForTimeout(2000);
+  await p.screenshot({ path: '/tmp/mob_ferme.png' });
+  await p.tap('#layerTog'); await p.waitForTimeout(300); await p.screenshot({ path: '/tmp/mob_ouvert.png' });
+  console.log('ouvert', await p.evaluate(() => getComputedStyle(document.querySelector('#layerBox')).display));
+  await p.tap('#map', { position: { x: 200, y: 300 } }); await p.waitForTimeout(300);
+  console.log('refermé', await p.evaluate(() => getComputedStyle(document.querySelector('#layerBox')).display), 'erreurs', errs.join('|') || 0); await b.close(); })();

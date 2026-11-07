@@ -532,6 +532,8 @@ function openMeasure() {
 function closeMeasure() { measOn = false; measBack = false; $('#measBox').classList.remove('show'); map.getContainer().classList.remove('cutting'); measLayer.clearLayers(); }
 $('#measX').onclick = closeMeasure;
 ['#measWi', '#measWo', '#measThr', '#measNo'].forEach(q => $(q).onchange = () => { renderMeasList(); if (measRes) showMeasure(measRes.s, measRes.target); });
+$('#layerTog').onclick = () => $('#layerBox').classList.toggle('open');
+map.on('click', () => $('#layerBox').classList.remove('open'));
 $('#bUndo').onclick = undo;
 $('#bCut').onclick = () => setTool('cut');
 $('#bRev').onclick = reverseCtrl;
