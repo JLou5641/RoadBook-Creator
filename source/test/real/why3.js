@@ -1,0 +1,11 @@
+const { chromium } = require('playwright'); const path = require('path');
+(async () => { const b = await chromium.launch(); const c = await b.newContext({ viewport: { width: 400, height: 860 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }); const p = await c.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file)(?!https:\/\/data\.geopf\.fr).*/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.setInputFiles('#fileIn', '/mnt/user-data/uploads/458e641c-1er_trac__RB_MORVAN.json'); await p.waitForTimeout(1500);
+  await p.setInputFiles('#fileIn', '/mnt/user-data/uploads/d628998c-chemins-osm-2026-11-06.rbosm'); await p.waitForTimeout(4000);
+  await p.tap('#bGen'); await p.waitForFunction(() => !document.querySelector('#modalBg.show'), null, { timeout: 170000 }).catch(() => {}); await p.waitForTimeout(1000);
+  await p.evaluate(() => { document.querySelector('#side').scrollIntoView(); const r = document.querySelectorAll('.rbr.row')[4]; r.scrollIntoView(); });
+  await p.tap('.rbr.row:nth-of-type(5)', { position: { x: 60, y: 30 } }).catch(() => {}); await p.waitForTimeout(500);
+  console.log('?', await p.evaluate(() => { const b = document.querySelector('.row.sel .acts button[data-a="why"]'); return b ? getComputedStyle(b.parentElement).opacity : 'absent'; }));
+  await p.screenshot({ path: '/tmp/why_mob.png' }); console.log('erreurs', errs.join('|') || 0); await b.close(); })();

@@ -337,3 +337,5 @@ body.dragNote .leaflet-tooltip{display:none}
 .lexdel{margin:4px 0 8px}
 .lextile.del{border-color:#c0392b;background:#fdecea}
 @media (pointer:coarse){.tulbar button{font-size:14px;padding:9px 11px;min-height:40px}}
+/* tactile : pas de survol, les boutons d'une ligne (?, ✎, 🗑) s'affichent sur la ligne choisie */
+@media (hover:none){.row.sel .acts{opacity:1}.acts button{font-size:15px;padding:5px 10px}}

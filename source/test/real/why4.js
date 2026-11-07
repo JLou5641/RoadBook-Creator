@@ -1,0 +1,10 @@
+const { chromium } = require('playwright'); const path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1400, height: 900 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file)(?!https:\/\/data\.geopf\.fr).*/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.setInputFiles('#fileIn', '/mnt/user-data/uploads/458e641c-1er_trac__RB_MORVAN.json'); await p.waitForTimeout(1500);
+  await p.setInputFiles('#fileIn', '/mnt/user-data/uploads/d628998c-chemins-osm-2026-11-06.rbosm'); await p.waitForTimeout(4000);
+  await p.click('#bGen'); await p.waitForFunction(() => !document.querySelector('#modalBg.show'), null, { timeout: 170000 }).catch(() => {}); await p.waitForTimeout(1500);
+  const rows = p.locator('.rbr.row'); await rows.nth(5).scrollIntoViewIfNeeded(); await rows.nth(5).hover(); await p.waitForTimeout(500);
+  console.log(await p.evaluate(() => [...document.querySelectorAll('.rbr.row')].slice(3, 9).map(r => { const a = r.querySelector('.acts'); return [r.dataset.id, !!r.title, a ? [...a.children].map(x => x.dataset.a).join('/') : 'noacts']; })));
+  await p.screenshot({ path: '/tmp/why_desk.png' }); console.log('erreurs', errs.join('|') || 0); await b.close(); })();

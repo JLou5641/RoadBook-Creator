@@ -1008,6 +1008,8 @@ body.dragNote .leaflet-tooltip{display:none}
 .lexdel{margin:4px 0 8px}
 .lextile.del{border-color:#c0392b;background:#fdecea}
 @media (pointer:coarse){.tulbar button{font-size:14px;padding:9px 11px;min-height:40px}}
+/* tactile : pas de survol, les boutons d'une ligne (?, ✎, 🗑) s'affichent sur la ligne choisie */
+@media (hover:none){.row.sel .acts{opacity:1}.acts button{font-size:15px;padding:5px 10px}}
 </style>
 </head>
 <body>
@@ -1015,7 +1017,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0711.0847</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0711.1243</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1043,7 +1045,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version v0.0711.0847</div>
+          <div class="ver">Version v0.0711.1243</div>
         </div>
       </div>
     </div>
@@ -2385,7 +2387,7 @@ function renderMarkers() {
   noteLayer.clearLayers(); markers.clear();
   S.notes.forEach((n, i) => {
     const m = L.marker([n.lat, n.lon], { icon: noteIcon(n, i), keyboard: false, riseOnHover: true });
-    m.bindTooltip(() => `<div style="display:flex;gap:8px;align-items:center">${tulipSVG(n.tulip, 86)}<div><b>${i + 1} · ${km(n.s)} km</b><br>${esc(n.text).replace(/\n/g, '<br>')}${n.why ? `<br><span style="color:#6b6559;font-size:11px">💡 ${esc(n.why)}</span>` : ''}${radiiText(n) ? `<br><span style="color:#6b6559">◎ ${radiiText(n)}</span>` : ''}${n.id === S.sel && !drawing ? '<br><span style="color:#b5651d">↔ glisse pour déplacer</span>' : ''}</div></div>`, { direction: 'top', offset: [0, -12], opacity: 1 });
+    m.bindTooltip(() => `<div style="display:flex;gap:8px;align-items:center">${tulipSVG(n.tulip, 86)}<div><b>${i + 1} · ${km(n.s)} km</b><br>${esc(n.text).replace(/\n/g, '<br>')}${whyOf(n) ? `<br><span style="color:#6b6559;font-size:11px">💡 ${esc(whyOf(n))}</span>` : ''}${radiiText(n) ? `<br><span style="color:#6b6559">◎ ${radiiText(n)}</span>` : ''}${n.id === S.sel && !drawing ? '<br><span style="color:#b5651d">↔ glisse pour déplacer</span>' : ''}</div></div>`, { direction: 'top', offset: [0, -12], opacity: 1 });
     m.on('click', () => selectNote(n.id, 'map'));
     m.on('dragstart', () => { moving = true; document.body.classList.add('dragNote'); });
     m.on('drag', () => dragBubble(n, m));
@@ -4010,6 +4012,8 @@ function detectOffroad(known) {
   return out;
 }
 const dataLbl = () => ({ osm: 'OSM', vt: 'OSM', ign: 'IGN', ignd: 'IGN détaillé' }[S.settings.data] || 'OSM');
+// raison d'une note ; pour une note sans raison enregistrée, on explique pourquoi (gardée à la main, ou générée avant cette version)
+const whyOf = n => n.why || (n.auto === false || n.edited || n.manual ? 'Note modifiée ou ajoutée à la main : elle est conservée telle quelle quand on régénère le roadbook.' : 'Note générée avec une ancienne version : relance « Générer » pour connaître la raison (tes notes modifiées à la main sont conservées).');
 function mkNote(o) {
   const ll = inv(o.xy[0], o.xy[1]);
   return { id: S.nextId++, s: Math.round(o.s * 10) / 10, lat: +ll[0].toFixed(6), lon: +ll[1].toFixed(6), text: o.text || '',
@@ -4889,7 +4893,7 @@ function rowInner(n, i, par, f, screen) {
     + `<div class="k k2">${tulipSVG(n.tulip, 200)}${freeLayer(n.sym, 't')}${t === 'cp' ? '<div class="cpf"></div>' : ''}</div>`
     + `<div class="k k3${signs.length ? ' hs' : cap ? ' hc' : ''}">${big}${top}${n.kind === 'info' ? lx : ''}<div class="t1"${tst(n, 800)}>${esc(lines[0] || '')}</div>${n.kind === 'info' ? '' : lx}${freeLayer((n.sym || []).concat(mainFree), 'd')}<div class="t2"${tst(n, 400)}>${esc(fitLines(lines, !!(dg || tl), !!(cap || signs.length), lk.length ? lr * (lh + 0.6) - 0.6 : 0, signs.length ? 12.4 : 0).join('\n'))}</div>${cap}${sg}`
     + (screen && (!n.auto || n.moved) ? '<div class="man">manuelle</div>' : '')
-    + (screen ? `<div class="acts">${n.why ? '<button data-a="why" title="Pourquoi cette note ?">?</button>' : ''}<button data-a="edit" title="Modifier la note">✎</button><button data-a="del" title="Supprimer la note">🗑</button></div>` : '') + `</div>`
+    + (screen ? `<div class="acts">${whyOf(n) ? '<button data-a="why" title="Pourquoi cette note ?">?</button>' : ''}<button data-a="edit" title="Modifier la note">✎</button><button data-a="del" title="Supprimer la note">🗑</button></div>` : '') + `</div>`
     + (f.zone ? `<div class="fr zone${f.zTop ? ' zt' : ''}${f.zBot ? ' zb' : ''}"></div>` : '') + (f.red ? '<div class="fr red"></div>' : '');
 }
 function renderRoadbook() {
@@ -4904,7 +4908,7 @@ function renderRoadbook() {
   }
   let prev = 0; const fl = rbFlags(S.notes);
   const descBox = `<div class="rbr dbox"><textarea id="rbDesc" spellcheck="true" placeholder="Description du roadbook : rallye, étape, date, départ, consignes, rappels…">${esc(S.desc || '')}</textarea></div>`;
-  rb.innerHTML = descBox + S.notes.map((n, i) => { const par = n.s - prev; prev = n.s; return `<div class="rbr row${n.id === S.sel ? ' sel' : ''}" data-id="${n.id}"${n.why ? ` title="Pourquoi cette note ? ${esc(n.why)}"` : ''}>${rowInner(n, i, par, fl[i], true)}</div>`; }).join('');
+  rb.innerHTML = descBox + S.notes.map((n, i) => { const par = n.s - prev; prev = n.s; return `<div class="rbr row${n.id === S.sel ? ' sel' : ''}" data-id="${n.id}"${whyOf(n) ? ` title="Pourquoi cette note ? ${esc(whyOf(n))}"` : ''}>${rowInner(n, i, par, fl[i], true)}</div>`; }).join('');
   renderInfo();
 }
 function renderAll() { S.notes.sort((a, b) => a.s - b.s); renderRoadbook(); renderMarkers(); renderInfo(); save(); }
@@ -5008,7 +5012,7 @@ function editNote(id, isNew) {
   const body = `
     <div class="entabs" id="enTabs"><button type="button" class="on" data-t="0">Note</button><button type="button" data-t="1">Dessin<i></i></button><button type="button" data-t="2">Waypoint<i></i></button><button type="button" data-t="3">Zone<i></i></button></div>
     <div class="enp on" data-p="0">
-    ${n.why ? `<div class="help why">💡 <b>Pourquoi cette note ?</b> ${esc(n.why)}</div>` : ''}
+    ${whyOf(n) ? `<div class="help why">💡 <b>Pourquoi cette note ?</b> ${esc(whyOf(n))}</div>` : ''}
     <div class="fld"><label for="eText">Texte de la note (1re ligne en gros)</label><textarea id="eText" rows="3">${esc(conv ? pre.lines.join('\n') : n.text)}</textarea></div>
     <div class="fgrid">
       <div class="fld"><label for="eCap">CAP (°)</label><input id="eCap" type="number" min="0" max="359" value="${n.cap == null ? '' : n.cap}"><button type="button" class="mbtn" id="eCapMeas" title="Enregistre la note puis mesure le cap sur la trace" style="margin-top:4px">📐 Mesurer</button></div>

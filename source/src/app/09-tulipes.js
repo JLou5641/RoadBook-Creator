@@ -574,7 +574,7 @@ function rowInner(n, i, par, f, screen) {
     + `<div class="k k2">${tulipSVG(n.tulip, 200)}${freeLayer(n.sym, 't')}${t === 'cp' ? '<div class="cpf"></div>' : ''}</div>`
     + `<div class="k k3${signs.length ? ' hs' : cap ? ' hc' : ''}">${big}${top}${n.kind === 'info' ? lx : ''}<div class="t1"${tst(n, 800)}>${esc(lines[0] || '')}</div>${n.kind === 'info' ? '' : lx}${freeLayer((n.sym || []).concat(mainFree), 'd')}<div class="t2"${tst(n, 400)}>${esc(fitLines(lines, !!(dg || tl), !!(cap || signs.length), lk.length ? lr * (lh + 0.6) - 0.6 : 0, signs.length ? 12.4 : 0).join('\n'))}</div>${cap}${sg}`
     + (screen && (!n.auto || n.moved) ? '<div class="man">manuelle</div>' : '')
-    + (screen ? `<div class="acts">${n.why ? '<button data-a="why" title="Pourquoi cette note ?">?</button>' : ''}<button data-a="edit" title="Modifier la note">✎</button><button data-a="del" title="Supprimer la note">🗑</button></div>` : '') + `</div>`
+    + (screen ? `<div class="acts">${whyOf(n) ? '<button data-a="why" title="Pourquoi cette note ?">?</button>' : ''}<button data-a="edit" title="Modifier la note">✎</button><button data-a="del" title="Supprimer la note">🗑</button></div>` : '') + `</div>`
     + (f.zone ? `<div class="fr zone${f.zTop ? ' zt' : ''}${f.zBot ? ' zb' : ''}"></div>` : '') + (f.red ? '<div class="fr red"></div>' : '');
 }
 function renderRoadbook() {
@@ -589,7 +589,7 @@ function renderRoadbook() {
   }
   let prev = 0; const fl = rbFlags(S.notes);
   const descBox = `<div class="rbr dbox"><textarea id="rbDesc" spellcheck="true" placeholder="Description du roadbook : rallye, étape, date, départ, consignes, rappels…">${esc(S.desc || '')}</textarea></div>`;
-  rb.innerHTML = descBox + S.notes.map((n, i) => { const par = n.s - prev; prev = n.s; return `<div class="rbr row${n.id === S.sel ? ' sel' : ''}" data-id="${n.id}"${n.why ? ` title="Pourquoi cette note ? ${esc(n.why)}"` : ''}>${rowInner(n, i, par, fl[i], true)}</div>`; }).join('');
+  rb.innerHTML = descBox + S.notes.map((n, i) => { const par = n.s - prev; prev = n.s; return `<div class="rbr row${n.id === S.sel ? ' sel' : ''}" data-id="${n.id}"${whyOf(n) ? ` title="Pourquoi cette note ? ${esc(whyOf(n))}"` : ''}>${rowInner(n, i, par, fl[i], true)}</div>`; }).join('');
   renderInfo();
 }
 function renderAll() { S.notes.sort((a, b) => a.s - b.s); renderRoadbook(); renderMarkers(); renderInfo(); save(); }
@@ -693,7 +693,7 @@ function editNote(id, isNew) {
   const body = `
     <div class="entabs" id="enTabs"><button type="button" class="on" data-t="0">Note</button><button type="button" data-t="1">Dessin<i></i></button><button type="button" data-t="2">Waypoint<i></i></button><button type="button" data-t="3">Zone<i></i></button></div>
     <div class="enp on" data-p="0">
-    ${n.why ? `<div class="help why">💡 <b>Pourquoi cette note ?</b> ${esc(n.why)}</div>` : ''}
+    ${whyOf(n) ? `<div class="help why">💡 <b>Pourquoi cette note ?</b> ${esc(whyOf(n))}</div>` : ''}
     <div class="fld"><label for="eText">Texte de la note (1re ligne en gros)</label><textarea id="eText" rows="3">${esc(conv ? pre.lines.join('\n') : n.text)}</textarea></div>
     <div class="fgrid">
       <div class="fld"><label for="eCap">CAP (°)</label><input id="eCap" type="number" min="0" max="359" value="${n.cap == null ? '' : n.cap}"><button type="button" class="mbtn" id="eCapMeas" title="Enregistre la note puis mesure le cap sur la trace" style="margin-top:4px">📐 Mesurer</button></div>
