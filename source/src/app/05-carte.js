@@ -42,9 +42,10 @@ function setBaseLayer(key) {
 }
 function rebuildLayerSelect() {
   const sel = $('#layerSel');
-  sel.querySelectorAll('option[data-my]').forEach(o => o.remove());
-  for (const l of myLayers) { const o = document.createElement('option'); o.value = 'c:' + l.id; o.textContent = '⭐ ' + l.name; o.dataset.my = 1; sel.appendChild(o); }
-  const m = document.createElement('option'); m.value = '__my'; m.textContent = '➕ Ajouter / gérer mes fonds…'; m.dataset.my = 1; sel.appendChild(m);
+  sel.querySelectorAll('optgroup[data-my]').forEach(o => o.remove());
+  const og = document.createElement('optgroup'); og.label = '⭐ Mes fonds'; og.dataset.my = 1;
+  for (const l of myLayers) { const o = document.createElement('option'); o.value = 'c:' + l.id; o.textContent = '⭐ ' + l.name; o.dataset.my = 1; og.appendChild(o); }
+  const m = document.createElement('option'); m.value = '__my'; m.textContent = '➕ Ajouter / gérer mes fonds…'; m.dataset.my = 1; og.appendChild(m); sel.appendChild(og);
   sel.value = curLayerKey;
 }
 function saveMyLayers() { try { localStorage.setItem('rbgen.myLayers', JSON.stringify(myLayers)); } catch (_) {} }

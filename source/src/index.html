@@ -56,14 +56,20 @@
       <button class="mapbox" id="layerTog" type="button" title="Fond de carte et couches" aria-label="Fond de carte et couches">🗺️</button>
       <div class="mapbox" id="layerBox">
         <select id="layerSel" aria-label="Fond de carte">
-          <option value="topo">🗻 OpenTopoMap</option>
-          <option value="scan25">🥾 IGN SCAN 25 (France)</option>
-          <option value="planign">🇫🇷 Plan IGN (France)</option>
-          <option value="cyclosm">🚵 CyclOSM (pistes)</option>
-          <option value="osm">🗺️ OSM standard</option>
-          <option value="sat">🛰️ Satellite</option>
-          <option value="ortho">🇫🇷 Photos aériennes IGN (France)</option>
-          <option value="esritopo">🏔️ Esri Topo (monde)</option>
+          <optgroup label="🇫🇷 IGN (Géoplateforme)">
+            <option value="scan25">🥾 SCAN 25 (cartes IGN)</option>
+            <option value="planign">🗺️ Plan IGN</option>
+            <option value="ortho">📷 Photos aériennes</option>
+          </optgroup>
+          <optgroup label="🌍 OpenStreetMap et dérivés">
+            <option value="topo">🗻 OpenTopoMap</option>
+            <option value="osm">🗺️ OSM standard</option>
+            <option value="cyclosm">🚵 CyclOSM (pistes)</option>
+          </optgroup>
+          <optgroup label="🛰️ Esri (monde)">
+            <option value="sat">🛰️ Satellite</option>
+            <option value="esritopo">🏔️ Esri Topo</option>
+          </optgroup>
         </select>
         <div><label class="heatlvl" title="Glisse vers la gauche pour atténuer le fond de carte. Double-clic sur le pourcentage : remettre à 100 %.">Intensité du fond <input type="range" id="baseLvl" min="10" max="100" step="5" value="100"> <span id="baseLvlTxt">100 %</span></label></div>
         <select id="heatSel" aria-label="Heatmap et couches" title="Couches par-dessus le fond : où les gens passent, sentiers balisés, relief et forêts (France)">

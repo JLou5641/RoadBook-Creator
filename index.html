@@ -1017,7 +1017,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0711.1243</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0711.1251</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1045,7 +1045,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version v0.0711.1243</div>
+          <div class="ver">Version v0.0711.1251</div>
         </div>
       </div>
     </div>
@@ -1058,14 +1058,20 @@ body.dragNote .leaflet-tooltip{display:none}
       <button class="mapbox" id="layerTog" type="button" title="Fond de carte et couches" aria-label="Fond de carte et couches">🗺️</button>
       <div class="mapbox" id="layerBox">
         <select id="layerSel" aria-label="Fond de carte">
-          <option value="topo">🗻 OpenTopoMap</option>
-          <option value="scan25">🥾 IGN SCAN 25 (France)</option>
-          <option value="planign">🇫🇷 Plan IGN (France)</option>
-          <option value="cyclosm">🚵 CyclOSM (pistes)</option>
-          <option value="osm">🗺️ OSM standard</option>
-          <option value="sat">🛰️ Satellite</option>
-          <option value="ortho">🇫🇷 Photos aériennes IGN (France)</option>
-          <option value="esritopo">🏔️ Esri Topo (monde)</option>
+          <optgroup label="🇫🇷 IGN (Géoplateforme)">
+            <option value="scan25">🥾 SCAN 25 (cartes IGN)</option>
+            <option value="planign">🗺️ Plan IGN</option>
+            <option value="ortho">📷 Photos aériennes</option>
+          </optgroup>
+          <optgroup label="🌍 OpenStreetMap et dérivés">
+            <option value="topo">🗻 OpenTopoMap</option>
+            <option value="osm">🗺️ OSM standard</option>
+            <option value="cyclosm">🚵 CyclOSM (pistes)</option>
+          </optgroup>
+          <optgroup label="🛰️ Esri (monde)">
+            <option value="sat">🛰️ Satellite</option>
+            <option value="esritopo">🏔️ Esri Topo</option>
+          </optgroup>
         </select>
         <div><label class="heatlvl" title="Glisse vers la gauche pour atténuer le fond de carte. Double-clic sur le pourcentage : remettre à 100 %.">Intensité du fond <input type="range" id="baseLvl" min="10" max="100" step="5" value="100"> <span id="baseLvlTxt">100 %</span></label></div>
         <select id="heatSel" aria-label="Heatmap et couches" title="Couches par-dessus le fond : où les gens passent, sentiers balisés, relief et forêts (France)">
@@ -2221,9 +2227,10 @@ function setBaseLayer(key) {
 }
 function rebuildLayerSelect() {
   const sel = $('#layerSel');
-  sel.querySelectorAll('option[data-my]').forEach(o => o.remove());
-  for (const l of myLayers) { const o = document.createElement('option'); o.value = 'c:' + l.id; o.textContent = '⭐ ' + l.name; o.dataset.my = 1; sel.appendChild(o); }
-  const m = document.createElement('option'); m.value = '__my'; m.textContent = '➕ Ajouter / gérer mes fonds…'; m.dataset.my = 1; sel.appendChild(m);
+  sel.querySelectorAll('optgroup[data-my]').forEach(o => o.remove());
+  const og = document.createElement('optgroup'); og.label = '⭐ Mes fonds'; og.dataset.my = 1;
+  for (const l of myLayers) { const o = document.createElement('option'); o.value = 'c:' + l.id; o.textContent = '⭐ ' + l.name; o.dataset.my = 1; og.appendChild(o); }
+  const m = document.createElement('option'); m.value = '__my'; m.textContent = '➕ Ajouter / gérer mes fonds…'; m.dataset.my = 1; og.appendChild(m); sel.appendChild(og);
   sel.value = curLayerKey;
 }
 function saveMyLayers() { try { localStorage.setItem('rbgen.myLayers', JSON.stringify(myLayers)); } catch (_) {} }
