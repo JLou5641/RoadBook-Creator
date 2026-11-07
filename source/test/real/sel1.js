@@ -1,0 +1,22 @@
+const { chromium } = require('playwright'); const fs = require('fs');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1300, height: 900 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file)(?!https:\/\/data\.geopf\.fr).*/, r => r.abort());
+  await p.goto('file:///home/claude/build/dist/generateur-roadbook.html'); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.evaluate(txt => window.__rb.loadText(txt, 'w.gpx'), fs.readFileSync('/home/claude/scan/w.gpx', 'utf8')); await p.waitForTimeout(1500);
+  await p.click('#bDraw'); await p.waitForTimeout(500);
+  // dialogue « Modifier la trace » éventuel
+  const dlg = await p.evaluate(() => document.querySelector('#modalBg.show') ? document.querySelector('#modal').innerText.slice(0, 120) : ''); console.log('dialogue:', dlg);
+  const btn = p.locator('#modal button', { hasText: /Modifier|modifier/ }); if (await btn.count()) await btn.first().click(); await p.waitForTimeout(800);
+  console.log('points', await p.evaluate(() => window.__rb.S.ctrl.length));
+  await p.click('#bSel'); await p.waitForTimeout(200);
+  const mk = p.locator('.cpt'); const n = await mk.count(); console.log('marqueurs visibles', n);
+  await p.evaluate(() => { window.__rb.map.fitBounds(window.__rb.map.getBounds(), {}); });
+  const i1 = Math.floor(n * 0.3), i2 = Math.floor(n * 0.55);
+  await mk.nth(i1).click({ force: true }); await p.waitForTimeout(200); console.log('1 clic :', await p.evaluate(() => document.querySelector('#selInfo').textContent), '| bouton:', await p.evaluate(() => document.querySelector('#bSnap').textContent));
+  await mk.nth(i2).click({ force: true }); await p.waitForTimeout(300); console.log('2 clics :', await p.evaluate(() => document.querySelector('#selInfo').textContent), '| sel:', await p.evaluate(() => document.querySelectorAll('.cpt.sel').length));
+  await p.screenshot({ path: '/home/claude/out/apercu-selection2.png' });
+  const before = await p.evaluate(() => window.__rb.S.ctrl.length);
+  await p.click('#bSnap'); await p.waitForTimeout(3000);
+  console.log('ctrl avant/après', before, await p.evaluate(() => window.__rb.S.ctrl.length), 'modes', await p.evaluate(() => [...new Set(window.__rb.S.ctrl.map(c => c[2]))]));
+  await p.screenshot({ path: '/tmp/sel_apres.png' });
+  console.log('erreurs', errs.join('|') || 0); await b.close(); })();

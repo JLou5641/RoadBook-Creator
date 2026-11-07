@@ -773,6 +773,7 @@ main{flex:1;display:flex;min-height:0}
 .nmk.sel{background:var(--sand);color:var(--ink)}
 .nmk.se{background:var(--ok)}
 .cpt{background:#fff;border:3px solid #e4572e;border-radius:50%;width:16px!important;height:16px!important;margin-left:-8px!important;margin-top:-8px!important;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+.cpt.sel{background:#ffb347;border-color:#c25400;box-shadow:0 0 0 4px rgba(255,140,0,.55)}
 .cpt.first{border-color:var(--ok)}
 .mapbox{position:absolute;z-index:1000;background:rgba(255,253,248,.97);border:2px solid var(--ink);border-radius:8px;padding:8px 10px;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 #layerBox{top:10px;right:10px;padding:5px 6px}
@@ -1017,7 +1018,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0711.1251</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0711.1325</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1045,7 +1046,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version v0.0711.1251</div>
+          <div class="ver">Version v0.0711.1325</div>
         </div>
       </div>
     </div>
@@ -1140,10 +1141,12 @@ body.dragNote .leaflet-tooltip{display:none}
           <button id="bMerge" title="Ajouter un autre fichier GPX à la suite (ou avant) de ce parcours">➕ Fusionner un GPX</button>
         </div>
         <div class="row2">
+          <button id="bSel" title="Choisir un point (1 clic) ou une section (clic sur le 1er puis le dernier point) : « Coller à la route » ne traitera que la sélection">👆 Sélectionner</button>
           <button id="bReduce" title="Réduire le nombre de points de la trace">Réduire les points</button>
-          <button id="bSnap" title="Recalculer la trace pour qu’elle suive les chemins (mode « Tracé » choisi ci-dessus)">🛣 Coller à la route</button>
+          <button id="bSnap" title="Recalculer la trace pour qu’elle suive les chemins (mode « Tracé » choisi ci-dessus)">🛣 Coller toute la trace à la route</button>
           <input type="file" id="mergeIn" accept=".gpx,.xml" style="display:none">
         </div>
+        <div class="help" id="selInfo" style="display:none;margin:4px 2px"></div>
       </div>
       <div id="status">Charge une trace GPX ou dessine ton parcours.</div>
       <div id="dropHint">Dépose ton fichier GPX ici</div>
@@ -2634,12 +2637,13 @@ hit.on('click', e => {
   if (pickClick(e.latlng)) return;
   if (drawing) {
     if (tool === 'cut') cutAt(e.latlng);
+    else if (tool === 'sel') { if (selR) { clearSel(); renderCtrl(); } }
     else if (!justDragged && !stroke && tool !== 'erase' && !freeOn()) addCtrl([e.latlng.lat, e.latlng.lng]);
   } else addManualNote(e.latlng);
 });
-map.on('click', e => { if (pickClick(e.latlng)) return; if (drawing && !justDragged && !stroke && tool !== 'erase' && tool !== 'cut' && !freeOn()) addCtrl([e.latlng.lat, e.latlng.lng]); });
+map.on('click', e => { if (pickClick(e.latlng)) return; if (drawing && tool === 'sel') { if (selR) { clearSel(); renderCtrl(); } return; } if (drawing && !justDragged && !stroke && tool !== 'erase' && tool !== 'cut' && !freeOn()) addCtrl([e.latlng.lat, e.latlng.lng]); });
 hit.on('mousedown', e => {
-  if (!drawing || tool === 'cut') return;
+  if (!drawing || tool === 'cut' || tool === 'sel') return;
   if (strokeStart(e.containerPoint, e.latlng)) return;
   if (S.ctrl.length >= 2) { const i = nearestSeg(e.latlng); if (i > 0) { const ls = lockedSet(); if (ls && ls.has(i) && ls.has(i - 1)) { toast('Étape verrouillée 🔒', 'err'); return; } pendingIns = { i, p0: e.containerPoint }; map.dragging.disable(); } }
 });
@@ -2730,7 +2734,7 @@ function setDrawing(on) {
   $('#drawBox').classList.toggle('show', on);
   map.getContainer().classList.toggle('drawing', on);
   $('#routeMode').value = S.routeMode;
-  if (on) resetHist(); else { tool = null; spaceDown = false; $('#bFree').classList.remove('on'); $('#bErase').classList.remove('on'); $('#bCut').classList.remove('on'); }
+  clearSel(); if (on) resetHist(); else { tool = null; $('#bSel').classList.remove('on'); spaceDown = false; $('#bFree').classList.remove('on'); $('#bErase').classList.remove('on'); $('#bCut').classList.remove('on'); }
   setCursorCls(); renderCtrl(); renderInfo();
 }
 /* ---- historique annuler / rétablir (points de contrôle) ---- */
@@ -2746,13 +2750,28 @@ function renderCtrl() {
   ctrlLayer.clearLayers();
   if (!drawing) return;
   const ls = lockedSet();
+  if (selR && selR.b >= S.ctrl.length) clearSel();
+  if (selR && selR.b > selR.a) {      // la section choisie est surlignée
+    const pts = []; for (let k = selR.a; k < selR.b; k++) { const sg = S.segs[k] || [S.ctrl[k].slice(0, 2), S.ctrl[k + 1].slice(0, 2)]; sg.forEach(p => pts.push([p[0], p[1]])); }
+    L.polyline(pts, { color: '#ff8c00', weight: 9, opacity: 0.55, interactive: false }).addTo(ctrlLayer);
+  }
+  const si = $('#selInfo'), bs = $('#bSnap');
+  if (si) {
+    si.style.display = drawing && tool === 'sel' ? '' : 'none';
+    si.textContent = !selR ? 'Touche un point pour le choisir. Touche ensuite le dernier point d’une section pour la choisir en entier.'
+      : selPend ? 'Point n° ' + (selR.a + 1) + ' choisi. Touche le dernier point de la section, ou colle ce point avec le bouton « Coller ce point à la route » pour ce seul point.'
+      : selR.a === selR.b ? 'Point n° ' + (selR.a + 1) + ' sélectionné : le bouton ci-dessous ne traitera que lui (et ses abords).'
+      : 'Section du point ' + (selR.a + 1) + ' au point ' + (selR.b + 1) + ' (' + (selR.b - selR.a + 1) + ' points) : le bouton ci-dessous ne traitera qu’elle.';
+  }
+  if (bs) bs.textContent = selR ? (selR.a === selR.b ? '🛣 Coller ce point à la route' : '🛣 Coller cette section à la route') : '🛣 Coller toute la trace à la route';
   S.ctrl.forEach((c, i) => {
     const lk = !!(ls && ls.has(i));
-    const m = L.marker([c[0], c[1]], { draggable: !lk, keyboard: false, icon: L.divIcon({ className: 'cpt' + (i === 0 ? ' first' : '') + (lk ? ' locked' : ''), iconSize: [16, 16] }) });
+    const inSel = !!selR && i >= selR.a && i <= selR.b;
+    const m = L.marker([c[0], c[1]], { draggable: !lk, keyboard: false, icon: L.divIcon({ className: 'cpt' + (i === 0 ? ' first' : '') + (lk ? ' locked' : '') + (inSel ? ' sel' : ''), iconSize: [16, 16] }) });
     let pre = null;
     m.on('dragstart', () => { pre = snap(); });
     m.on('dragend', () => { const p = m.getLatLng(); pushHist(pre); S.ctrl[i] = [p.lat, p.lng, S.ctrl[i][2]]; reroute(); });
-    m.on('click', () => { if (lk) { toast('Étape verrouillée 🔒', 'err'); return; } pushHist(); S.ctrl.splice(i, 1); if (i === 0 && S.ctrl.length) S.ctrl[0][2] = null; renderCtrl(); reroute(); });
+    m.on('click', () => { if (tool === 'sel') { selClick(i); return; } if (lk) { toast('Étape verrouillée 🔒', 'err'); return; } pushHist(); S.ctrl.splice(i, 1); if (i === 0 && S.ctrl.length) S.ctrl[0][2] = null; renderCtrl(); reroute(); });
     m.addTo(ctrlLayer);
   });
   updHist();
@@ -2776,8 +2795,17 @@ function liveRebuild(dirty) {
 /* ---- outils : main levée, gomme, ajout d'un point en tirant sur la trace ---- */
 let tool = null, spaceDown = false, stroke = null, pendingIns = null, justDragged = false;
 const freeOn = () => drawing && (tool === 'free' || spaceDown);
+/* ---- sélection d'un point ou d'une section (outil 👆) : 1er clic = un point, 2e clic = dernier point de la section ---- */
+let selR = null, selPend = false;
+function clearSel() { selR = null; selPend = false; }
+function selClick(i) {
+  if (!selR || !selPend) { selR = { a: i, b: i }; selPend = true; }
+  else { selR = { a: Math.min(selR.a, i), b: Math.max(selR.a, i) }; selPend = false; }
+  renderCtrl();
+}
 function setTool(t) {
   tool = tool === t ? null : t;
+  $('#bSel').classList.toggle('on', tool === 'sel'); if (tool !== 'sel') { clearSel(); renderCtrl(); }
   $('#bFree').classList.toggle('on', tool === 'free'); $('#bErase').classList.toggle('on', tool === 'erase'); $('#bCut').classList.toggle('on', tool === 'cut'); setCursorCls();
 }
 function setCursorCls() { const c = map.getContainer(); c.classList.toggle('freedraw', freeOn()); c.classList.toggle('erasing', drawing && tool === 'erase'); c.classList.toggle('cutting', drawing && tool === 'cut'); }
@@ -5763,6 +5791,23 @@ function reduceDialog() {
   const upd = () => { const t = +m.querySelector('#redTol').value; idx = show(t); m.querySelector('#redTxt').textContent = `Tolérance ${String(t).replace('.', ',')} m : ${n0} → ${idx.length} points`; };
   m.querySelector('#redTol').oninput = upd; upd();
 }
+function snapSel() {      // « Coller à la route » limité au point ou à la section choisie (le reste de la trace ne bouge pas)
+  if (anyLock()) { toast('Une étape est verrouillée 🔒 : déverrouille-la (menu ⋯ › Étapes) pour utiliser cet outil.', 'err'); return; }
+  if (S.routeMode === 'line') { toast('Choisis d’abord un mode « Tracé » qui suit les chemins (Suivre pistes & chemins…).', 'err'); return; }
+  const single = selR.a === selR.b; let a = selR.a, b = selR.b; const pin = selR.a;
+  if (single) { while (a > 0 && gapM(S.ctrl[a], S.ctrl[pin]) < 30) a--; while (b < S.ctrl.length - 1 && gapM(S.ctrl[b], S.ctrl[pin]) < 30) b++; }
+  if (a === b) { toast('Le point est seul : rien à recalculer.', 'err'); return; }
+  const P = [], off = [];
+  for (let k = a; k < b; k++) { off.push(P.length); const sg = S.segs[k] || [S.ctrl[k].slice(0, 2), S.ctrl[k + 1].slice(0, 2)]; sg.forEach((p, j) => { if (P.length && !j) return; P.push([p[0], p[1]]); }); }
+  off.push(P.length - 1);
+  if (P.length < 2) return;
+  let idx = simplifyLL(P, 20, 40); if (single) idx = [...new Set([...idx, off[pin - a]])].sort((x, y) => x - y);
+  const n0 = b - a + 1, np = idx.map((k, j) => [P[k][0], P[k][1], j ? S.routeMode : S.ctrl[a][2]]);
+  np[0] = [S.ctrl[a][0], S.ctrl[a][1], S.ctrl[a][2]]; np[np.length - 1] = [S.ctrl[b][0], S.ctrl[b][1], S.routeMode];
+  pushHist(); S.ctrl.splice(a, n0, ...np); S.src = 'draw';
+  const s0 = single ? a + idx.indexOf(off[pin - a]) : a; selR = { a: s0, b: single ? s0 : a + np.length - 1 }; selPend = false;
+  renderCtrl(); reroute(); toast(`${single ? 'Point' : 'Section'} recollé${single ? '' : 'e'} à la route : ${n0} → ${np.length} points (annulable avec ↶).`, 'ok');
+}
 function snapDialog() {
   if (anyLock()) { toast('Une étape est verrouillée 🔒 : déverrouille-la (menu ⋯ › Étapes) pour utiliser cet outil.', 'err'); return; }
   if (S.ctrl.length < 2 && S.ll.length < 2) return;
@@ -6140,7 +6185,8 @@ $('#bRev').onclick = reverseCtrl;
 $('#bMerge').onclick = () => $('#mergeIn').click();
 $('#mergeIn').onchange = e => { const f = e.target.files[0]; if (f) mergeFile(f); e.target.value = ''; };
 $('#bReduce').onclick = reduceDialog;
-$('#bSnap').onclick = snapDialog;
+$('#bSel').onclick = () => setTool('sel');
+$('#bSnap').onclick = () => { if (selR) snapSel(); else snapDialog(); };
 $('#bRedo').onclick = redo;
 $('#bFree').onclick = () => setTool('free');
 $('#bErase').onclick = () => setTool('erase');
