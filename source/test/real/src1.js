@@ -1,0 +1,16 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1300, height: 900 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file)(?!https:\/\/(data\.geopf\.fr\/(wfs|tms)|tiles\.openfreemap\.org)).*/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html'));
+  await p.evaluate(async () => { localStorage.clear(); await new Promise(r => { const q = indexedDB.deleteDatabase('rbgen-osm'); q.onsuccess = q.onerror = q.onblocked = r; }); }); await p.reload();
+  await p.evaluate(() => { window.__rb.S.settings.data = 'ign'; });
+  await p.evaluate(t => window.__rb.loadText(t, 't.gpx'), fs.readFileSync('/home/claude/scan/seg.gpx', 'utf8')); await p.waitForTimeout(500);
+  await p.evaluate(() => window.__rb.generate());
+  await p.waitForFunction(() => !document.querySelector('#modalBg').classList.contains('show'), null, { timeout: 280000 });
+  console.log('dataSrc', await p.evaluate(() => window.__rb.S.dataSrc), '| UI:', await p.evaluate(() => (document.querySelector('.dsrc') || {}).textContent));
+  const g = await p.evaluate(() => window.__rb.buildGPX()); const gpx = typeof g === 'string' ? g : await g; console.log('GPX desc:', (/<metadata>[\s\S]*?<desc>([\s\S]*?)<\/desc>/.exec(gpx) || [])[1]);
+  const snap = await p.evaluate(() => JSON.parse(localStorage.getItem('rbgen.v1') || '{}').dataSrc); console.log('sauvegarde locale', snap);
+  await p.evaluate(() => { const t = document.querySelector('#rbDesc'); t.value = 'Rallye Tourangelle — étape 1, départ 8h'; t.dispatchEvent(new Event('input', { bubbles: true })); });
+  await p.evaluate(() => document.querySelector('#rb .dbox').scrollIntoView({ block: 'center' })); await p.waitForTimeout(300);
+  await (await p.$('#rb .dbox')).screenshot({ path: '/home/claude/out/apercu-source-descriptif.png' });
+  console.log('erreurs', errs.join('|') || 0); await b.close(); })();

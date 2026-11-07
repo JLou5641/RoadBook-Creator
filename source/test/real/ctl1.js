@@ -1,0 +1,16 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+const [A, B, shot] = process.argv.slice(2);
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1000, height: 900 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file)(?!https:\/\/(data\.geopf\.fr\/(wfs|tms)|tiles\.openfreemap\.org)).*/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html'));
+  await p.evaluate(async () => { localStorage.clear(); await new Promise(r => { const q = indexedDB.deleteDatabase('rbgen-osm'); q.onsuccess = q.onerror = q.onblocked = r; }); }); await p.reload();
+  await p.evaluate(() => { window.__rb.S.settings.data = 'ign'; });
+  await p.evaluate(t => window.__rb.loadText(t, 't.gpx'), fs.readFileSync('/home/claude/scan/seg.gpx', 'utf8')); await p.waitForTimeout(500);
+  await p.evaluate(() => window.__rb.generate());
+  await p.waitForFunction(() => !document.querySelector('#modalBg').classList.contains('show'), null, { timeout: 280000 });
+  console.log('notes', await p.evaluate(() => window.__rb.S.notes.length), await p.evaluate(() => window.__rb.G && window.__rb.G.diag));
+  await p.click('#bMore'); await p.click('button[data-act=ctl]'); await p.waitForTimeout(300);
+  await p.selectOption('#ctlA', A); await p.selectOption('#ctlB', B); await p.click('#ctlGo');
+  await p.waitForFunction(() => /contrôlées|impossible|différentes/.test(document.querySelector('#ctlP').textContent), null, { timeout: 280000 });
+  console.log(await p.evaluate(() => document.querySelector('#ctlP').textContent)); console.log(await p.evaluate(() => [...document.querySelectorAll('.ctlrow')].slice(0, 6).map(r => r.innerText.replace(/\n/g, ' ')).join('\n')));
+  await p.screenshot({ path: shot || '/tmp/ctl.png' }); console.log('erreurs', errs.join('|') || 0); await b.close(); })();

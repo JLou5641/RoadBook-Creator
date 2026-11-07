@@ -1011,6 +1011,9 @@ body.dragNote .leaflet-tooltip{display:none}
 @media (pointer:coarse){.tulbar button{font-size:14px;padding:9px 11px;min-height:40px}}
 /* tactile : pas de survol, les boutons d'une ligne (?, ✎, 🗑) s'affichent sur la ligne choisie */
 @media (hover:none){.row.sel .acts{opacity:1}.acts button{font-size:15px;padding:5px 10px}}
+
+.ctlw{background:#ff8c00;color:#fff;border:2px solid #fff;border-radius:50%;width:22px;height:22px;line-height:18px;text-align:center;font-weight:700;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+.rbr.dbox{position:relative}.rbr.dbox textarea{padding-bottom:7cqw}.dsrc{position:absolute;right:2.6cqw;bottom:1.4cqw;font-family:var(--cond);font-weight:600;font-size:2.5cqw;color:#8a8478;pointer-events:none;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -1018,7 +1021,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0711.1325</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.0711.1543</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1037,6 +1040,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="meas">📐 Mesurer un cap / liste des virages</button>
           <button data-act="alt">⛰️ Altitude et horaires (profil, 3D, horodatage)</button>
           <button data-act="marks">📍 Marqueurs (refuges, eau, repères)</button>
+          <button data-act="ctl">🔍 Contrôler les notes (comparer deux sources)</button>
           <div class="mgrp">Fichiers</div>
           <button data-act="saveProject">🗂️ Enregistrer le projet (.json)</button>
           <button data-act="saveOsm">💾 Enregistrer les chemins OSM (dossier au choix)</button>
@@ -1046,7 +1050,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version v0.0711.1325</div>
+          <div class="ver">Version v0.0711.1543</div>
         </div>
       </div>
     </div>
@@ -1062,12 +1066,14 @@ body.dragNote .leaflet-tooltip{display:none}
           <optgroup label="🇫🇷 IGN (Géoplateforme)">
             <option value="scan25">🥾 SCAN 25 (cartes IGN)</option>
             <option value="planign">🗺️ Plan IGN</option>
+            <option value="planignv">🧩 Plan IGN vectoriel (BD TOPO)</option>
             <option value="ortho">📷 Photos aériennes</option>
           </optgroup>
           <optgroup label="🌍 OpenStreetMap et dérivés">
             <option value="topo">🗻 OpenTopoMap</option>
             <option value="osm">🗺️ OSM standard</option>
             <option value="cyclosm">🚵 CyclOSM (pistes)</option>
+            <option value="ofmv">🧩 OpenFreeMap vectoriel (OSM)</option>
           </optgroup>
           <optgroup label="🛰️ Esri (monde)">
             <option value="sat">🛰️ Satellite</option>
@@ -2033,11 +2039,13 @@ const S = {
 let T = null;    // parcours dérivé : {xy, cum, L, grid}
 let G = null;    // réseau OSM : {nodes, ways, key}
 const LS_KEY = 'rbgen.v1';
+const DATA_LABEL = { bdtopo: 'BD TOPO (IGN)', ofm: 'OpenFreeMap (OSM)', osm: 'OpenStreetMap (Overpass)' };      // source des chemins réellement utilisée pour générer
+const srcNote = () => S.dataSrc && DATA_LABEL[S.dataSrc] ? 'Généré avec : ' + DATA_LABEL[S.dataSrc] : '';
 let saveTimer = null, saveWarned = false;
 
 function snapshot() {
   return { v: 2, name: S.name, desc: S.desc, src: S.src, ll: S.ll, mm: S.mm, ctrl: S.ctrl, segs: S.segs, notes: S.notes, settings: S.settings,
-    stale: S.stale, routeMode: S.routeMode, nextId: S.nextId, stages: S.stages, marks: S.marks, ele: S.ele, timing: S.timing, mySyms: MYS };
+    stale: S.stale, routeMode: S.routeMode, nextId: S.nextId, stages: S.stages, marks: S.marks, ele: S.ele, timing: S.timing, dataSrc: S.dataSrc || '', mySyms: MYS };
 }
 let dirty = false;
 function setDirty(v) { dirty = v; try { localStorage.setItem('rbgen.dirty', v ? '1' : ''); } catch (e) { } const b = document.getElementById('bSave'); if (b) { b.classList.toggle('dirty', v); b.title = v ? 'Modifications non sauvegardées dans un fichier : clique pour sauvegarder le projet' : 'Sauvegarder le projet en cours (fichier .json à rouvrir plus tard)'; } }
@@ -2072,7 +2080,7 @@ function restore(o) {
   S.routeMode = o.routeMode || 'trekking'; S.nextId = o.nextId || (Math.max(0, ...S.notes.map(n => n.id)) + 1); S.sel = null;
   for (let i = 1; i < S.ctrl.length; i++) if (S.segs[i - 1]) routeCache.set(segKey(S.ctrl[i - 1], S.ctrl[i], S.ctrl[i][2]), S.segs[i - 1]);
   if (o.mySyms) { regMySyms(o.mySyms); saveMySyms(); }      // symboles importés contenus dans le projet
-  S.stages = o.stages || []; S.marks = o.marks || []; S.ele = o.ele || null; S.timing = o.timing || null; renderMarks();
+  S.stages = o.stages || []; S.marks = o.marks || []; S.ele = o.ele || null; S.timing = o.timing || null; S.dataSrc = o.dataSrc || ''; renderMarks();
   G = null;
   S.mm = o.mm || null;
   setTrack(o.ll || [], true, true);
@@ -2193,6 +2201,7 @@ const map = L.map('map', { preferCanvas: true, zoomControl: true, maxZoom: 19 })
 const LAYERS = {
   topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { subdomains: 'abc', maxNativeZoom: 17, maxZoom: 19, attribution: '© contributeurs OpenStreetMap, SRTM | style © OpenTopoMap (CC-BY-SA)' }),
   scan25: L.tileLayer('https://data.geopf.fr/private/wmts?Service=WMTS&apikey=ign_scan_ws&Version=1.0.0&Request=GetTile&Layer=GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN25TOUR&Style=normal&Format=image/jpeg&TileMatrixSet=PM&TileMatrix={z}&TileRow={y}&TileCol={x}', { minZoom: 6, maxNativeZoom: 16, maxZoom: 19, attribution: '© IGN – SCAN 25® Touristique' }),
+  planignv: vecLayer('ign', ''), ofmv: vecLayer('ofm', ''),
   planign: L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png', { maxNativeZoom: 19, maxZoom: 19, attribution: '© IGN – Plan IGN' }),
   cyclosm: L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', { subdomains: 'abc', maxZoom: 19, attribution: '© contributeurs OpenStreetMap | CyclOSM' }),
   ortho: L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/jpeg', { maxNativeZoom: 19, maxZoom: 19, attribution: '© IGN – Photographies aériennes' }),
@@ -3346,7 +3355,7 @@ async function fetchIGN(progress, isCancelled, detail) {
   prog0(1, 'Lecture des chemins…'); await sleep(20);
   G = buildGraph(corridorFilter(ignToElements([...all.values(), ...extra.feats]), zones));
   if (got.length) { for (const r of got) memIGN.set(r.k, r); TileDB.putMany(got, 'ign'); }
-  G.key = key;
+  G.key = key; G.used = 'bdtopo';
   G.diag = `mode IGN${detail ? ' détaillé' : ''} : BD TOPO® (© IGN, Licence Ouverte) · ${cells.length} cases (${cached} en mémoire) · ${G.ways.length} chemins retenus` + (detail ? ` · ${extra.feats.length} repères` : '')
     + (skippedLayers.size ? ` · non chargés : ${[...skippedLayers].join(', ')}` : '') + (extra.failed.size ? ` · repères non chargés : ${[...extra.failed].map(c => IGN_XNAME[c]).join(', ')}` : '');
   if (extra.failed.size) toast(`Repères IGN non chargés (${[...extra.failed].map(c => IGN_XNAME[c]).join(', ')}) : le service ne répond pas. Les routes sont bien là ; régénère plus tard pour les avoir.`, 'err');
@@ -3407,7 +3416,7 @@ async function fetchVT(progress, isCancelled) {
   if (!tiles.some(t => t.layers.transportation)) throw new Error('Format du fond vectoriel inconnu');     // schéma changé : mode détaillé en secours
   G = buildGraph(corridorFilter(vtToElements(tiles, { barriers: new Set(Object.keys(BARRIER_TXT)) }), zones));
   if (got.length) { for (const r of got) memVT.set(r.k, r.d); TileDB.putMany(got, 'vt'); }
-  G.key = key;
+  G.key = key; G.used = 'ofm';
   G.diag = `mode rapide : fond vectoriel OpenFreeMap (© OpenMapTiles, données © OpenStreetMap) · ${keys.length} tuiles (${cached} en mémoire) · ${G.ways.length} chemins retenus`;
   return G;
 }
@@ -3447,7 +3456,7 @@ async function fetchOverpass(progress, isCancelled) {
   if (!missing.length) progress(1, `Chemins déjà en mémoire (${cached} zones)`);
   G = buildGraph(tilesToElements(keys.map(k => recs.get(k))));
   if (G.ways.length && fetched.length) { for (const r of fetched) memTiles.set(r.k, r); TileDB.putMany(fetched); }
-  G.key = key;
+  G.key = key; G.used = 'osm';
   G.diag = `mode détaillé : serveur ${[...eps].join(', ') || '—'} · ${keys.length} zones (${cached} en mémoire) · ${G.ways.length} chemins retenus`;
   return G;
 }
@@ -4942,7 +4951,7 @@ function renderRoadbook() {
     renderInfo(); return;
   }
   let prev = 0; const fl = rbFlags(S.notes);
-  const descBox = `<div class="rbr dbox"><textarea id="rbDesc" spellcheck="true" placeholder="Description du roadbook : rallye, étape, date, départ, consignes, rappels…">${esc(S.desc || '')}</textarea></div>`;
+  const descBox = `<div class="rbr dbox"><textarea id="rbDesc" spellcheck="true" placeholder="Description du roadbook : rallye, étape, date, départ, consignes, rappels…">${esc(S.desc || '')}</textarea>${srcNote() ? `<div class="dsrc">${esc(srcNote())}</div>` : ''}</div>`;
   rb.innerHTML = descBox + S.notes.map((n, i) => { const par = n.s - prev; prev = n.s; return `<div class="rbr row${n.id === S.sel ? ' sel' : ''}" data-id="${n.id}"${whyOf(n) ? ` title="Pourquoi cette note ? ${esc(whyOf(n))}"` : ''}>${rowInner(n, i, par, fl[i], true)}</div>`; }).join('');
   renderInfo();
 }
@@ -5344,6 +5353,7 @@ async function runGenerate() {
   try {
     S.mm = null; buildDerived();                // on repart de la trace d'origine
     await fetchOSM((f, txt) => prog(txt, 0.05 + 0.6 * f), () => cancelGen);
+    S.dataSrc = (G && G.used) || '';
     if (cancelGen) throw new Error('annulé');
     if (!G.ways.length) {
       closeModal(); renderAll();
@@ -5411,7 +5421,7 @@ async function buildGPX(onProg) {
   const o = [];
   o.push('<?xml version="1.0" encoding="UTF-8"?>');
   o.push(`<gpx xmlns="http://www.topografix.com/GPX/1/1" creator="Generateur de Roadbook OSM" version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:openrally="${NS}" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd ${NS} http://www.openrally.org/xmlschemas/GpxExtensions/v1.0.3/openrally.xsd">`);
-  o.push(`  <metadata>\n    <name>${xmlEsc(S.name)}</name>${(S.desc || '').trim() ? `\n    <desc>${xmlEsc(S.desc.trim())}</desc>` : ''}\n    <time>${new Date().toISOString().replace(/\.\d+Z$/, 'Z')}</time>\n    <extensions>\n      <openrally:units>metric</openrally:units>\n      <openrally:distance>${km(T.L)}</openrally:distance>\n    </extensions>\n  </metadata>`);
+  o.push(`  <metadata>\n    <name>${xmlEsc(S.name)}</name>${(S.desc || '').trim() || srcNote() ? `\n    <desc>${xmlEsc([(S.desc || '').trim(), srcNote()].filter(Boolean).join('\n'))}</desc>` : ''}\n    <time>${new Date().toISOString().replace(/\.\d+Z$/, 'Z')}</time>\n    <extensions>\n      <openrally:units>metric</openrally:units>\n      <openrally:distance>${km(T.L)}</openrally:distance>\n    </extensions>\n  </metadata>`);
   let wpCount = 0;
   for (let i = 0; i < S.notes.length; i++) {
     const n = S.notes[i];
@@ -5481,7 +5491,7 @@ async function exportGPX() {
 function printRB() {
   if (!S.notes.length) { toast('Génère d’abord le roadbook.', 'err'); return; }
   const fl = rbFlags(S.notes), rows = [], P = 5; let prev = 0;       // une page = 5 places ; la description en prend 2
-  if ((S.desc || '').trim()) rows.push({ w: 2, h: `<div class="rbr prow dbox"><div class="dtxt">${esc(S.desc.trim())}</div></div>` });
+  if ((S.desc || '').trim()) rows.push({ w: 2, h: `<div class="rbr prow dbox"><div class="dtxt">${esc(S.desc.trim())}</div>${srcNote() ? `<div class="dsrc">${esc(srcNote())}</div>` : ''}</div>` });
   S.notes.forEach((n, i) => { const par = n.s - prev; prev = n.s; rows.push({ w: 1, h: `<div class="rbr prow">${rowInner(n, i, par, fl[i], false)}</div>` }); });
   const pages = []; let cur = [], used = 0;
   for (const r of rows) { if (used + r.w > P) { pages.push(cur); cur = []; used = 0; } cur.push(r.h); used += r.w; }
@@ -5626,6 +5636,204 @@ function openHelp() {
     <p style="color:#8a8478;font-size:12px">Données © contributeurs OpenStreetMap (ODbL). Chemins du mode rapide : OpenFreeMap © OpenMapTiles. Mode IGN : BD TOPO® © IGN (Licence Ouverte). Itinéraires BRouter / OSRM. Fonds OpenTopoMap, IGN, CyclOSM, Esri.</p>`, [{ label: 'OK', cls: 'primary' }]);
 }
 
+/* ---------- Contrôle des notes : compare deux sources de réseau routier autour de chaque note ----------
+   Une « source » = { id, name, load(box) } où box = [sud, ouest, nord, est] et load renvoie [{ c: classe, pts: [[lat, lon], …] }].
+   Pour ajouter un pays ou un fond : CTL.add('id', 'Nom affiché', async box => lignes). Elle apparaît alors dans les deux listes. */
+const CTL = { sources: {}, add(id, name, load) { this.sources[id] = { id, name, load }; } };
+async function ctlTile(url, ms) {
+  for (let t = 0; t < 4; t++) {
+    const ac = new AbortController(), to = setTimeout(() => ac.abort(), ms || 20000);
+    try {
+      const r = await fetch(url, { signal: ac.signal });
+      if (r.status === 204 || r.status === 404) return new Uint8Array(0);
+      if (r.ok) return new Uint8Array(await r.arrayBuffer());
+    } catch (e) { /* on réessaie */ } finally { clearTimeout(to); }
+    await sleep(600 * (t + 1));
+  }
+  throw new Error('tuile indisponible');
+}
+async function ctlMvt(tpl, z, box, layers, cls) {      // tuiles vectorielles (format MVT) → lignes
+  const n = 2 ** z, tx = lon => Math.floor((lon + 180) / 360 * n), ty = lat => { const r = lat * D2R; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n); };
+  const jobs = []; for (let x = tx(box[1]); x <= tx(box[3]); x++) for (let y = ty(box[2]); y <= ty(box[0]); y++) jobs.push([x, y]);
+  const out = [];
+  await Promise.all(Array.from({ length: Math.min(5, jobs.length) }, async (_, w) => {
+    for (let i = w; i < jobs.length; i += Math.min(5, jobs.length)) {
+      const [x, y] = jobs[i], d = await ctlTile(tpl.replace('{z}', z).replace('{x}', x).replace('{y}', y));
+      if (!d.length) continue;
+      const L = decodeMVT(d);
+      for (const ln of layers) for (const f of (L[ln] ? L[ln].features : [])) {
+        if (f.type !== 2) continue; const c = cls(f.props, ln); if (c === null) continue;
+        const ext = L[ln].extent || 4096;
+        for (const ring of f.rings) if (ring.length > 1) out.push({ c, pts: ring.map(([cx, cy]) => { const yy = Math.PI - 2 * Math.PI * (y + cy / ext) / n; return [Math.atan(Math.sinh(yy)) / D2R, (x + cx / ext) / n * 360 - 180]; }) });
+      }
+    }
+  }));
+  return out;
+}
+CTL.add('bdtopo', 'BD TOPO (IGN)', async box => {
+  const out = [];
+  for (let page = 0; page < 20; page++) {
+    const q = new URLSearchParams({ SERVICE: 'WFS', VERSION: '2.0.0', REQUEST: 'GetFeature', TYPENAMES: 'BDTOPO_V3:troncon_de_route', OUTPUTFORMAT: 'application/json',
+      BBOX: `${box[0].toFixed(5)},${box[1].toFixed(5)},${box[2].toFixed(5)},${box[3].toFixed(5)},urn:ogc:def:crs:EPSG::4326`, SORTBY: 'cleabs', COUNT: 5000, STARTINDEX: page * 5000 });
+    let j = null; for (let t = 0; t < 4 && !j; t++) { try { j = await fetchJSON(IGN_WFS + '?' + q, {}, 90000); } catch (e) { if (t === 3) throw e; await sleep(800 * (t + 1)); } }
+    for (const f of j.features || []) { const g = f.geometry; if (!g) continue; const ls = g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : [];
+      for (const l of ls) if (l.length > 1) out.push({ c: f.properties.nature || '', pts: l.map(c => [c[1], c[0]]) }); }
+    if ((j.features || []).length < 5000) break;
+  }
+  return out;
+});
+CTL.add('planign', 'Plan IGN vectoriel (BD TOPO)', box => ctlMvt('https://data.geopf.fr/tms/1.0.0/PLAN.IGN/{z}/{x}/{y}.pbf', 15, box, ['routier_route', 'routier_chemin'], p => p.symbo || ''));
+CTL.add('ofm', 'OpenFreeMap (OSM)', box => ctlMvt('https://tiles.openfreemap.org/planet/latest/{z}/{x}/{y}.pbf', 14, box, ['transportation'],
+  p => /^(rail|transit|ferry|aerialway|pier)$/.test(p.class || '') ? null : (p.class || '') + (p.subclass ? '/' + p.subclass : '')));
+
+/* Compare, autour d'une note, les voies de A et de B : longueur de voie de l'une absente de l'autre (tolérance 10 m, rayon 40 m) */
+function ctlNear(lines, lat0, lon0, R) {
+  const k = Math.cos(lat0 * D2R) * 111320, segs = [];
+  for (const l of lines) {
+    const p = l.pts; let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity;
+    for (const q of p) { a = Math.min(a, q[0]); b = Math.min(b, q[1]); c = Math.max(c, q[0]); d = Math.max(d, q[1]); }
+    if (c < lat0 - R / 111320 || a > lat0 + R / 111320 || d < lon0 - R / k || b > lon0 + R / k) continue;
+    for (let i = 0; i + 1 < p.length; i++) segs.push([(p[i][1] - lon0) * k, (p[i][0] - lat0) * 111320, (p[i + 1][1] - lon0) * k, (p[i + 1][0] - lat0) * 111320]);
+  }
+  return segs;
+}
+function ctlMissing(A, B, R, tol) {      // métrés de A (dans le rayon R) à plus de tol de B 
+  let miss = 0;
+  for (const s of A) {
+    const L = Math.hypot(s[2] - s[0], s[3] - s[1]), n = Math.max(1, Math.ceil(L / 4));
+    for (let i = 0; i < n; i++) {
+      const t = (i + .5) / n, x = s[0] + (s[2] - s[0]) * t, y = s[1] + (s[3] - s[1]) * t;
+      if (x * x + y * y > R * R) continue;
+      let dmin = Infinity;
+      for (const b of B) {
+        const dx = b[2] - b[0], dy = b[3] - b[1], l2 = dx * dx + dy * dy, u = l2 ? clamp(((x - b[0]) * dx + (y - b[1]) * dy) / l2, 0, 1) : 0;
+        const d = Math.hypot(x - b[0] - u * dx, y - b[1] - u * dy); if (d < dmin) dmin = d; if (dmin <= tol) break;
+      }
+      if (dmin > tol) { miss += L / n; }
+    }
+  }
+  return { m: miss };
+}
+let ctlLayer = null;
+function ctlClear() { if (ctlLayer) { map.removeLayer(ctlLayer); ctlLayer = null; } }
+async function ctlRun(idA, idB, out, setP) {
+  const A = CTL.sources[idA], B = CTL.sources[idB], notes = S.notes.filter(n => n.lat != null);
+  const cells = new Map();      // cases de 0,02° contenant des notes (marge 0,003°)
+  for (const n of notes) { const c = Math.floor(n.lat / .02) + ',' + Math.floor(n.lon / .02); if (!cells.has(c)) cells.set(c, [Math.floor(n.lat / .02) * .02 - .003, Math.floor(n.lon / .02) * .02 - .003, Math.floor(n.lat / .02) * .02 + .023, Math.floor(n.lon / .02) * .02 + .023]); }
+  const la = [], lb = []; let done = 0; const tot = cells.size * 2, boxes = [...cells.values()];
+  for (const box of boxes) {
+    setP(`Chargement… ${done}/${tot}`);
+    la.push(...await A.load(box)); done++; setP(`Chargement… ${done}/${tot}`);
+    lb.push(...await B.load(box)); done++;
+  }
+  setP('Comparaison…'); await sleep(20);
+  const R = 40, tol = 10, res = [];
+  for (const n of notes) {
+    const sa = ctlNear(la, n.lat, n.lon, R + tol + 5), sb = ctlNear(lb, n.lat, n.lon, R + tol + 5);
+    const ma = ctlMissing(sa, sb, R, tol), mb = ctlMissing(sb, sa, R, tol);
+    if (ma.m > 25 || mb.m > 25) res.push({ n, ma: Math.round(ma.m), mb: Math.round(mb.m), la: sa.length, lb: sb.length });
+  }
+  return { res, total: notes.length, na: la.length, nb: lb.length };
+}
+function controlDialog() {
+  if (!S.notes.length) { toast('Génère d’abord le roadbook : le contrôle porte sur les notes.', 'err'); return; }
+  const ids = Object.keys(CTL.sources), cur = CTL.sources[S.dataSrc] ? S.dataSrc : (/^(ign|ignd)$/.test(S.settings.data) ? 'bdtopo' : 'ofm'), opt = sel => ids.map(i => `<option value="${i}"${i === sel ? ' selected' : ''}>${esc(CTL.sources[i].name)}</option>`).join('');
+  openModal('Contrôler les notes', `<div style="font-size:13px;color:#6b6558;margin-bottom:8px">Compare, autour de chaque note (40 m), les voies connues par deux sources. Une note est signalée quand l’une montre au moins 25 m de voie que l’autre ne montre pas. Rien n’est modifié.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><label style="font-size:12px">Source de données<select id="ctlA" style="width:100%">${opt(cur)}</select></label>
+    <label style="font-size:12px">Fond à comparer<select id="ctlB" style="width:100%">${opt(cur === 'ofm' ? 'planign' : 'ofm')}</select></label></div>
+    <button class="mbtn primary" id="ctlGo" style="width:100%;margin:10px 0">Lancer le contrôle</button><div id="ctlP" style="font-size:12px;color:#8a8478"></div><div id="ctlOut" style="max-height:38vh;overflow:auto"></div>`,
+    [{ label: 'Effacer les ⚠', onClick: ctlClear }, 'sp', { label: 'Fermer', cls: 'primary' }], { top: true });
+  const go = $('#ctlGo'), P = $('#ctlP'), O = $('#ctlOut');
+  go.onclick = async () => {
+    const a = $('#ctlA').value, b = $('#ctlB').value;
+    if (a === b) { P.textContent = 'Choisis deux sources différentes.'; return; }
+    go.disabled = true; O.innerHTML = ''; ctlClear();
+    try {
+      const r = await ctlRun(a, b, O, t => P.textContent = t), nm = i => CTL.sources[i].name;
+      P.textContent = `${r.total} notes contrôlées · ${r.res.length} à revérifier (${r.na} tronçons « ${nm(a)} », ${r.nb} « ${nm(b)} »).`;
+      ctlLayer = L.layerGroup().addTo(map);
+      O.innerHTML = r.res.map((x, i) => `<div class="ctlrow" data-i="${i}" style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid #e3dccb;cursor:pointer"><span style="color:#c25400">⚠</span><div><b>Note ${S.notes.indexOf(x.n) + 1} · km ${(x.n.s / 1000).toFixed(2)}</b><div style="font-size:12px;color:#6b6558">${x.ma > 25 ? `« ${esc(nm(a))} » montre ${x.ma} m de voie absente de « ${esc(nm(b))} ». ` : ''}${x.mb > 25 ? `« ${esc(nm(b))} » montre ${x.mb} m de voie absente de « ${esc(nm(a))} ».` : ''}</div></div></div>`).join('') || '<div style="padding:10px 0">Aucune différence : les deux sources montrent les mêmes voies autour des notes.</div>';
+      r.res.forEach(x => L.marker([x.n.lat, x.n.lon], { icon: L.divIcon({ className: 'ctlw', html: '⚠', iconSize: [22, 22] }), interactive: false }).addTo(ctlLayer));
+      O.querySelectorAll('.ctlrow').forEach(el => el.onclick = () => { const x = r.res[+el.dataset.i]; map.setView([x.n.lat, x.n.lon], Math.max(map.getZoom(), 17)); selectNote(x.n.id, 'map'); });
+    } catch (e) { P.textContent = 'Contrôle impossible : ' + (e.message || e); }
+    go.disabled = false;
+  };
+}
+
+/* ---------- Fonds vectoriels dessinés par l'appli : tuiles vectorielles téléchargées, décodées (decodeMVT) et peintes sur un canvas ----------
+   kind : 'ign' (Plan IGN), 'bdtopo' (BD TOPO brute), 'ofm' (OpenFreeMap / OpenMapTiles) ; tint : '' | 'gris' | 'sombre' (filtre appliqué à la tuile) */
+function VEC() {
+  const _u = { ign: 'https://data.geopf.fr/tms/1.0.0/PLAN.IGN/{z}/{x}/{y}.pbf', bdtopo: 'https://data.geopf.fr/tms/1.0.0/BDTOPO/{z}/{x}/{y}.pbf', ofm: 'https://tiles.openfreemap.org/planet/latest/{z}/{x}/{y}.pbf' };
+  const _a = { ign: '© IGN – Plan IGN (tuiles vectorielles)', bdtopo: '© IGN – BD TOPO®', ofm: '© OpenMapTiles, © contributeurs OpenStreetMap' };
+  const _f = { gris: 'grayscale(1) contrast(.85) brightness(1.08)', sombre: 'invert(1) hue-rotate(180deg) brightness(.85) contrast(.92)' };
+  return { url: _u, attr: _a, filter: _f };
+}
+function vecLayer(kind, tint) {
+  const VEC_URL = VEC().url, VEC_ATTR = VEC().attr, VEC_FILTER = VEC().filter;
+  const ZR = { ign: [0, 18], bdtopo: [15, 18], ofm: [0, 14] };      // zooms où le serveur a des données ; au-delà on redessine la tuile agrandie (vraiment vectoriel), en dessous on assemble des tuiles plus fines
+  const Layer = L.GridLayer.extend({
+    createTile(c, done) {
+      const cv = document.createElement('canvas'), S2 = 2, N = 256; cv.width = cv.height = N * S2; const g = cv.getContext('2d'); g.scale(S2, S2);
+      if (tint) cv.style.filter = VEC_FILTER[tint];
+      g.fillStyle = '#f4f1e8'; g.fillRect(0, 0, N, N);
+      const [zmin, zmax] = ZR[kind], jobs = [];
+      if (c.z > zmax) { const d = c.z - zmax, f = 2 ** d, px = Math.floor(c.x / f), py = Math.floor(c.y / f); jobs.push({ z: zmax, x: px, y: py, ox: -(c.x - px * f) * N, oy: -(c.y - py * f) * N, s: f }); }
+      else if (c.z < zmin) { const n = 2 ** (zmin - c.z); for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) jobs.push({ z: zmin, x: c.x * n + i, y: c.y * n + j, ox: i * N / n, oy: j * N / n, s: 1 / n }); }
+      else jobs.push({ z: c.z, x: c.x, y: c.y, ox: 0, oy: 0, s: 1 });
+      Promise.all(jobs.map(j => ctlTile(VEC_URL[kind].replace('{z}', j.z).replace('{x}', j.x).replace('{y}', j.y)).then(d => ({ j, d })).catch(() => null))).then(res => {
+        for (const r of res) {
+          if (!r || !r.d.length) continue; const j = r.j;
+          g.save(); if (j.s < 1) { g.beginPath(); g.rect(j.ox, j.oy, N * j.s, N * j.s); g.clip(); }
+          g.translate(j.ox, j.oy); g.scale(j.s, j.s); vecDraw(kind, g, decodeMVT(r.d), c.z, N, j.s); g.restore();
+        }
+        done(null, cv);
+      });
+      return cv;
+    } });
+  return new Layer({ minZoom: kind === 'bdtopo' ? 14 : 6, maxZoom: 19, tileSize: 256, attribution: VEC_ATTR[kind] });
+}
+function planIgnVector() { return vecLayer('ign', ''); }
+var VROAD = { // classe → [largeur, remplissage, contour]
+  REGIONALE_1: [4.4, '#f4a259', '#a8651f'], REGIONALE_2: [3.8, '#f8c471', '#b08b3a'], REGIONALE_3: [3.4, '#fbe29a', '#b8a35a'], LOCALE_1: [3, '#fff6cc', '#a39a73'], LOCALE_2: [2.8, '#fff', '#9a958a'],
+  NON_CLASSEE: [2.2, '#fff', '#9a958a'], NON_CLASSEE_RESTREINT: [2, '#f3f0e6', '#a8a396'], NON_REVETUE_CARRO: [1.8, '#e8c9a0', '#9a7440'], NON_REVETUE_CARRO_RESTREINT: [1.6, '#eddcc2', '#a8896a'] };
+var VPATH = { CHEMIN: [1.5, '#6b4a1e', [5, 3]], SENTIER: [1.3, '#b5412c', [2.5, 2.5]], PISTE_CYCLABLE: [1.4, '#2a7ab5', [5, 3]], ESCALIER: [1.3, '#555', [1.5, 1.5]], RUE_PIETONNE: [1.6, '#b0aa9a', null] };
+function vecDraw(kind, g, T, z, N, sc) {
+  sc = sc || 1; const k = clamp(0.55 + (z - 12) * 0.2, 0.45, 1.7) / sc;      // sc : échelle appliquée au dessin (tuile agrandie ou réduite), les épaisseurs et textes la compensent
+  const pth = (f, ext, close) => { g.beginPath(); for (const r of f.rings) { r.forEach(([x, y], i) => { x = x / ext * N; y = y / ext * N; i ? g.lineTo(x, y) : g.moveTo(x, y); }); if (close) g.closePath(); } };
+  const polys = (name, col, stroke) => { const Ly = T[name]; if (!Ly) return; for (const f of Ly.features) { if (f.type !== 3) continue; const c = typeof col === 'function' ? col(f.props) : col; if (!c) continue; pth(f, Ly.extent, true); g.fillStyle = c; g.fill('evenodd'); if (stroke) { g.strokeStyle = stroke; g.lineWidth = .6 / sc; g.stroke(); } } };
+  const lines = (name, fn) => { const Ly = T[name]; if (!Ly) return; for (const f of Ly.features) { if (f.type !== 2) continue; const st = fn(f.props); if (!st) continue; pth(f, Ly.extent, false); g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = st[1]; g.lineWidth = st[0] * k; g.setLineDash(st[2] ? st[2].map(v => v * k) : []); g.stroke(); g.setLineDash([]); } };
+  const roads = (name, fn) => { const Ly = T[name]; if (!Ly) return; for (const pass of [0, 1]) for (const f of Ly.features) { if (f.type !== 2) continue; const st = fn(f.props); if (!st) continue; pth(f, Ly.extent, false); g.lineCap = 'round'; g.lineJoin = 'round';
+      if (pass === 0) { g.strokeStyle = st[2]; g.lineWidth = (st[0] + 1.4) * k; g.setLineDash([]); } else { g.strokeStyle = st[1]; g.lineWidth = st[0] * k; g.setLineDash(st[3] ? [6 * k, 3 * k] : []); } g.stroke(); g.setLineDash([]); } };
+  const label = (txt, px, py, size) => { g.font = `600 ${size / sc}px sans-serif`; g.textAlign = 'center'; g.lineJoin = 'round'; g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 3 / sc; g.strokeText(txt, px, py); g.fillStyle = '#333'; g.fillText(txt, px, py); };
+  const points = (name, keyF, minZ, size) => { const Ly = T[name]; if (!Ly || z < minZ) return; for (const f of Ly.features) { const t = keyF(f.props); if (!t || f.type !== 1 || !f.rings[0]) continue; const [x, y] = f.rings[0][0]; label(t, x / Ly.extent * N, y / Ly.extent * N, size); } };
+  const lbl = Math.round(10 + clamp(z - 12, 0, 3));
+  if (kind === 'ign') {
+    polys('ocs_nature_sol_surf', '#efe9d6'); polys('ocs_vegetation_surf', p => /BOISEE|FORET/.test(p.symbo || '') ? '#cfe3b8' : /VIGNE|VERGER/.test(p.symbo || '') ? '#e3e8bd' : '#e0ecc8');
+    polys('hydro_surf', '#a9d3f0'); lines('oro_courbe', p => [/MAITRESSE/.test(p.symbo || '') ? 1 : .5, '#dcc3a4']); lines('hydro_reseau', () => [1.6, '#6fb2e0']);
+    polys('bati_surf', '#cdc7ba', '#a8a294'); lines('ferre', () => [1.4, '#666']); lines('limite_lin', () => [.8 / k / sc, '#b07ac0', [6, 3]]);
+    lines('routier_chemin', p => { const s = VPATH[p.symbo] || VPATH.CHEMIN; return [s[0], s[1], s[2]]; });
+    roads('routier_route', p => { const s = VROAD[p.symbo] || VROAD.NON_CLASSEE; return [s[0], s[1], s[2], /NON_REVETUE/.test(p.symbo || '')]; });
+    points('toponyme_localite_ponc', p => p.texte, 12, lbl); points('toponyme_ocs_ponc', p => p.texte, 14, lbl);
+  } else if (kind === 'bdtopo') {
+    polys('zone_de_vegetation', p => /Vigne|Verger/.test(p.nature || '') ? '#e3e8bd' : /Forêt|Bois|Peupleraie/.test(p.nature || '') ? '#cfe3b8' : '#e0ecc8');
+    polys('surface_hydrographique', '#a9d3f0'); polys('plan_d_eau', '#a9d3f0'); polys('zone_d_habitation', '#ece5d6'); polys('batiment', '#cdc7ba', '#a8a294');
+    lines('troncon_hydrographique', () => [1.6, '#6fb2e0']); lines('haie', () => [1.1, '#5c8a3a']); lines('ligne_electrique', () => [.7, '#8a7aa8', [4, 3]]); lines('troncon_de_voie_ferree', () => [1.4, '#666']);
+    const RN = { 'Route à 2 chaussées': [3.8, '#f4a259', '#a8651f'], 'Route à 1 chaussée': [2.6, '#fff', '#9a958a'], 'Route empierrée': [1.8, '#e8c9a0', '#9a7440', true], 'Rond-point': [2.6, '#fff', '#9a958a'], 'Bretelle': [3, '#f8c471', '#b08b3a'], 'Type autoroutier': [4.4, '#f4a259', '#a8651f'] };
+    lines('troncon_de_route', p => /^(Chemin|Sentier|Escalier|Piste cyclable)$/.test(p.nature || '') ? (p.nature === 'Sentier' ? [1.3, '#b5412c', [2.5, 2.5]] : p.nature === 'Piste cyclable' ? [1.4, '#2a7ab5', [5, 3]] : p.nature === 'Escalier' ? [1.3, '#555', [1.5, 1.5]] : [1.5, '#6b4a1e', [5, 3]]) : null);
+    roads('troncon_de_route', p => RN[p.nature] || (/^(Chemin|Sentier|Escalier|Piste cyclable)$/.test(p.nature || '') ? null : RN['Route à 1 chaussée']));
+    points('lieu_dit_non_habite', p => p.toponyme, 14, lbl);
+    const Z = T.zone_d_habitation; if (Z && z >= 12) for (const f of Z.features) { if (f.type !== 3 || !f.props.toponyme || !f.rings[0]) continue; let a = 1e9, b = 1e9, c2 = -1e9, d = -1e9; for (const [x, y] of f.rings[0]) { a = Math.min(a, x); b = Math.min(b, y); c2 = Math.max(c2, x); d = Math.max(d, y); } label(f.props.toponyme, (a + c2) / 2 / Z.extent * N, (b + d) / 2 / Z.extent * N, lbl); }
+  } else {      // OpenFreeMap : schéma OpenMapTiles
+    polys('landcover', p => p.class === 'wood' ? '#cfe3b8' : p.class === 'grass' ? '#e0ecc8' : p.class === 'farmland' ? '#eef0d4' : p.class === 'wetland' ? '#d6e8d4' : p.class === 'sand' ? '#f2e8c8' : p.class === 'ice' ? '#f4fafd' : '#e8eed8');
+    polys('landuse', p => /residential|suburb|neighbourhood/.test(p.class || '') ? '#ece5d6' : /cemetery|park|pitch|playground/.test(p.class || '') ? '#dbe9c3' : /industrial|retail|commercial/.test(p.class || '') ? '#e6dfe8' : null);
+    polys('park', '#d9e8c4'); polys('water', '#a9d3f0');
+    lines('waterway', p => [p.class === 'river' ? 2 : 1.2, '#6fb2e0']); polys('building', '#cdc7ba', '#a8a294');
+    const OR = { motorway: [4.4, '#f4a259', '#a8651f'], trunk: [4.2, '#f4a259', '#a8651f'], primary: [3.8, '#f8c471', '#b08b3a'], secondary: [3.4, '#fbe29a', '#b8a35a'], tertiary: [3, '#fff6cc', '#a39a73'], minor: [2.4, '#fff', '#9a958a'], service: [1.8, '#fff', '#a8a396'] };
+    lines('transportation', p => p.class === 'rail' ? [1.4, '#666'] : p.class === 'track' ? [1.6, '#9a7440', [6, 3]] : p.class === 'path' ? (p.subclass === 'cycleway' ? [1.4, '#2a7ab5', [5, 3]] : p.subclass === 'steps' ? [1.3, '#555', [1.5, 1.5]] : p.subclass === 'footway' || p.subclass === 'pedestrian' ? [1.3, '#b5412c', [2.5, 2.5]] : [1.4, '#6b4a1e', [5, 3]]) : null);
+    roads('transportation', p => OR[p.class] || null);
+    points('place', p => p.name, 10, lbl); points('mountain_peak', p => p.name, 13, lbl - 1);
+  }
+}
 /* ============================================================
    14. Fichiers, boutons, démarrage
    ============================================================ */
@@ -6208,6 +6416,7 @@ $('#moreMenu').addEventListener('click', e => {
   if (act === 'settings') openSettings();
   else if (act === 'stages') stagesDialog();
   else if (act === 'marks') marksDialog();
+  else if (act === 'ctl') controlDialog();
   else if (act === 'alt') altDialog();
   else if (act === 'meas') openMeasure();
   else if (act === 'saveProject') saveProject();
@@ -6218,7 +6427,7 @@ $('#moreMenu').addEventListener('click', e => {
   else if (act === 'new') ask('Nouveau roadbook ?', 'Le parcours et les notes en cours seront effacés (pense à exporter ou enregistrer le projet avant).', 'Tout effacer', () => {
     if (drawing) setDrawing(false);
     S.stages = []; S.ele = null; S.marks = []; renderMarks(); candLayer.clearLayers();
-    S.name = 'Mon roadbook'; S.desc = ''; S.src = ''; S.ctrl = []; S.segs = []; S.notes = []; S.stale = false; S.sel = null;
+    S.name = 'Mon roadbook'; S.desc = ''; S.dataSrc = ''; S.src = ''; S.ctrl = []; S.segs = []; S.notes = []; S.stale = false; S.sel = null;
     $('#rbName').value = S.name; setTrack([], true); renderAll();
   });
 });
