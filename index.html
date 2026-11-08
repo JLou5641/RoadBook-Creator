@@ -1015,6 +1015,9 @@ body.dragNote .leaflet-tooltip{display:none}
 .ctlw{background:#ff8c00;color:#fff;border:2px solid #fff;border-radius:50%;width:22px;height:22px;line-height:18px;text-align:center;font-weight:700;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.5)}
 .rbr.dbox{position:relative}.rbr.dbox textarea{padding-bottom:7cqw}.dsrc{position:absolute;right:2.6cqw;bottom:1.4cqw;font-family:var(--cond);font-weight:600;font-size:2.5cqw;color:#8a8478;pointer-events:none;white-space:nowrap}
 .dropdown{max-width:calc(100vw - 16px);max-height:calc(100dvh - 130px);overflow-y:auto}
+.ctltul svg{width:100%;height:auto;display:block}
+#modalBg.free{background:transparent;pointer-events:none}
+#modalBg.free .modal{pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.35)}
 </style>
 </head>
 <body>
@@ -1022,7 +1025,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261107.2006</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261108.1023</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1051,7 +1054,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version v0.261107.2006</div>
+          <div class="ver">Version v0.261108.1023</div>
         </div>
       </div>
     </div>
@@ -2041,7 +2044,12 @@ let T = null;    // parcours dérivé : {xy, cum, L, grid}
 let G = null;    // réseau OSM : {nodes, ways, key}
 const LS_KEY = 'rbgen.v1';
 const DATA_LABEL = { bdtopo: 'BD TOPO (IGN)', ofm: 'OpenFreeMap (OSM)', osm: 'OpenStreetMap (Overpass)' };      // source des chemins réellement utilisée pour générer
-const srcNote = () => S.dataSrc && DATA_LABEL[S.dataSrc] ? 'Généré avec : ' + DATA_LABEL[S.dataSrc] : '';
+const srcNote = () => {
+  if (!S.dataSrc || !DATA_LABEL[S.dataSrc]) return '';
+  const m = {}; for (const n of S.notes) if (n.tsrc && n.tulipEdited && n.tsrc !== S.dataSrc && DATA_LABEL[n.tsrc]) m[DATA_LABEL[n.tsrc]] = (m[DATA_LABEL[n.tsrc]] || 0) + 1;      // tulipes choisies avec l'autre source (outil de contrôle)
+  const e = Object.entries(m);
+  return 'Généré avec : ' + DATA_LABEL[S.dataSrc] + (e.length ? ' ; tulipes choisies avec ' + e.map(([l, c]) => l + ' (' + c + (c > 1 ? ' notes)' : ' note)')).join(', ') : '');
+};
 let saveTimer = null, saveWarned = false;
 
 function snapshot() {
@@ -2644,6 +2652,7 @@ function moveNoteTo(n, m) {
 }
 
 hit.on('click', e => {
+  if ($('#modalBg').classList.contains('free')) return;      // fenêtre qui laisse la carte active (comparaison de tulipes) : un clic sur la trace n'ajoute pas de note
   if (pickClick(e.latlng)) return;
   if (drawing) {
     if (tool === 'cut') cutAt(e.latlng);
@@ -5522,7 +5531,7 @@ function openModal(title, body, buttons, opts) {
     mf.appendChild(el);
   }
   if (!buttons || !buttons.length) mf.style.display = 'none';
-  m.style.transform = ''; $('#modalBg').classList.toggle('top', !!(opts && opts.top));      // top : fenêtre ancrée en haut (sa position ne change pas quand son contenu change) et fond plus clair
+  m.style.transform = ''; $('#modalBg').classList.toggle('top', !!(opts && opts.top)); $('#modalBg').classList.toggle('free', !!(opts && opts.free));      // free : la carte derrière reste utilisable (zoom, déplacement)      // top : fenêtre ancrée en haut (sa position ne change pas quand son contenu change) et fond plus clair
   $('#modalBg').classList.add('show');
   return m;
 }
@@ -5640,7 +5649,7 @@ function openHelp() {
 /* ---------- Contrôle des notes : compare deux sources de réseau routier autour de chaque note ----------
    Une « source » = { id, name, load(box) } où box = [sud, ouest, nord, est] et load renvoie [{ c: classe, pts: [[lat, lon], …] }].
    Pour ajouter un pays ou un fond : CTL.add('id', 'Nom affiché', async box => lignes). Elle apparaît alors dans les deux listes. */
-const CTL = { sources: {}, add(id, name, load) { this.sources[id] = { id, name, load }; } };
+const CTL = { sources: {}, add(id, name, load, mode, used) { this.sources[id] = { id, name, load, mode, used }; } };      // mode / used (facultatifs) : réglage « data » et clé G.used qui permettent de dessiner des tulipes avec cette source
 async function ctlTile(url, ms) {
   for (let t = 0; t < 4; t++) {
     const ac = new AbortController(), to = setTimeout(() => ac.abort(), ms || 20000);
@@ -5682,10 +5691,10 @@ CTL.add('bdtopo', 'BD TOPO (IGN)', async box => {
     if ((j.features || []).length < 5000) break;
   }
   return out;
-});
-CTL.add('planign', 'Plan IGN vectoriel (BD TOPO)', box => ctlMvt('https://data.geopf.fr/tms/1.0.0/PLAN.IGN/{z}/{x}/{y}.pbf', 15, box, ['routier_route', 'routier_chemin'], p => p.symbo || ''));
+}, 'ign', 'bdtopo');
+CTL.add('planign', 'Plan IGN vectoriel (BD TOPO)', box => ctlMvt('https://data.geopf.fr/tms/1.0.0/PLAN.IGN/{z}/{x}/{y}.pbf', 15, box, ['routier_route', 'routier_chemin'], p => p.symbo || ''), 'ign', 'bdtopo');
 CTL.add('ofm', 'OpenFreeMap (OSM)', box => ctlMvt('https://tiles.openfreemap.org/planet/latest/{z}/{x}/{y}.pbf', 14, box, ['transportation'],
-  p => /^(rail|transit|ferry|aerialway|pier)$/.test(p.class || '') ? null : (p.class || '') + (p.subclass ? '/' + p.subclass : '')));
+  p => /^(rail|transit|ferry|aerialway|pier)$/.test(p.class || '') ? null : (p.class || '') + (p.subclass ? '/' + p.subclass : '')), 'vt', 'ofm');
 
 /* Compare, autour d'une note, les voies de A et de B : longueur de voie de l'une absente de l'autre (tolérance 10 m, rayon 40 m) */
 function ctlNear(lines, lat0, lon0, R) {
@@ -5736,6 +5745,47 @@ async function ctlRun(idA, idB, out, setP) {
   }
   return { res, total: notes.length, na: la.length, nb: lb.length };
 }
+
+/* ---------- Comparer les deux tulipes d'une note signalée et choisir celle à garder ---------- */
+let CTLR = null;      // dernier contrôle : { a, b, res } (la liste reste disponible quand on revient de la comparaison)
+const ctlGraphs = {};
+async function ctlTulip(n, id) {      // tulipe de la note n dessinée avec le réseau de la source id (réseau du roadbook inchangé)
+  const src = CTL.sources[id]; if (!src || !src.mode) throw new Error('cette source ne sait pas dessiner de tulipe');
+  const g0 = G, d0 = S.settings.data;
+  try {
+    S.settings.data = src.mode;
+    const gk = ctlGraphs[src.mode];
+    if (gk && gk.key === graphKey()) G = gk;
+    else if (g0 && g0.key === graphKey()) G = g0;
+    else { G = null; await fetchOSM(() => {}, () => false); }
+    if (!G || G.used !== src.used) throw new Error('« ' + src.name + ' » indisponible pour le moment');
+    ctlGraphs[src.mode] = G;
+    const tmp = { ...n, src: null, tulip: null };
+    await redrawTulip(tmp, n.tulip && n.tulip.R || S.settings.tulipR);
+    return tmp.tulip;
+  } finally { S.settings.data = d0; G = g0; }
+}
+async function ctlCompare(i) {
+  const R = CTLR, x = R.res[i], n = x.n, A = CTL.sources[R.a], B = CTL.sources[R.b], idx = S.notes.indexOf(n) + 1;
+  map.setView([n.lat, n.lon], Math.max(map.getZoom(), 17)); selectNote(n.id, 'map');
+  const nav = [{ label: '← Liste', onClick: () => controlDialog() }, 'sp',
+    ...(i > 0 ? [{ label: '‹', onClick: () => ctlCompare(i - 1) }] : []), ...(i < R.res.length - 1 ? [{ label: '›', onClick: () => ctlCompare(i + 1) }] : [])];
+  const m = openModal(`Note ${idx} · km ${(n.s / 1000).toFixed(2)}`, `<div style="font-size:12px;color:#6b6558;margin-bottom:8px">${i + 1} sur ${R.res.length} · ${R.res.filter(r => r.pick).length} choisie${R.res.filter(r => r.pick).length > 1 ? 's' : ''}</div><div id="ctlCmp" style="font-size:13px;color:#8a8478">Dessin des deux tulipes…</div>`, nav, { top: true, free: true });
+  const box = m.querySelector('#ctlCmp');
+  try {
+    if (!x.ta) x.ta = await ctlTulip(n, R.a);
+    if (!x.tb) x.tb = await ctlTulip(n, R.b);
+  } catch (e) { box.textContent = 'Impossible de dessiner : ' + (e.message || e); return; }
+  if (!document.body.contains(box)) return;
+  const col = (id, S_, t, k) => `<div style="border:1px solid #e3dccb;border-radius:10px;padding:6px;text-align:center;${x.pick === k ? 'outline:3px solid #2e7d32;' : ''}"><div class="ctltul">${tulipSVG(t, 150)}</div><div style="font-size:13px;font-weight:600">${k === 'a' ? 'A' : 'B'} · ${esc(S_.name)}</div><div style="font-size:11px;color:#8a8478">${(k === 'a' ? x.ma : x.mb) > 25 ? Math.round(k === 'a' ? x.ma : x.mb) + ' m de voie en plus' : '&nbsp;'}</div><button class="mbtn primary" data-k="${k}" style="width:100%;margin-top:6px">Garder ${k === 'a' ? 'A' : 'B'}</button></div>`;
+  box.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${col(R.a, A, x.ta, 'a')}${col(R.b, B, x.tb, 'b')}</div>` + (x.pick ? `<div style="font-size:12px;color:#2e7d32;margin-top:6px">Tulipe ${x.pick === 'a' ? 'A' : 'B'} appliquée à la note.</div>` : '');
+  box.querySelectorAll('button[data-k]').forEach(b => b.onclick = () => {
+    const k = b.dataset.k, t = JSON.parse(JSON.stringify(k === 'a' ? x.ta : x.tb));
+    n.tulip = t; n.tulipEdited = true; n.edited = true; n.tsrc = CTL.sources[k === 'a' ? R.a : R.b].used || ''; x.pick = k;
+    renderAll(); selectNote(n.id, 'map'); save();
+    if (i < R.res.length - 1) ctlCompare(i + 1); else ctlCompare(i);
+  });
+}
 function controlDialog() {
   if (!S.notes.length) { toast('Génère d’abord le roadbook : le contrôle porte sur les notes.', 'err'); return; }
   const ids = Object.keys(CTL.sources), cur = CTL.sources[S.dataSrc] ? S.dataSrc : (/^(ign|ignd)$/.test(S.settings.data) ? 'bdtopo' : 'ofm'), opt = sel => ids.map(i => `<option value="${i}"${i === sel ? ' selected' : ''}>${esc(CTL.sources[i].name)}</option>`).join('');
@@ -5745,6 +5795,15 @@ function controlDialog() {
     <button class="mbtn primary" id="ctlGo" style="width:100%;margin:10px 0">Lancer le contrôle</button><div id="ctlP" style="font-size:12px;color:#8a8478"></div><div id="ctlOut" style="max-height:38vh;overflow:auto"></div>`,
     [{ label: 'Effacer les ⚠', onClick: ctlClear }, 'sp', { label: 'Fermer', cls: 'primary' }], { top: true });
   const go = $('#ctlGo'), P = $('#ctlP'), O = $('#ctlOut');
+  const showList = () => {
+    const { a, b, res } = CTLR, nm = i => CTL.sources[i].name;
+    P.textContent = CTLR.msg; ctlClear(); ctlLayer = L.layerGroup().addTo(map);
+    O.innerHTML = res.map((x, i) => `<div class="ctlrow" data-i="${i}" style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid #e3dccb;cursor:pointer"><span style="color:${x.pick ? '#2e7d32' : '#c25400'}">${x.pick ? '✓' : '⚠'}</span><div><b>Note ${S.notes.indexOf(x.n) + 1} · km ${(x.n.s / 1000).toFixed(2)}</b>${x.pick ? ' <span style="font-size:12px;color:#2e7d32">tulipe ' + (x.pick === 'a' ? 'A' : 'B') + ' gardée</span>' : ''}<div style="font-size:12px;color:#6b6558">${x.ma > 25 ? `« ${esc(nm(a))} » montre ${x.ma} m de voie absente de « ${esc(nm(b))} ». ` : ''}${x.mb > 25 ? `« ${esc(nm(b))} » montre ${x.mb} m de voie absente de « ${esc(nm(a))} ».` : ''}</div></div></div>`).join('') || '<div style="padding:10px 0">Aucune différence : les deux sources montrent les mêmes voies autour des notes.</div>';
+    res.forEach(x => L.marker([x.n.lat, x.n.lon], { icon: L.divIcon({ className: 'ctlw', html: x.pick ? '✓' : '⚠', iconSize: [22, 22] }), interactive: false }).addTo(ctlLayer));
+    O.querySelectorAll('.ctlrow').forEach(el => el.onclick = () => ctlCompare(+el.dataset.i));
+    if (res.length) O.insertAdjacentHTML('afterbegin', '<div style="font-size:12px;color:#6b6558;padding:2px 0 6px">Touche une ligne pour voir les deux tulipes et choisir celle à garder.</div>');
+  };
+  if (CTLR && CTLR.res.every(x => S.notes.includes(x.n))) { $('#ctlA').value = CTLR.a; $('#ctlB').value = CTLR.b; showList(); }
   go.onclick = async () => {
     const a = $('#ctlA').value, b = $('#ctlB').value;
     if (a === b) { P.textContent = 'Choisis deux sources différentes.'; return; }
@@ -5752,10 +5811,7 @@ function controlDialog() {
     try {
       const r = await ctlRun(a, b, O, t => P.textContent = t), nm = i => CTL.sources[i].name;
       P.textContent = `${r.total} notes contrôlées · ${r.res.length} à revérifier (${r.na} tronçons « ${nm(a)} », ${r.nb} « ${nm(b)} »).`;
-      ctlLayer = L.layerGroup().addTo(map);
-      O.innerHTML = r.res.map((x, i) => `<div class="ctlrow" data-i="${i}" style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid #e3dccb;cursor:pointer"><span style="color:#c25400">⚠</span><div><b>Note ${S.notes.indexOf(x.n) + 1} · km ${(x.n.s / 1000).toFixed(2)}</b><div style="font-size:12px;color:#6b6558">${x.ma > 25 ? `« ${esc(nm(a))} » montre ${x.ma} m de voie absente de « ${esc(nm(b))} ». ` : ''}${x.mb > 25 ? `« ${esc(nm(b))} » montre ${x.mb} m de voie absente de « ${esc(nm(a))} ».` : ''}</div></div></div>`).join('') || '<div style="padding:10px 0">Aucune différence : les deux sources montrent les mêmes voies autour des notes.</div>';
-      r.res.forEach(x => L.marker([x.n.lat, x.n.lon], { icon: L.divIcon({ className: 'ctlw', html: '⚠', iconSize: [22, 22] }), interactive: false }).addTo(ctlLayer));
-      O.querySelectorAll('.ctlrow').forEach(el => el.onclick = () => { const x = r.res[+el.dataset.i]; map.setView([x.n.lat, x.n.lon], Math.max(map.getZoom(), 17)); selectNote(x.n.id, 'map'); });
+      CTLR = { a, b, res: r.res, msg: P.textContent }; showList();
     } catch (e) { P.textContent = 'Contrôle impossible : ' + (e.message || e); }
     go.disabled = false;
   };
