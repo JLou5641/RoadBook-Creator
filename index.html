@@ -1018,6 +1018,11 @@ body.dragNote .leaflet-tooltip{display:none}
 .ctltul svg{width:100%;height:auto;display:block}
 #modalBg.free{background:transparent;pointer-events:none}
 #modalBg.free .modal{pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+.xopt{display:flex;gap:10px;align-items:flex-start;border:1px solid #d8cfba;border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.xopt.on{border:2px solid #2b6cb0;padding:9px 11px}
+.xopt input{margin-top:3px;flex:none}
+.xopt .xd{font-size:12px;color:#6b6558;margin-top:3px;line-height:1.4}
+.xopt .xw{font-size:12px;color:#b3261e;margin-top:3px;line-height:1.4}
 </style>
 </head>
 <body>
@@ -1025,7 +1030,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261108.1242</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261108.1303</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1054,7 +1059,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version v0.261108.1242</div>
+          <div class="ver">Version v0.261108.1303</div>
         </div>
       </div>
     </div>
@@ -5425,12 +5430,18 @@ function download(name, content, mime) {
   a.href = url; a.download = name; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
 }
-async function buildGPX(onProg) {
+async function gzipB64(txt) {      // texte -> gzip -> base64 (projet enregistré dans le GPX)
+  const buf = new Uint8Array(await new Response(new Blob([txt]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+  let b = ''; for (let i = 0; i < buf.length; i += 0x8000) b += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+  return btoa(b);
+}
+async function buildGPX(onProg, withProject) {
   const NS = 'http://www.openrally.org/xmlschemas/GpxExtensions/v1.0.3';
+  const proj = withProject ? await gzipB64(JSON.stringify(snapshot())) : '';      // projet complet : le GPX rouvert dans le générateur redonne le roadbook modifiable
   const o = [];
   o.push('<?xml version="1.0" encoding="UTF-8"?>');
-  o.push(`<gpx xmlns="http://www.topografix.com/GPX/1/1" creator="Generateur de Roadbook OSM" version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:openrally="${NS}" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd ${NS} http://www.openrally.org/xmlschemas/GpxExtensions/v1.0.3/openrally.xsd">`);
-  o.push(`  <metadata>\n    <name>${xmlEsc(S.name)}</name>${(S.desc || '').trim() || srcNote() ? `\n    <desc>${xmlEsc([(S.desc || '').trim(), srcNote()].filter(Boolean).join('\n'))}</desc>` : ''}\n    <time>${new Date().toISOString().replace(/\.\d+Z$/, 'Z')}</time>\n    <extensions>\n      <openrally:units>metric</openrally:units>\n      <openrally:distance>${km(T.L)}</openrally:distance>\n    </extensions>\n  </metadata>`);
+  o.push(`<gpx xmlns="http://www.topografix.com/GPX/1/1" creator="Generateur de Roadbook OSM" version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:openrally="${NS}" xmlns:rbgen="https://jlou5641.github.io/RoadBook-Creator/ns" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd ${NS} http://www.openrally.org/xmlschemas/GpxExtensions/v1.0.3/openrally.xsd">`);
+  o.push(`  <metadata>\n    <name>${xmlEsc(S.name)}</name>${(S.desc || '').trim() || srcNote() ? `\n    <desc>${xmlEsc([(S.desc || '').trim(), srcNote()].filter(Boolean).join('\n'))}</desc>` : ''}\n    <time>${new Date().toISOString().replace(/\.\d+Z$/, 'Z')}</time>\n    <extensions>\n      <openrally:units>metric</openrally:units>\n      <openrally:distance>${km(T.L)}</openrally:distance>${proj ? `\n      <rbgen:project encoding="gzip+base64">${proj}</rbgen:project>` : ''}\n    </extensions>\n  </metadata>`);
   let wpCount = 0;
   for (let i = 0; i < S.notes.length; i++) {
     const n = S.notes[i];
@@ -5489,12 +5500,21 @@ async function buildGPX(onProg) {
 }
 async function exportGPX() {
   if (!T || !S.notes.length) { toast('Génère d’abord le roadbook.', 'err'); return; }
+  let pk = 0; try { pk = Math.round((await gzipB64(JSON.stringify(snapshot()))).length / 1024); } catch (e) { }
+  const opt = (v, t, d, w, on) => `<label class="xopt${on ? ' on' : ''}"><input type="radio" name="xgpx" value="${v}"${on ? ' checked' : ''}><div><b>${t}</b><div class="xd">${d}</div>${w ? `<div class="xw">${w}</div>` : ''}</div></label>`;
+  const m = openModal('Exporter le GPX', `<div style="font-size:13px;color:#6b6558;margin-bottom:10px">Que veux-tu mettre dans le fichier ?</div>` +
+    opt('0', 'GPX roadbook seul', 'Pour ton lecteur et pour les pilotes. Fichier léger.', 'Aucune possibilité de reprendre et modifier le roadbook.', true) +
+    opt('1', 'GPX roadbook + projet', 'Pour le rouvrir plus tard dans l’éditeur et le modifier. Le lecteur ignore le projet.' + (pk ? ` Ajoute environ ${pk >= 1024 ? (pk / 1024).toFixed(1).replace('.', ',') + ' Mo' : pk + ' Ko'}.` : ''), '', false),
+    [{ label: 'Annuler' }, { label: 'Exporter', cls: 'primary', onClick: mm => runExport(+(mm.querySelector('input[name=xgpx]:checked') || {}).value === 1) }], { noEsc: false });
+  m.querySelectorAll('input[name=xgpx]').forEach(r => r.onchange = () => m.querySelectorAll('.xopt').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)));
+}
+async function runExport(withProject) {
   const m = openModal('Export GPX OpenRally', `<div id="pTxt">Dessin des tulipes…</div><div class="prog"><div id="pBar"></div></div>`, [], { noEsc: true });
   try {
-    const gpx = await buildGPX((i, n) => { const b = m.querySelector('#pBar'); if (b) b.style.width = Math.round(100 * i / n) + '%'; });
+    const gpx = await buildGPX((i, n) => { const b = m.querySelector('#pBar'); if (b) b.style.width = Math.round(100 * i / n) + '%'; }, withProject);
     closeModal();
     download(fileName('.gpx'), gpx, 'application/gpx+xml');
-    toast('GPX OpenRally exporté : ouvre-le dans ton lecteur de roadbook.', 'ok');
+    toast(withProject ? 'GPX exporté avec le projet : rouvre-le ici pour modifier le roadbook.' : 'GPX OpenRally exporté : ouvre-le dans ton lecteur de roadbook.', 'ok');
   } catch (e) { closeModal(); console.error(e); openModal('Export impossible', esc(e.message || e), [{ label: 'OK', cls: 'primary' }]); }
 }
 function printRB() {
@@ -5911,6 +5931,14 @@ async function loadFile(file) {
       if (drawing) setDrawing(false);
       restore(o); $('#rbName').value = S.name; HIST.length = 0; renderAll(); renderTrack(true); setDirty(false);
       toast('Projet ouvert.', 'ok'); return;
+    }
+    if (txt.includes('rbgen:project')) {      // GPX exporté « avec projet » : on rouvre le roadbook complet
+      try {
+        const el = new DOMParser().parseFromString(txt, 'application/xml').getElementsByTagNameNS('*', 'project')[0];
+        const bin = Uint8Array.from(atob(el.textContent.trim()), c => c.charCodeAt(0));
+        const o = JSON.parse(await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+        if (o && o.ll) { if (drawing) setDrawing(false); restore(o); $('#rbName').value = S.name; HIST.length = 0; renderAll(); renderTrack(true); setDirty(false); toast('Roadbook rouvert avec son projet.', 'ok'); return; }
+      } catch (e) { console.warn('projet du GPX illisible', e); }
     }
     const g = parseGPX(txt);
     if (g.ll.length < 2) throw new Error(g.wpts ? 'Ce GPX ne contient que des waypoints, pas de trace (trk). Utilise un GPX avec la trace du parcours, ou dessine-le.' : 'Aucune trace trouvée dans ce fichier.');
