@@ -9,9 +9,12 @@ const { chromium } = require('playwright'); const fs = require('fs'), path = req
   await p.waitForFunction(() => !/Génération/.test(document.querySelector('#modal').innerText) || !document.querySelector('#modalBg').classList.contains('show'), null, { timeout: 280000 });
   const gpx = await p.evaluate(async () => {
     const N = window.__rb.S.notes; const mk = (i, type, limit) => { N[i].wp = { type, limit, speed: 30 }; };
-    mk(5, 'dss', 25); mk(10, 'dt', 40); mk(15, 'dn', 12); mk(20, 'dss'); mk(25, 'ass', 9); mk(30, 'ch', 15);
+    mk(5, 'dss', 25); mk(10, 'dt', 40); mk(15, 'dn', 12); N[15].wp.open = 1200; N[15].wp.clear = 100; mk(20, 'dss'); mk(25, 'ass', 9); mk(30, 'ch', 15);
     return await window.__rb.buildGPX(() => {}, false);
   });
   const w = [...gpx.matchAll(/<wpt[\s\S]*?<\/wpt>/g)].map(m => m[0]).filter(x => /openrally:(dss|dt|dn|neutralization|ass|checkpoint)/.test(x));
   for (const x of w) console.log((x.match(/openrally:(dss|dt|dn|ass|checkpoint)/) || [])[1], '|', (x.match(/<openrally:(dss|dt|dn|ass|checkpoint|timecontrol|speed|neutralization)[^>]*>/g) || []).join(' '));
+  await p.evaluate(() => { const N = window.__rb.S.notes; N[16].wp = { type: 'dn', dur: 5 }; window.__rb.editNote(N[16].id); });
+  await p.waitForTimeout(600);
+  console.log('éditeur DN : rayons visibles', await p.isVisible('#eOpen'), 'valeurs', await p.inputValue('#eOpen'), await p.inputValue('#eClear'));
   console.log('erreurs', errs.join('|') || 0); await b.close(); })();
