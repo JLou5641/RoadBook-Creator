@@ -12,6 +12,6 @@ const { chromium } = require('playwright'); const fs = require('fs'), path = req
     mk(5, 'dss', 25); mk(10, 'dt', 40); mk(15, 'dn', 12); mk(20, 'dss'); mk(25, 'ass', 9); mk(30, 'ch', 15);
     return await window.__rb.buildGPX(() => {}, false);
   });
-  const w = [...gpx.matchAll(/<wpt[\s\S]*?<\/wpt>/g)].map(m => m[0]).filter(x => /openrally:(dss|dt|dn|ass|checkpoint)/.test(x));
+  const w = [...gpx.matchAll(/<wpt[\s\S]*?<\/wpt>/g)].map(m => m[0]).filter(x => /openrally:(dss|dt|dn|neutralization|ass|checkpoint)/.test(x));
   for (const x of w) console.log((x.match(/openrally:(dss|dt|dn|ass|checkpoint)/) || [])[1], '|', (x.match(/<openrally:(dss|dt|dn|ass|checkpoint|timecontrol|speed|neutralization)[^>]*>/g) || []).join(' '));
   console.log('erreurs', errs.join('|') || 0); await b.close(); })();
