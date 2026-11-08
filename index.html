@@ -1030,7 +1030,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261108.1437</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261108.1446</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1059,7 +1059,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version v0.261108.1437</div>
+          <div class="ver">Version v0.261108.1446</div>
         </div>
       </div>
     </div>
@@ -5462,7 +5462,7 @@ async function buildGPX(onProg, withProject) {
       if (t === 'dn') ex.push(`<openrally:dn${attrs(n.wp.open || 1000, n.wp.clear || 90)}/>`, `<openrally:neutralization>${Math.max(0, Math.round((n.wp.dur || 0) * 60))}</openrally:neutralization>`);
       else if (isRadiusWP(t)) {
         if (isNumberedWP(t)) wpCount++;
-        ex.push(`<openrally:${t === 'cp' ? 'checkpoint' : t}${attrs(n.wp.open, n.wp.clear, n.wp.name || (isNumberedWP(t) ? String(wpCount) : ''))}/>`);
+        ex.push(`<openrally:${t === 'cp' ? 'checkpoint' : t}${attrs(n.wp.open || WP_DEF[t][0], n.wp.clear || WP_DEF[t][1], n.wp.name || (isNumberedWP(t) ? String(wpCount) : ''))}/>`);
       }
       if (t === 'ch') {      // CH : marqueur « checkpoint » vide (aucun rayon) ; le temps limite de la liaison part de ce CH jusqu'au contrôle horaire suivant
         ex.push('<openrally:checkpoint/>');
