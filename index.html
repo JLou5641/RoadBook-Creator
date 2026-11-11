@@ -1023,6 +1023,10 @@ body.dragNote .leaflet-tooltip{display:none}
 .xopt input{margin-top:3px;flex:none}
 .xopt .xd{font-size:12px;color:#6b6558;margin-top:3px;line-height:1.4}
 .xopt .xw{font-size:12px;color:#b3261e;margin-top:3px;line-height:1.4}
+.svpop .leaflet-popup-content{margin:8px 10px;font:600 13px/1.3 system-ui,sans-serif}
+.svlnk{color:#3a2a14;text-decoration:none;display:block;padding:4px 2px}
+.svlnk:hover{text-decoration:underline}
+.svco{font:11px/1.2 ui-monospace,monospace;color:#6b6558;margin-top:2px}
 </style>
 </head>
 <body>
@@ -1030,7 +1034,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261108.1446</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261111.0958</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1059,7 +1063,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
-          <div class="ver">Version v0.261108.1446</div>
+          <div class="ver">Version v0.261111.0958</div>
         </div>
       </div>
     </div>
@@ -2052,13 +2056,14 @@ const srcNote = () => {
   if (!S.dataSrc || !DATA_LABEL[S.dataSrc]) return '';
   const m = {}; for (const n of S.notes) if (n.tsrc && n.tulipEdited && n.tsrc !== S.dataSrc && DATA_LABEL[n.tsrc]) m[DATA_LABEL[n.tsrc]] = (m[DATA_LABEL[n.tsrc]] || 0) + 1;      // tulipes choisies avec l'autre source (outil de contrôle)
   const e = Object.entries(m);
-  return 'Généré avec : ' + DATA_LABEL[S.dataSrc] + (e.length ? ' ; tulipes choisies avec ' + e.map(([l, c]) => l + ' (' + c + (c > 1 ? ' notes)' : ' note)')).join(', ') : '');
+  const dn = S.dataSrcN && S.dataSrcN !== S.dataSrc && DATA_LABEL[S.dataSrcN];      // tulipes et instructions de la 3e case issues de deux sources
+  return 'Généré avec : ' + (dn ? 'tulipes ' + DATA_LABEL[S.dataSrc] + ' · instructions ' + DATA_LABEL[S.dataSrcN] : DATA_LABEL[S.dataSrc]) + (e.length ? ' ; tulipes choisies avec ' + e.map(([l, c]) => l + ' (' + c + (c > 1 ? ' notes)' : ' note)')).join(', ') : '');
 };
 let saveTimer = null, saveWarned = false;
 
 function snapshot() {
   return { v: 2, name: S.name, desc: S.desc, src: S.src, ll: S.ll, mm: S.mm, ctrl: S.ctrl, segs: S.segs, notes: S.notes, settings: S.settings,
-    stale: S.stale, routeMode: S.routeMode, nextId: S.nextId, stages: S.stages, marks: S.marks, ele: S.ele, timing: S.timing, dataSrc: S.dataSrc || '', mySyms: MYS };
+    stale: S.stale, routeMode: S.routeMode, nextId: S.nextId, stages: S.stages, marks: S.marks, ele: S.ele, timing: S.timing, dataSrc: S.dataSrc || '', dataSrcN: S.dataSrcN || '', mySyms: MYS };
 }
 let dirty = false;
 function setDirty(v) { dirty = v; try { localStorage.setItem('rbgen.dirty', v ? '1' : ''); } catch (e) { } const b = document.getElementById('bSave'); if (b) { b.classList.toggle('dirty', v); b.title = v ? 'Modifications non sauvegardées dans un fichier : clique pour sauvegarder le projet' : 'Sauvegarder le projet en cours (fichier .json à rouvrir plus tard)'; } }
@@ -2093,7 +2098,7 @@ function restore(o) {
   S.routeMode = o.routeMode || 'trekking'; S.nextId = o.nextId || (Math.max(0, ...S.notes.map(n => n.id)) + 1); S.sel = null;
   for (let i = 1; i < S.ctrl.length; i++) if (S.segs[i - 1]) routeCache.set(segKey(S.ctrl[i - 1], S.ctrl[i], S.ctrl[i][2]), S.segs[i - 1]);
   if (o.mySyms) { regMySyms(o.mySyms); saveMySyms(); }      // symboles importés contenus dans le projet
-  S.stages = o.stages || []; S.marks = o.marks || []; S.ele = o.ele || null; S.timing = o.timing || null; S.dataSrc = o.dataSrc || ''; renderMarks();
+  S.stages = o.stages || []; S.marks = o.marks || []; S.ele = o.ele || null; S.timing = o.timing || null; S.dataSrc = o.dataSrc || ''; S.dataSrcN = o.dataSrcN || ''; renderMarks();
   G = null;
   S.mm = o.mm || null;
   setTrack(o.ll || [], true, true);
@@ -2451,7 +2456,7 @@ async function regenNoteAt(latlng, s2) {
     if (S.settings.followLvl !== 0 && !(S.settings.followLvl === undefined && S.settings.followRoad === false)) all = followRoad(all).notes;
     regenCache = { k: ck, all };
   }
-  const dist = x => x.span ? Math.max(0, x.span[0] - s2, s2 - x.span[1]) : Math.abs(x.s - s2);
+  const dist = x => x.span && x.span[1] - x.span[0] <= 60 ? Math.max(0, x.span[0] - s2, s2 - x.span[1]) : Math.abs(x.s - s2);      // note qui regroupe plusieurs carrefours (étendue longue) : on ne la recopie que si on clique près d'elle, sinon la tulipe est dessinée à l'endroit cliqué
   let best = null; for (const x of all) { const d = dist(x); if (d <= 10 && (!best || d < best.d)) best = { x, d }; }
   let note; const found = !!best;
   if (best) note = JSON.parse(JSON.stringify(best.x));
@@ -2723,6 +2728,14 @@ window.addEventListener('mouseup', () => { if (pendingIns && !stroke) { pendingI
   inp.addEventListener('blur', () => setTimeout(() => { list.style.display = 'none'; }, 150));
   L.DomEvent.disableClickPropagation(box); L.DomEvent.disableScrollPropagation(box);
 }
+
+/* ---------- Clic droit (ou appui long) sur la carte : ouvrir cet endroit dans Google Street View ---------- */
+map.on('contextmenu', e => {
+  const la = e.latlng.lat.toFixed(6), lo = e.latlng.lng.toFixed(6);
+  const url = `https://www.google.com/maps?q=&layer=c&cbll=${la},${lo}`;      // cbll : Google cale sur le panorama le plus proche (le lien « pano/viewpoint » donnait un écran noir)
+  L.popup({ closeButton: false, className: 'svpop', offset: [0, 4] }).setLatLng(e.latlng)
+    .setContent(`<a class="svlnk" href="${url}" target="_blank" rel="noopener">👁 Ouvrir dans Google Street View</a><div class="svco">${la}, ${lo}</div>`).openOn(map);
+});
 /* ============================================================
    6. Mode dessin & itinéraire
    ============================================================ */
@@ -3036,7 +3049,8 @@ function liveServers() {               // serveurs qui répondent (on n'attend p
 async function overpass(q, isCancelled, first, servers) {
   const list = servers && servers.length ? servers : OVERPASS;
   let lastErr = null;
-  for (let round = 0; round < 2; round++) for (let k = 0; k < list.length; k++) {
+  for (let round = 0; round < 4; round++) for (let k = 0; k < list.length; k++) {      // 4 tours, attente qui double entre deux tours (serveurs saturés : consigne d'Overpass)
+    if (k === 0 && round > 0) await sleep(2000 * 2 ** (round - 1));
     const ep = list[(k + (first || 0)) % list.length];
     if (isCancelled()) throw new Error('annulé');
     try {
@@ -3192,7 +3206,7 @@ function failReason(e) {                 // raison courte et lisible d'un échec
 }
 async function fetchOSM(progress, isCancelled) {      // mode rapide (fond vectoriel) par défaut ; IGN ou détaillé au choix ; les autres en secours
   const want = /^(osm|ign|ignd)$/.test(S.settings.data) ? S.settings.data : 'vt';
-  const order = want === 'ignd' ? ['ignd', 'vt', 'osm'] : want === 'ign' ? ['ign', 'vt', 'osm'] : want === 'vt' ? ['vt', 'osm'] : ['osm'];
+  const order = want === 'ignd' ? ['ignd', 'vt', 'osm'] : want === 'ign' ? ['ign', 'vt', 'osm'] : want === 'vt' ? ['vt', 'osm'] : ['osm', 'vt'];      // OSM détaillé saturé : repli sur le fond vectoriel (avec message)
   const NAME = { ignd: 'BD TOPO de l’IGN (détaillé)', ign: 'BD TOPO de l’IGN', vt: 'Fond vectoriel', osm: 'OpenStreetMap détaillé' }, FN = { ignd: (p, c) => fetchIGN(p, c, true), ign: fetchIGN, vt: fetchVT, osm: fetchOverpass };
   for (let i = 0; i < order.length; i++) {
     try { return await FN[order[i]](progress, isCancelled); }
@@ -3200,7 +3214,7 @@ async function fetchOSM(progress, isCancelled) {      // mode rapide (fond vecto
       if (isCancelled() || /annulé/.test(e.message || '') || i === order.length - 1) throw e;
       console.warn(NAME[order[i]] + ' indisponible', e);
       const why = failReason(e);
-      toast(`${NAME[order[i]]} ${/hors de France/.test(e.message || '') ? 'absente ici (hors de France ?)' : 'indisponible'}${why ? ' — ' + why : ''} : passage au mode ${order[i + 1] === 'vt' ? 'rapide' : 'détaillé (plus lent)'}.`, 'err');
+      genWarn(`${NAME[order[i]]} ${/hors de France/.test(e.message || '') ? 'absente ici (hors de France ?)' : 'indisponible'}${why ? ' — ' + why : ''} : passage au mode ${order[i + 1] === 'vt' ? 'rapide' : 'détaillé (plus lent)'}.`, 'err');
       lastFail = `${NAME[order[i]]} : ${why || e.message || e}`;
     }
   }
@@ -3372,8 +3386,8 @@ async function fetchIGN(progress, isCancelled, detail) {
   G.key = key; G.used = 'bdtopo';
   G.diag = `mode IGN${detail ? ' détaillé' : ''} : BD TOPO® (© IGN, Licence Ouverte) · ${cells.length} cases (${cached} en mémoire) · ${G.ways.length} chemins retenus` + (detail ? ` · ${extra.feats.length} repères` : '')
     + (skippedLayers.size ? ` · non chargés : ${[...skippedLayers].join(', ')}` : '') + (extra.failed.size ? ` · repères non chargés : ${[...extra.failed].map(c => IGN_XNAME[c]).join(', ')}` : '');
-  if (extra.failed.size) toast(`Repères IGN non chargés (${[...extra.failed].map(c => IGN_XNAME[c]).join(', ')}) : le service ne répond pas. Les routes sont bien là ; régénère plus tard pour les avoir.`, 'err');
-  if (skippedLayers.size) toast(`BD TOPO : ${[...skippedLayers].join(' et ')} non chargés (le service ne répond pas), les routes sont bien là.`, 'err');
+  if (extra.failed.size) genWarn(`Repères IGN non chargés (${[...extra.failed].map(c => IGN_XNAME[c]).join(', ')}) : le service ne répond pas. Les routes sont bien là ; régénère plus tard pour les avoir.`, 'err');
+  if (skippedLayers.size) genWarn(`BD TOPO : ${[...skippedLayers].join(' et ')} non chargés (le service ne répond pas), les routes sont bien là.`, 'err');
   return G;
 }
 /* ---------- Mode rapide : tuiles vectorielles OpenFreeMap (schéma OpenMapTiles), gardées dans le navigateur ---------- */
@@ -5354,11 +5368,24 @@ async function generate() {
   if (drawing) setDrawing(false);
   if (!T) { toast('Charge une trace GPX ou dessine un parcours d’abord.', 'err'); return; }
   if (routing) { toast('Patiente, l’itinéraire est encore en calcul…'); return; }
-  runGenerate();
+  const SRC = [['ign', 'BD TOPO (IGN)', 'Réseau très fidèle en France'], ['vt', 'OpenFreeMap vectoriel (OSM)', 'Rapide, partout dans le monde'], ['osm', 'OSM détaillé (Overpass)', 'Noms de routes, ponts, numéros : le plus complet']];
+  const cur = S.settings.data, curN = S.settings.dataN || cur;
+  const sel = (id, v) => `<select id="${id}" style="width:100%">${SRC.map(([k, l]) => `<option value="${k}"${k === v ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
+  openModal('Générer le roadbook', `<div style="font-size:13px;color:#6b6558;margin-bottom:12px;line-height:1.4">Choisis la source de chaque partie. Tu peux prendre la même pour les deux.</div>
+    <div style="font-size:13px;font-weight:600;margin:0 0 4px">Tulipes (fidélité des routes et chemins)</div>${sel('gsT', cur)}
+    <div style="font-size:13px;font-weight:600;margin:12px 0 4px">Instructions de la 3e case (noms, ponts, numéros…)</div>${sel('gsN', curN)}
+    <div id="gsH" style="font-size:12px;color:#6b6558;margin-top:10px;line-height:1.4"></div>
+    <div id="gsW" style="display:none;margin-top:10px;padding:8px 10px;border-radius:8px;background:rgba(224,138,0,.14);font-size:12px;line-height:1.4"><b>⚠ Fichier ouvert en local :</b> OSM détaillé (Overpass) refuse souvent les pages sans adresse web. Utilise plutôt la Web App (GitHub), ou choisis BD TOPO / OpenFreeMap.</div>`,
+    [{ label: 'Annuler' }, { label: 'Générer', cls: 'primary', onClick: m => { S.settings.data = m.querySelector('#gsT').value; S.settings.dataN = m.querySelector('#gsN').value === S.settings.data ? '' : m.querySelector('#gsN').value; runGenerate(); } }]);
+  const mm = $('#modal'), hint = () => { const a = mm.querySelector('#gsT').value, b = mm.querySelector('#gsN').value, nm = k => SRC.find(x => x[0] === k)[1]; mm.querySelector('#gsH').textContent = a === b ? 'Une seule source : ' + nm(a) + '.' : 'Le descriptif indiquera : « Tulipes : ' + nm(a) + ' · Instructions : ' + nm(b) + ' ».';
+    const w = mm.querySelector('#gsW'); if (w) w.style.display = location.protocol === 'file:' && (a === 'osm' || b === 'osm') ? '' : 'none'; };
+  mm.querySelector('#gsT').onchange = mm.querySelector('#gsN').onchange = hint; hint();
 }
 const keepOnRegen = n => !n.auto || n.moved || n.edited || n.wp || n.zone || n.fuel || (n.sym && n.sym.length) || (n.lex && n.lex.length) || n.tpos || n.tulipEdited || n.symLocked;
+let GENLOG = [];
+function genWarn(msg) { GENLOG.push(msg); toast(msg, 'err'); }      // avertissements de la génération, repris dans le rapport final
 async function runGenerate() {
-  cancelGen = false;
+  cancelGen = false; GENLOG = [];
   const m = openModal('Génération du roadbook', `<div id="pTxt">Préparation…</div><div class="prog"><div id="pBar"></div></div>`, [{ label: 'Annuler', onClick: () => { cancelGen = true; } }], { noEsc: true });
   const t0 = Date.now(); let lastTxt = 'Préparation…';
   const show = () => { const t = m.querySelector('#pTxt'); if (t) t.textContent = lastTxt + ' · ' + Math.round((Date.now() - t0) / 1000) + ' s'; };
@@ -5388,19 +5415,38 @@ async function runGenerate() {
     const manual = S.notes.filter(keepOnRegen);      // notes ajoutées, déplacées ou modifiées à la main (texte, symboles, waypoint, zone, danger, tulipe, cap…) : jamais supprimées
     const kept = new Set(manual.map(n => n.kind));
     const all = [...(kept.has('start') ? [] : [startNote()]), ...jn, ...bends, ...(kept.has('end') ? [] : [endNote()])].filter(n => !manual.some(m => m.kind !== 'start' && m.kind !== 'end' && n.kind !== 'start' && n.kind !== 'end' && Math.abs(m.s - n.s) < 30)).sort((a, b) => a.s - b.s);      // on ne recrée pas une note automatique juste à côté d'une note gardée
+    const G0 = G, dT = S.settings.data, dN = S.settings.dataN;      // source des tulipes ; les instructions de la 3e case peuvent venir d'une autre source
+    S.dataSrcN = '';
+    if (dN && dN !== dT) {
+      prog('Chargement de la source des instructions…', 0.96);
+      try {
+        S.settings.data = dN; G = null;
+        await fetchOSM((f, txt) => prog(txt, 0.96), () => cancelGen);
+        if (cancelGen) throw new Error('annulé');
+        if (G && G.ways && G.ways.length) S.dataSrcN = G.used || ''; else G = G0;
+      } catch (e) { if (/annulé/.test(e.message || '')) throw e; console.warn('source des instructions indisponible', e); G = G0; genWarn('Source des instructions indisponible : la source des tulipes est utilisée.'); }
+      finally { S.settings.data = dT; }
+    }
     let rep = null;
     if (S.settings.pois || S.settings.landmarks) { prog('Ajout des repères (gués, ponts, villages…)', 0.97); await sleep(10); rep = osmExtras(G, all); }
     addTrackNames(all);
     let fr = null;
     if (S.settings.followLvl !== 0 && !(S.settings.followLvl === undefined && S.settings.followRoad === false)) { fr = followRoad(all); all.length = 0; all.push(...fr.notes); }
+    G = G0;      // le réseau des tulipes reste celui du roadbook (retouche des tulipes)
     S.notes = [...all, ...manual];
     S.stale = false; S.sel = null;
     closeModal(); renderTrack(); renderAll();
     if (S.notes.length > 1) map.fitBounds(line.getBounds(), { padding: [40, 40] });
     const pc = Math.round(ratio * 100);
     const nk = manual.length, nr = all.length;
-    toast(`${nk ? nk + (nk > 1 ? ' notes gardées' : ' note gardée') + ' (modifiées ou ajoutées à la main), ' + nr + (nr > 1 ? ' recalculées' : ' recalculée') + '. ' : ''}${S.notes.length} notes : ${jn.length} intersection${jn.length > 1 ? 's' : ''}${bends.length ? ', ' + bends.length + (bends.length > 1 ? ' virages serrés' : ' virage serré') : ''}${rep && rep.events ? ', ' + rep.events + ' repères' : ''}. ${S.settings.tol === 0 ? 'Trace non recalée.' : 'Parcours reconnu sur les chemins : ' + pc + ' %.'}`, 'ok');
-    if (pc < 60 && S.settings.tol !== 0) openModal('Parcours peu reconnu', `Seulement <b>${pc} %</b> de ta trace a pu être recalée sur les chemins OpenStreetMap (trait noir sur la carte) : les intersections ne sont repérées que sur cette partie.<br><br>Si ta trace a été dessinée à main levée ou s’écarte des chemins, augmente <b>« Écart maxi trace ↔ chemins »</b> dans ⋯ › Réglages (par ex. 70 m), puis régénère. Les portions hors-piste ou absentes d’OpenStreetMap restent sans intersection.`, [{ label: 'OK', cls: 'primary' }]);
+    const rows = [`<b>${S.notes.length} notes</b> : ${jn.length} intersection${jn.length > 1 ? 's' : ''}${bends.length ? ', ' + bends.length + (bends.length > 1 ? ' virages serrés' : ' virage serré') : ''}${rep && rep.events ? ', ' + rep.events + ' repères' : ''}.`];
+    if (nk) rows.push(`${nk} note${nk > 1 ? 's gardées' : ' gardée'} (modifiées ou ajoutées à la main), ${nr} recalculée${nr > 1 ? 's' : ''}.`);
+    rows.push(S.settings.tol === 0 ? 'Trace non recalée.' : `Parcours reconnu sur les chemins : <b>${pc} %</b>.`);
+    const sn = typeof srcNote === 'function' ? srcNote() : ''; if (sn) rows.push(esc(sn) + '.');
+    let html = rows.map(r => `<p style="margin:0 0 6px">${r}</p>`).join('');
+    if (GENLOG.length) html += `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(224,138,0,.14)"><b>À savoir :</b><ul style="margin:4px 0 0 18px;padding:0">${GENLOG.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`;
+    if (pc < 60 && S.settings.tol !== 0) html += `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(224,138,0,.14)"><b>Parcours peu reconnu.</b> Seulement ${pc} % de ta trace a pu être recalée sur les chemins (trait noir sur la carte) : les intersections ne sont repérées que sur cette partie. Si la trace a été dessinée à main levée, augmente <b>« Écart maxi trace ↔ chemins »</b> dans ⋯ › Réglages (par ex. 70 m), puis régénère.</div>`;
+    openModal(GENLOG.length || (pc < 60 && S.settings.tol !== 0) ? 'Roadbook généré — rapport (avec avertissements)' : 'Roadbook généré — rapport', html, [{ label: 'Fermer', cls: 'primary' }]);
   } catch (e) {
     closeModal();
     if (e.message === 'annulé') { toast('Génération annulée.'); return; }
@@ -6516,7 +6562,7 @@ $('#moreMenu').addEventListener('click', e => {
   else if (act === 'new') ask('Nouveau roadbook ?', 'Le parcours et les notes en cours seront effacés (pense à exporter ou enregistrer le projet avant).', 'Tout effacer', () => {
     if (drawing) setDrawing(false);
     S.stages = []; S.ele = null; S.marks = []; renderMarks(); candLayer.clearLayers();
-    S.name = 'Mon roadbook'; S.desc = ''; S.dataSrc = ''; S.src = ''; S.ctrl = []; S.segs = []; S.notes = []; S.stale = false; S.sel = null;
+    S.name = 'Mon roadbook'; S.desc = ''; S.dataSrc = ''; S.dataSrcN = ''; S.src = ''; S.ctrl = []; S.segs = []; S.notes = []; S.stale = false; S.sel = null;
     $('#rbName').value = S.name; setTrack([], true); renderAll();
   });
 });
@@ -6548,7 +6594,7 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
 })();
 
 // accès pour les tests automatisés
-window.__rb = { tulipEditor, measureForNote, openMeasure, measureAtLL, bendList, bendAt, editNote, altDialog, view3D, cleanEle, timeSeries, timeAt, buildGPX, stagesDialog, stageList, addStage, marksDialog, markForm, pickTrack, parseGPX, cutAt, reverseCtrl, mergeFile, reduceDialog, snapDialog, cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, addManualNote, notesSVG, renderAll, renderRadii, noteRadii };
+window.__rb = { pointAt, inv, tulipEditor, measureForNote, openMeasure, measureAtLL, bendList, bendAt, editNote, altDialog, view3D, cleanEle, timeSeries, timeAt, buildGPX, stagesDialog, stageList, addStage, marksDialog, markForm, pickTrack, parseGPX, cutAt, reverseCtrl, mergeFile, reduceDialog, snapDialog, cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, addManualNote, notesSVG, renderAll, renderRadii, noteRadii };
 })();
 
 // Version installable (PWA) : actif seulement quand la page est servie en https (pas en fichier local)
