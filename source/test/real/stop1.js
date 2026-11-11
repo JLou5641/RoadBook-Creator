@@ -7,6 +7,7 @@ const scen = {
   'stop sur la piste (noeud propre à la piste, 1008)': e => { e.find(x => x.id === 1008).tags = { highway: 'stop' }; },
   'stop sur la route principale (noeud propre 1003)': e => { e.find(x => x.id === 1003).tags = { highway: 'stop' }; },
   'stop partagé, direction=backward (contraire au sens)': e => { e.find(x => x.id === 1004).tags = { highway: 'stop', direction: 'backward' }; },
+  'route principale coupée au carrefour + stop (doit être ignoré)': e => { const w = e.find(x => x.id === 5000); const i = w.nodes.indexOf(1004); e.push({ type: 'way', id: 5002, nodes: w.nodes.slice(i), tags: { ...w.tags } }); w.nodes = w.nodes.slice(0, i + 1); e.find(x => x.id === 1004).tags = { highway: 'give_way' }; },
   'cédez-le-passage sur noeud partagé': e => { e.find(x => x.id === 1004).tags = { highway: 'give_way' }; },
 };
 (async () => { const b = await chromium.launch();
