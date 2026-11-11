@@ -1034,7 +1034,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261111.1050</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261111.1206</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1064,7 +1064,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
           <button data-act="manual">📖 Manuel d'utilisation</button>
-          <div class="ver">Version v0.261111.1050</div>
+          <div class="ver">Version v0.261111.1206</div>
         </div>
       </div>
     </div>
@@ -2071,11 +2071,18 @@ function setDirty(v) { dirty = v; try { localStorage.setItem('rbgen.dirty', v ? 
 /* Historique : un instantané du projet après chaque modification (40 max), pour le bouton « Annuler » */
 const HIST = [];
 function updUndo() { const b = document.getElementById('bUndo'); if (b) b.disabled = HIST.length < 2; }
-function histPush(str) { if (HIST.length && HIST[HIST.length - 1] === str) return; HIST.push(str); if (HIST.length > 40) HIST.shift(); updUndo(); }
+function histPush(str) { if (HIST.length && HIST[HIST.length - 1] === str) return; HIST.push(str); const mx = str.length > 3e6 ? 6 : 40; while (HIST.length > mx) HIST.shift(); updUndo(); }      // gros projet : moins d'étapes d'annulation gardées en mémoire
+const ProjDB = (() => {      // sauvegarde automatique des gros projets (IndexedDB, bien plus de place que localStorage)
+  let dbp = null; const open = () => dbp || (dbp = new Promise(res => { try { const r = indexedDB.open('rbgen-proj', 1); r.onupgradeneeded = () => r.result.createObjectStore('p'); r.onsuccess = () => res(r.result); r.onerror = r.onblocked = () => res(null); } catch (e) { res(null); } }));
+  const run = (mode, fn) => open().then(db => new Promise(res => { if (!db) return res(null); try { const tx = db.transaction('p', mode); let out = null; const rq = fn(tx.objectStore('p')); if (rq) rq.onsuccess = () => { out = rq.result; }; tx.oncomplete = () => res(out === null ? true : out); tx.onerror = tx.onabort = () => res(null); } catch (e) { res(null); } }));
+  return { has: false, put: str => run('readwrite', st => st.put(str, 'cur')), get: () => run('readonly', st => st.get('cur')).then(v => (typeof v === 'string' ? v : null)), del: () => run('readwrite', st => st.delete('cur')) };
+})();
 function doSave() {
   const str = JSON.stringify(snapshot());
-  try { localStorage.setItem(LS_KEY, str); }
-  catch (e) { if (!saveWarned) { saveWarned = true; toast('Sauvegarde auto impossible (projet trop gros) : utilise « Sauvegarder ».'); } }
+  let ok = false;
+  try { localStorage.setItem(LS_KEY, str); ok = true; if (ProjDB.has) { ProjDB.has = false; ProjDB.del(); } }
+  catch (e) { }
+  if (!ok) ProjDB.put(str).then(r => { if (r) { ProjDB.has = true; try { localStorage.removeItem(LS_KEY); } catch (_) { } } else if (!saveWarned) { saveWarned = true; toast('Sauvegarde auto impossible (projet trop gros) : utilise « Sauvegarder ».'); } });      // gros projet : trop lourd pour localStorage (~5 Mo) → IndexedDB
   histPush(str);
 }
 function save() {
@@ -3215,7 +3222,7 @@ async function fetchOSM(progress, isCancelled) {      // mode rapide (fond vecto
       if (isCancelled() || /annulé/.test(e.message || '') || i === order.length - 1) throw e;
       console.warn(NAME[order[i]] + ' indisponible', e);
       const why = failReason(e);
-      genWarn(`${NAME[order[i]]} ${/hors de France/.test(e.message || '') ? 'absente ici (hors de France ?)' : 'indisponible'}${why ? ' — ' + why : ''} : passage au mode ${order[i + 1] === 'vt' ? 'rapide' : 'détaillé (plus lent)'}.`, 'err');
+      genWarn(`${NAME[order[i]]} ${/hors de France/.test(e.message || '') ? 'absente ici (hors de France ?)' : 'indisponible'}${why ? ' — ' + why : ''} : passage au mode ${order[i + 1] === 'vt' ? 'rapide' : 'détaillé (plus lent)'}.${order[i] === 'osm' && location.protocol === 'file:' ? ' Cause probable : fichier ouvert en local, Overpass refuse ces pages — utilise la Web App (' + WEBAPP_URL + ').' : ''}`, 'err');
       lastFail = `${NAME[order[i]]} : ${why || e.message || e}`;
     }
   }
@@ -5376,7 +5383,7 @@ async function generate() {
     <div style="font-size:13px;font-weight:600;margin:0 0 4px">Tulipes (fidélité des routes et chemins)</div>${sel('gsT', cur)}
     <div style="font-size:13px;font-weight:600;margin:12px 0 4px">Instructions de la 3e case (noms, ponts, numéros…)</div>${sel('gsN', curN)}
     <div id="gsH" style="font-size:12px;color:#6b6558;margin-top:10px;line-height:1.4"></div>
-    <div id="gsW" style="display:none;margin-top:10px;padding:8px 10px;border-radius:8px;background:rgba(224,138,0,.14);font-size:12px;line-height:1.4"><b>⚠ Fichier ouvert en local :</b> OSM détaillé (Overpass) refuse souvent les pages sans adresse web. Utilise plutôt la Web App (GitHub), ou choisis BD TOPO / OpenFreeMap.</div>`,
+    <div id="gsW" style="display:none;margin-top:10px;padding:8px 10px;border-radius:8px;background:rgba(224,138,0,.14);font-size:12px;line-height:1.4"><b>⚠ Fichier ouvert en local :</b> OSM détaillé (Overpass) refuse souvent les pages sans adresse web. Utilise plutôt la Web App (GitHub), ou choisis BD TOPO / OpenFreeMap.<br><a href="${WEBAPP_URL}" target="_blank" rel="noopener" style="font-weight:700">🌐 Ouvrir la Web App</a> <span style="opacity:.8">(enregistre d'abord ton projet avec 🗂️, puis rouvre-le là-bas)</span></div>`,
     [{ label: 'Annuler' }, { label: 'Générer', cls: 'primary', onClick: m => { S.settings.data = m.querySelector('#gsT').value; S.settings.dataN = m.querySelector('#gsN').value === S.settings.data ? '' : m.querySelector('#gsN').value; runGenerate(); } }]);
   const mm = $('#modal'), hint = () => { const a = mm.querySelector('#gsT').value, b = mm.querySelector('#gsN').value, nm = k => SRC.find(x => x[0] === k)[1]; mm.querySelector('#gsH').textContent = a === b ? 'Une seule source : ' + nm(a) + '.' : 'Le descriptif indiquera : « Tulipes : ' + nm(a) + ' · Instructions : ' + nm(b) + ' ».';
     const w = mm.querySelector('#gsW'); if (w) w.style.display = location.protocol === 'file:' && (a === 'osm' || b === 'osm') ? '' : 'none'; };
@@ -5384,6 +5391,14 @@ async function generate() {
 }
 const keepOnRegen = n => !n.auto || n.moved || n.edited || n.wp || n.zone || n.fuel || (n.sym && n.sym.length) || (n.lex && n.lex.length) || n.tpos || n.tulipEdited || n.symLocked;
 let GENLOG = [];
+const WEBAPP_URL = 'https://jlou5641.github.io/RoadBook-Creator/';
+function reportText(m) {      // rapport de génération en texte brut (copie / fichier .txt)
+  const body = m.querySelector('.mb').cloneNode(true);
+  body.querySelectorAll('li').forEach(li => { li.prepend('• '); li.append('\n'); });
+  body.querySelectorAll('p,div').forEach(e => e.append('\n'));
+  const v = document.querySelector('.ver'), nm = ($('#rbName') || {}).value || '';
+  return [m.querySelector('h2').textContent, (nm ? nm + ' — ' : '') + new Date().toLocaleString('fr-FR') + (v ? ' — ' + v.textContent.trim() : ''), '', body.textContent.replace(/\n{3,}/g, '\n\n').trim()].join('\n') + '\n';
+}
 function genWarn(msg) { GENLOG.push(msg); toast(msg, 'err'); }      // avertissements de la génération, repris dans le rapport final
 async function runGenerate() {
   cancelGen = false; GENLOG = [];
@@ -5447,7 +5462,10 @@ async function runGenerate() {
     let html = rows.map(r => `<p style="margin:0 0 6px">${r}</p>`).join('');
     if (GENLOG.length) html += `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(224,138,0,.14)"><b>À savoir :</b><ul style="margin:4px 0 0 18px;padding:0">${GENLOG.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`;
     if (pc < 60 && S.settings.tol !== 0) html += `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(224,138,0,.14)"><b>Parcours peu reconnu.</b> Seulement ${pc} % de ta trace a pu être recalée sur les chemins (trait noir sur la carte) : les intersections ne sont repérées que sur cette partie. Si la trace a été dessinée à main levée, augmente <b>« Écart maxi trace ↔ chemins »</b> dans ⋯ › Réglages (par ex. 70 m), puis régénère.</div>`;
-    openModal(GENLOG.length || (pc < 60 && S.settings.tol !== 0) ? 'Roadbook généré — rapport (avec avertissements)' : 'Roadbook généré — rapport', html, [{ label: 'Fermer', cls: 'primary' }]);
+    openModal(GENLOG.length || (pc < 60 && S.settings.tol !== 0) ? 'Roadbook généré — rapport (avec avertissements)' : 'Roadbook généré — rapport', html, [
+      { label: '📋 Copier', keep: 1, onClick: (m, el) => { const t = reportText(m); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { el.textContent = '✓ Copié'; }, () => { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); el.textContent = '✓ Copié'; } catch (_) { el.textContent = 'Copie impossible'; } ta.remove(); }); } },
+      { label: '💾 Enregistrer (.txt)', keep: 1, onClick: m => { download('rapport-roadbook-' + new Date().toISOString().slice(0, 10) + '.txt', reportText(m), 'text/plain'); } },
+      'sp', { label: 'Fermer', cls: 'primary' }]);
   } catch (e) {
     closeModal();
     if (e.message === 'annulé') { toast('Génération annulée.'); return; }
@@ -5462,10 +5480,31 @@ async function runGenerate() {
 /* ============================================================
    12. Export GPX OpenRally, impression, projet
    ============================================================ */
+/* PNG à palette (64 couleurs) : les tulipes et notes sont des dessins à aplats, ~4 fois plus légers qu'un PNG en millions de couleurs (GPX de 700 notes : ~28 Mo → ~7 Mo) */
+const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(b) { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC_T[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+async function pngPalette(cv, maxCol) {
+  const w = cv.width, h = cv.height, d = cv.getContext('2d').getImageData(0, 0, w, h).data;
+  const cnt = new Map();      // couleurs regroupées sur 5 bits par canal, comptées
+  for (let i = 0; i < d.length; i += 4) { const k = ((d[i] >> 3) << 10) | ((d[i + 1] >> 3) << 5) | (d[i + 2] >> 3); cnt.set(k, (cnt.get(k) || 0) + 1); }
+  const pal = [...cnt.entries()].sort((a, b) => b[1] - a[1]).slice(0, maxCol).map(e => e[0]);
+  const rgb = k => [((k >> 10) & 31) * 255 / 31 | 0, ((k >> 5) & 31) * 255 / 31 | 0, (k & 31) * 255 / 31 | 0];
+  const P = pal.map(rgb), idx = new Map(), raw = new Uint8Array((w + 1) * h);
+  const near = k => { let r = idx.get(k); if (r !== undefined) return r; const [R, G, B] = rgb(k); let best = 0, bd = 1e9; for (let j = 0; j < P.length; j++) { const dd = (P[j][0] - R) ** 2 + (P[j][1] - G) ** 2 + (P[j][2] - B) ** 2; if (dd < bd) { bd = dd; best = j; } } idx.set(k, best); return best; };
+  for (let y = 0; y < h; y++) { raw[y * (w + 1)] = 0; for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; raw[y * (w + 1) + 1 + x] = near(((d[i] >> 3) << 10) | ((d[i + 1] >> 3) << 5) | (d[i + 2] >> 3)); } }
+  const z = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
+  const chunk = (type, data) => { const o = new Uint8Array(12 + data.length), v = new DataView(o.buffer); v.setUint32(0, data.length); for (let i = 0; i < 4; i++) o[4 + i] = type.charCodeAt(i); o.set(data, 8); v.setUint32(8 + data.length, crc32(o.subarray(4, 8 + data.length))); return o; };
+  const ihdr = new Uint8Array(13), hv = new DataView(ihdr.buffer); hv.setUint32(0, w); hv.setUint32(4, h); ihdr[8] = 8; ihdr[9] = 3;
+  const plte = new Uint8Array(P.length * 3); P.forEach((c, i) => plte.set(c, i * 3));
+  const parts = [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('PLTE', plte), chunk('IDAT', z), chunk('IEND', new Uint8Array(0))];
+  let n = 0; for (const p of parts) n += p.length; const out = new Uint8Array(n); n = 0; for (const p of parts) { out.set(p, n); n += p.length; }
+  let b = ''; for (let i = 0; i < out.length; i += 0x8000) b += String.fromCharCode.apply(null, out.subarray(i, i + 0x8000));
+  return 'data:image/png;base64,' + btoa(b);
+}
 function svgToPNG(svg, w, h) {
   return new Promise((res, rej) => {
     const img = new Image();
-    img.onload = () => { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.drawImage(img, 0, 0, w, h); res(c.toDataURL('image/png')); };
+    img.onload = () => { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.drawImage(img, 0, 0, w, h); pngPalette(c, 64).then(res, () => res(c.toDataURL('image/png'))); };
     img.onerror = () => rej(new Error('rendu de l’image impossible'));
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   });
@@ -5594,7 +5633,7 @@ function openModal(title, body, buttons, opts) {
   for (const b of buttons || []) {
     if (b === 'sp') { const sp = document.createElement('span'); sp.className = 'sp'; mf.appendChild(sp); continue; }
     const el = document.createElement('button'); el.className = 'mbtn ' + (b.cls || ''); el.textContent = b.label;
-    el.onclick = () => { modalOpts = null; closeModal(); if (b.onClick) b.onClick(m); };
+    el.onclick = () => { if (!b.keep) { modalOpts = null; closeModal(); } if (b.onClick) b.onClick(m, el); };
     mf.appendChild(el);
   }
   if (!buttons || !buttons.length) mf.style.display = 'none';
@@ -6589,6 +6628,7 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
 // démarrage : reprise du dernier travail
 (function init() {
   try { const raw = localStorage.getItem(LS_KEY); if (raw) { restore(JSON.parse(raw)); $('#rbName').value = S.name; } } catch (e) { console.warn(e); }
+  if (!(S.notes.length || S.ll.length)) ProjDB.get().then(raw => { if (!raw || S.notes.length || S.ll.length) return; try { restore(JSON.parse(raw)); ProjDB.has = true; $('#rbName').value = S.name; $('#routeMode').value = S.routeMode; histPush(raw); renderRoadbook(); renderMarkers(); renderTrack(true); renderInfo(); } catch (e) { console.warn(e); } });      // reprise d'un gros projet gardé dans IndexedDB
   $('#routeMode').value = S.routeMode;
   try { setDirty(localStorage.getItem('rbgen.dirty') === '1'); } catch (e) { }
   if (S.notes.length || S.ll.length) histPush(JSON.stringify(snapshot()));
@@ -6596,7 +6636,7 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
 })();
 
 // accès pour les tests automatisés
-window.__rb = { pointAt, inv, tulipEditor, measureForNote, openMeasure, measureAtLL, bendList, bendAt, editNote, altDialog, view3D, cleanEle, timeSeries, timeAt, buildGPX, stagesDialog, stageList, addStage, marksDialog, markForm, pickTrack, parseGPX, cutAt, reverseCtrl, mergeFile, reduceDialog, snapDialog, cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, addManualNote, notesSVG, renderAll, renderRadii, noteRadii };
+window.__rb = { svgToPNG, tulipSVG, pointAt, inv, tulipEditor, measureForNote, openMeasure, measureAtLL, bendList, bendAt, editNote, altDialog, view3D, cleanEle, timeSeries, timeAt, buildGPX, stagesDialog, stageList, addStage, marksDialog, markForm, pickTrack, parseGPX, cutAt, reverseCtrl, mergeFile, reduceDialog, snapDialog, cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, addManualNote, notesSVG, renderAll, renderRadii, noteRadii };
 })();
 
 // Version installable (PWA) : actif seulement quand la page est servie en https (pas en fichier local)

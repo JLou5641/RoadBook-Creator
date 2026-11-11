@@ -1,0 +1,14 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+(async () => { const b = await chromium.launch(); const p = await (await b.newContext({ viewport: { width: 1000, height: 900 } })).newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file)(?!https:\/\/(data\.geopf\.fr\/(wfs|tms)|tiles\.openfreemap\.org)).*/, r => r.abort());
+  const url = 'file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html');
+  await p.goto(url); await p.waitForTimeout(500);
+  await p.evaluate(t => window.__rb.loadText(t, 't.gpx'), fs.readFileSync('/home/claude/scan/tour.gpx', 'utf8')); await p.waitForTimeout(800);
+  await p.click('#bGen'); await p.waitForTimeout(300); await p.selectOption('#gsT', 'ign'); await p.selectOption('#gsN', 'ign'); await p.click('#modal .mbtn.primary');
+  await p.waitForSelector('#modal h2:has-text("rapport")', { timeout: 280000 }); await p.click('#modal .mbtn.primary'); await p.waitForTimeout(2500);
+  console.log('toast', await p.evaluate(() => (document.querySelector('#toast') || { innerText: '' }).innerText));
+  const info = await p.evaluate(async () => ({ n: window.__rb.S.notes.length, ls: (localStorage.getItem('rbgen.v1') || '').length, idb: await new Promise(r => { const q = indexedDB.open('rbgen-proj', 1); q.onsuccess = () => { const g = q.result.transaction('p').objectStore('p').get('cur'); g.onsuccess = () => r((g.result || '').length); }; q.onerror = () => r(-1); }) }));
+  console.log(JSON.stringify(info));
+  await p.reload(); await p.waitForTimeout(3000);
+  console.log('après rechargement', await p.evaluate(() => ({ n: window.__rb.S.notes.length, name: document.querySelector('#rbName').value, rows: document.querySelectorAll('#rb .row, #rbList > *').length })));
+  console.log('erreurs', errs.join('|') || 0); await b.close(); })();

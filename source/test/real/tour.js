@@ -1,0 +1,13 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+const [A, C] = [process.argv[2] || 'ign', process.argv[3] || 'vt'];
+(async () => { const b = await chromium.launch(); const p = await (await b.newContext({ viewport: { width: 1000, height: 900 } })).newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file)(?!https:\/\/(data\.geopf\.fr\/(wfs|tms)|tiles\.openfreemap\.org)).*/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.waitForTimeout(500);
+  await p.evaluate(t => window.__rb.loadText(t, 't.gpx'), fs.readFileSync('/home/claude/scan/tour.gpx', 'utf8')); await p.waitForTimeout(800);
+  const t0 = Date.now(); await p.click('#bGen'); await p.waitForTimeout(300); await p.selectOption('#gsT', A); await p.selectOption('#gsN', C); await p.click('#modal .mbtn.primary');
+  await p.waitForSelector('#modal h2:has-text("rapport")', { timeout: 1500000 });
+  console.log('durée s', Math.round((Date.now() - t0) / 1000)); console.log(await p.evaluate(() => document.querySelector('#modal .mb').innerText));
+  await p.screenshot({ path: `/tmp/tour_${A}_${C}.png` }); await p.click('#modal .mbtn.primary'); await p.waitForTimeout(500);
+  console.log(JSON.stringify(await p.evaluate(() => { const S = window.__rb.S; const n = S.notes; return { n: n.length, noKind: n.filter(x => !x.kind).length, vide: n.filter(x => !(x.text || '').trim() && !x.sym).length }; })));
+  const gpx = await p.evaluate(() => window.__rb.buildGPX(() => {}, false)); console.log('gpx Ko', Math.round(gpx.length / 1024)); fs.writeFileSync('/tmp/tour_'+A+'_'+C+'.gpx', gpx);
+  console.log('erreurs', errs.join('|') || 0); await b.close(); })();
