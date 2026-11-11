@@ -27,6 +27,9 @@ console.log('OK', out, (html.length / 1024).toFixed(0) + ' Ko', stamp, version);
 {
   const pd = path.join(d, 'dist', 'pwa'); fs.mkdirSync(pd, { recursive: true });
   fs.writeFileSync(path.join(pd, 'index.html'), html);
-  fs.writeFileSync(path.join(pd, 'sw.js'), fs.readFileSync(path.join(d, 'src', 'sw.js'), 'utf8').replace('__STAMP__', stamp.replace(/\W/g, '')));
+  fs.cpSync(path.join(d, 'src', 'manuel'), path.join(pd, 'manuel'), { recursive: true });
+  fs.cpSync(path.join(d, 'src', 'manuel'), path.join(d, 'dist', 'manuel'), { recursive: true });
+  const mf = ['./manuel/', './manuel/index.html'].concat(fs.readdirSync(path.join(d, 'src', 'manuel', 'img')).map(f => './manuel/img/' + f));
+  fs.writeFileSync(path.join(pd, 'sw.js'), fs.readFileSync(path.join(d, 'src', 'sw.js'), 'utf8').replace('__STAMP__', stamp.replace(/\W/g, '')).replace("'./icon-512.png']", "'./icon-512.png'].concat(" + JSON.stringify(mf) + ")"));
   for (const f of ['manifest.webmanifest', 'icon-192.png', 'icon-512.png']) fs.copyFileSync(path.join('/home/claude/out', f), path.join(pd, f));
 }
