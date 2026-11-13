@@ -96,18 +96,18 @@ const snapIsOn = () => S.snapOn !== false && S.routeMode !== 'line';
 const curMode = () => snapIsOn() ? S.routeMode : 'line';
 function updSnapBtn() {
   const b = $('#bSnapMode'); if (!b) return; const on = snapIsOn();
-  b.textContent = on ? '🧲 Route : activée' : '🧲 Route : désactivée'; b.classList.toggle('on', on);
+  b.textContent = on ? '🧲 Routage : activé' : '🧲 Routage : désactivé'; b.classList.toggle('on', on);
   b.title = on ? 'Les points suivants suivent les chemins. Cliquer (ou touche R) pour les relier en ligne droite (hors-piste).' : 'Les points suivants sont reliés en ligne droite. Cliquer (ou touche R) pour qu’ils suivent de nouveau les chemins.';
 }
 function toggleSnap() {
   if (snapIsOn()) S.snapOn = false;
   else { S.snapOn = true; if (S.routeMode === 'line') { S.routeMode = S.prevRoute && S.prevRoute !== 'line' ? S.prevRoute : 'trekking'; $('#routeMode').value = S.routeMode; } }
-  updSnapBtn(); save(); toast(snapIsOn() ? 'Route activée : les points suivent les chemins.' : 'Route désactivée : lignes droites.', 'ok');
+  updSnapBtn(); save(); toast(snapIsOn() ? 'Routage activé : les points suivent les chemins.' : 'Routage désactivé : lignes droites.', 'ok');
 }
 /* Mode aimant : un point posé est replacé sur la route / le chemin le plus proche (là où le routeur le pose) ; trop loin (> MAG_MAX m), il est refusé. Sans internet : posé tel quel. */
 const MAG_MAX = 40;
 const dMeters = (p, q) => { const k = Math.cos(p[0] * Math.PI / 180); return Math.hypot((q[1] - p[1]) * k * 111320, (q[0] - p[0]) * 110540); };
-const tooFarMsg = d => `🧲 Point trop loin d’une route ou d’un chemin${isFinite(d) ? ' (' + Math.round(d) + ' m)' : ''}. Rapproche-le, ou désactive « Route » (touche R).`;
+const tooFarMsg = d => `🧲 Point trop loin d’une route ou d’un chemin${isFinite(d) ? ' (' + Math.round(d) + ' m)' : ''}. Rapproche-le, ou désactive « Routage » (touche R).`;
 let magBusy = false;
 async function magnet(nb, p, nbFirst, mode) {      // → { pt: point replacé, d: distance du clic, other: voisin replacé } ou null si le calcul est indisponible
   const seg = nbFirst ? await routeSeg(nb, p, mode) : await routeSeg(p, nb, mode), q = nbFirst ? seg.snapB : seg.snapA;
