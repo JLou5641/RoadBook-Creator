@@ -1,0 +1,18 @@
+const { chromium } = require('playwright'); const path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1200, height: 800 } });
+  let roadLat = 0;
+  await p.route(/brouter\.de/, r => { const m = /lonlats=([^&]+)/.exec(decodeURIComponent(r.request().url())); const [A, B] = m[1].split('|').map(s => s.split(',').map(Number));
+    r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ features: [{ geometry: { coordinates: [[A[0], roadLat], [(A[0] + B[0]) / 2, roadLat], [B[0], roadLat]] } }] }) }); });
+  await p.route(/routing\.openstreetmap|tile|arcgisonline|overpass/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.click('#bDraw'); await p.waitForTimeout(300); await p.selectOption('#magMax','0');
+  await p.evaluate(() => { const m = window.__rb.map; m.setView([45, 3], 17, { animate: false }); });
+  roadLat = await p.evaluate(() => { const m = window.__rb.map, r = m.getContainer().getBoundingClientRect(); return m.containerPointToLatLng([400 - r.left, 417 - r.top]).lat; });
+  const ctrl = () => p.evaluate(() => window.__rb.S.ctrl.map(c => [c[0].toFixed(5), c[1].toFixed(5), c[2]]));
+  const tst = () => p.evaluate(() => [...document.querySelectorAll('.toast')].map(t => t.textContent).slice(-1)[0] || '');
+  await p.mouse.click(400, 400); await p.waitForTimeout(300);
+  await p.mouse.click(550, 410); await p.waitForTimeout(800);
+  console.log('road lat', roadLat.toFixed(5), 'ctrl après 2 clics proches:', JSON.stringify(await ctrl()));
+  await p.mouse.click(600, 600); await p.waitForTimeout(500); const body = await p.evaluate(() => document.body.innerText);
+  console.log('après clic loin:', (await ctrl()).length, 'points ; message:', (/🧲 Point trop loin[^\n]*/.exec(body) || ['ABSENT'])[0]);
+  await p.screenshot({ path: '/tmp/mag1.png' }); await b.close(); })();

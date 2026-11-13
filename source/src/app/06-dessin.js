@@ -71,7 +71,7 @@ function renderCtrl() {
     m.on('dragend', async () => {
       const p = m.getLatLng(); let pt = [p.lat, p.lng], dm = null;
       const md0 = S.ctrl.length > 1 ? (i > 0 ? S.ctrl[i][2] : S.ctrl[1][2]) : null, md = md0 === 'osmway' ? S.routeMode : md0;
-      if (snapIsOn() && !magBusy && md && !/^(line|trace)$/.test(md)) {      // aimant : le point déplacé se replace sur la route (les tronçons en ligne droite ou de trace chargée ne sont pas touchés)
+      if (snapIsOn() && magOn() && !magBusy && md && !/^(line|trace)$/.test(md)) {      // aimant : le point déplacé se replace sur la route (les tronçons en ligne droite ou de trace chargée ne sont pas touchés)
         magBusy = true;
         try {
           const t = i > 0 ? await magnetTry(S.ctrl[i - 1].slice(0, 2), pt, true, md) : await magnetTry(S.ctrl[1].slice(0, 2), pt, false, md), r = t.r;
@@ -92,9 +92,11 @@ function renderCtrl() {
   updHist();
 }
 /* « 🧲 Route » : activé, les points posés suivent les chemins (menu « Tracé ») ; désactivé, ils sont reliés en ligne droite (hors-piste). Réglage changeable à tout moment, chaque tronçon garde celui de sa pose. */
+const magOn = () => S.magMax !== 0;      // 0 = aimant coupé : le routage reste actif mais les points sont posés tels quels
 const snapIsOn = () => S.snapOn !== false && S.routeMode !== 'line';
 const curMode = () => snapIsOn() ? S.routeMode : 'line';
 function updSnapBtn() {
+  MAG_MAX = S.magMax || 40; const mg = $('#magMax'); if (mg) mg.value = String(S.magMax === 0 ? 0 : MAG_MAX);
   const b = $('#bSnapMode'); if (!b) return; const on = snapIsOn();
   b.textContent = on ? '🧲 Routage : activé' : '🧲 Routage : désactivé'; b.classList.toggle('on', on);
   b.title = on ? 'Les points suivants suivent les chemins. Cliquer (ou touche R) pour les relier en ligne droite (hors-piste).' : 'Les points suivants sont reliés en ligne droite. Cliquer (ou touche R) pour qu’ils suivent de nouveau les chemins.';
@@ -105,7 +107,7 @@ function toggleSnap() {
   updSnapBtn(); save(); toast(snapIsOn() ? 'Routage activé : les points suivent les chemins.' : 'Routage désactivé : lignes droites.', 'ok');
 }
 /* Mode aimant : un point posé est replacé sur la route / le chemin le plus proche (là où le routeur le pose) ; trop loin (> MAG_MAX m), il est refusé. Sans internet : posé tel quel. */
-const MAG_MAX = 40;
+let MAG_MAX = 40;      // distance maxi clic ↔ route (réglable : 5 à 50 m, S.magMax)
 const dMeters = (p, q) => { const k = Math.cos(p[0] * Math.PI / 180); return Math.hypot((q[1] - p[1]) * k * 111320, (q[0] - p[0]) * 110540); };
 const tooFarMsg = d => `🧲 Point trop loin d’une route ou d’un chemin${isFinite(d) ? ' (' + Math.round(d) + ' m)' : ''}. Rapproche-le, ou désactive « Routage » (touche R).`;
 let magBusy = false;
@@ -183,7 +185,7 @@ async function magnetTry(nb, p, nbFirst, mode) {
 async function addCtrl(p) {
   if (magBusy) { toast('Calcul du point précédent en cours…', 'ok'); return; }
   let pt = [+p[0].toFixed(6), +p[1].toFixed(6)], first = null, pm = null, rSeg = null, osmPoly = null;
-  if (snapIsOn() && S.ctrl.length) {
+  if (snapIsOn() && magOn() && S.ctrl.length) {
     magBusy = true;
     try {
       const last = S.ctrl[S.ctrl.length - 1], t = await magnetTry(last.slice(0, 2), pt, true, S.routeMode), r = t.r; pm = t.mode !== S.routeMode ? t.mode : null;

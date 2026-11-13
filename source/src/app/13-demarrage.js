@@ -571,6 +571,7 @@ $('#bSnapMode').onclick = toggleSnap;
 $('#bRedo').onclick = redo;
 $('#bFree').onclick = () => setTool('free');
 $('#bErase').onclick = () => setTool('erase');
+$('#magMax').onchange = e => { S.magMax = +e.target.value; updSnapBtn(); save(); toast(S.magMax ? 'Aimant : ' + S.magMax + ' m maximum entre ton clic et la route.' : 'Aimant coupé : les points sont posés tels quels (le routage reste actif).', 'ok'); };
 $('#routeMode').onchange = e => { S.routeMode = e.target.value; if (S.routeMode !== 'line') { S.prevRoute = S.routeMode; S.snapOn = true; } updSnapBtn(); save(); if (/^ors:/.test(S.routeMode) && !orsKey()) orsDialog(); };
 $('#orsBtn').onclick = orsDialog;
 $('#bGen').onclick = generate;
