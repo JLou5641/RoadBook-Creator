@@ -1037,7 +1037,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261113.2045</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261113.2103</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1068,7 +1068,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="help">❓ Aide</button>
           <button data-act="report">📋 Dernier rapport de génération</button>
           <button data-act="manual">📖 Manuel d'utilisation</button>
-          <div class="ver">Version v0.261113.2045 · VERSION DE TEST</div>
+          <div class="ver">Version v0.261113.2103 · VERSION DE TEST</div>
         </div>
       </div>
     </div>
@@ -3102,7 +3102,7 @@ function routeBoxes(margin) {
   return boxes;
 }
 /* ---------- Mémoire des chemins : carreaux de 0,0025° gardés dans le navigateur (sans limite de durée) ---------- */
-const TS = 0.0025, TILE_V = 2, memTiles = new Map();   // TILE_V : version du contenu des carreaux (2 = avec repères)
+const TS = 0.0025, TILE_V = 3, memTiles = new Map();   // TILE_V : version du contenu des carreaux (2 = avec repères, 3 = + panneaux d'agglomération)
 const tkey = (la, lo) => Math.floor(lo / TS) + ',' + Math.floor(la / TS);
 const tileBox = k => { const [tx, ty] = k.split(',').map(Number); return [ty * TS, tx * TS, (ty + 1) * TS, (tx + 1) * TS]; };
 const TileDB = (() => {
@@ -3167,7 +3167,7 @@ function osmQuery(keys) {
   const po = boxes.map(b => `node["amenity"~"^(place_of_worship|fuel)$"](${b});way["amenity"~"^(place_of_worship|fuel)$"](${b});`
     + `node["man_made"~"^(water_tower|mast|tower|communications_tower|chimney|windmill|lighthouse)$"](${b});way["man_made"~"^(water_tower|tower|chimney|windmill|lighthouse)$"](${b});`
     + `node["power"="generator"]["generator:source"="wind"](${b});node["natural"~"^(peak|saddle)$"](${b});node["mountain_pass"="yes"](${b});`
-    + `node["place"~"^(city|town|village|hamlet|locality|isolated_dwelling)$"](${b});node["hazard"](${b});`).join('');
+    + `node["place"~"^(city|town|village|hamlet|locality|isolated_dwelling)$"](${b});node["hazard"](${b});node["traffic_sign"="city_limit"](${b});`).join('');
   return `[out:json][timeout:180];(${hw})->.h;.h out body;.h >;out qt;(${ft});out geom qt;(${po});out center qt;`;
 }
 function attribute(j, keys) {          // répartit la réponse Overpass dans les carreaux demandés
@@ -3519,7 +3519,7 @@ function buildGraph(els) {
   const nodes = new Map(), ways = [], feats = [];
   for (const e of els) if (e.type === 'node') nodes.set(e.id, { id: e.id, lat: e.lat, lon: e.lon, xy: fwd(e.lat, e.lon), br: [], tags: e.tags || null });
   const pois = [], lines = [];
-  for (const e of els) if (e.type === 'poi') pois.push({ id: e.id, xy: fwd(e.lat, e.lon), tags: e.tags || {} });
+  for (const e of els) if (e.type === 'poi') pois.push({ id: e.id, lat: e.lat, lon: e.lon, xy: fwd(e.lat, e.lon), tags: e.tags || {} });
   for (const e of els) if (e.type === 'way' && e.geometry) {          // cours d'eau, plans d'eau, bâtiments, lignes
     const lk = lineKind(e.tags || {});
     if (lk) {
@@ -4096,6 +4096,7 @@ function detectOffroad(known) {
   return out;
 }
 const dataLbl = () => ({ osm: 'OSM', vt: 'OSM', ign: 'IGN', ignd: 'IGN détaillé' }[S.settings.data] || 'OSM');
+const srcLbl = g => ({ bdtopo: 'IGN BD TOPO', ofm: 'OpenFreeMap (OSM)', osm: 'OSM' }[g && g.used] || dataLbl());      // source réellement lue pour les repères
 // raison d'une note ; pour une note sans raison enregistrée, on explique pourquoi (gardée à la main, ou générée avant cette version)
 const whyOf = n => n.why || (n.auto === false || n.edited || n.manual ? 'Note modifiée ou ajoutée à la main : elle est conservée telle quelle quand on régénère le roadbook.' : 'Note générée avec une ancienne version : relance « Générer » pour connaître la raison (tes notes modifiées à la main sont conservées).');
 function mkNote(o) {
@@ -4231,13 +4232,13 @@ const LM_TYPES = [      // [id, libellé, groupe : p = « Notes de repères », 
   ['ford', 'Gué', 'p'], ['level', 'Passage à niveau', 'p'], ['railway', 'Voie ferrée (croisement, pont sur / sous voie ferrée)', 'p'], ['stop', 'STOP', 'p'], ['giveway', 'Cédez le passage', 'p'],
   ['barrier', 'Portail, barrière, grille à bétail, chaîne, plots, chicane', 'p'], ['bridge', 'Pont', 'p'], ['under', 'Sous pont', 'p'], ['tunnel', 'Tunnel, passage sous bâtiment', 'p'],
   ['steps', 'Marches', 'p'], ['surf', 'Sable, boue, cailloux…', 'p'], ['smooth', 'Piste dégradée, très dégradée, impraticable', 'p'], ['incline', 'Montée / descente raide', 'p'],
-  ['fence', 'Longer une clôture', 'p'], ['wall', 'Longer un mur', 'p'], ['hedge', 'Longer une haie', 'p'], ['village', 'Entrée / sortie de village', 'p'], ['col', 'Col', 'p'], ['fuel', 'Station-service', 'p'], ['hazard', 'Danger (panneau)', 'p'],
+  ['fence', 'Longer une clôture', 'p'], ['wall', 'Longer un mur', 'p'], ['hedge', 'Longer une haie', 'p'], ['village', 'Entrée / sortie de village', 'p'], ['col', 'Col', 'p'], ['fuel', 'Station-service', 'p'], ['hazard', 'Danger (panneau)', 'p'], ['signals', 'Feux tricolores', 'p'], ['peds', 'Passage piéton', 'p'], ['calm', 'Ralentisseur, bandes sonores', 'p'],
   ['watertower', 'Château d’eau', 'v'], ['antenna', 'Antenne', 'v'], ['tower', 'Tour', 'v'], ['chimney', 'Cheminée', 'v'], ['mill', 'Moulin', 'v'], ['lighthouse', 'Phare', 'v'], ['wind', 'Éolienne', 'v'],
   ['church', 'Église, lieu de culte', 'v'], ['peak', 'Sommet', 'v'], ['place', 'Lieu-dit, hameau', 'v'], ['trackname', 'Nom de la rue ou de la piste prise au carrefour', 'v']];
 const lmOn = id => !id || !(S.settings.lmOff || []).includes(id);
 function lmId(e) {
   const t = e.text || '', k = e.key || '';
-  if (k === 'ford' || k === 'barrier' || k === 'col' || k === 'hazard' || k === 'bridge' || k === 'tunnel' || k === 'steps' || k === 'surf' || k === 'smooth' || k === 'incline' || k === 'fuel' || k === 'under') return k;
+  if (k === 'ford' || k === 'barrier' || k === 'col' || k === 'hazard' || k === 'bridge' || k === 'tunnel' || k === 'steps' || k === 'surf' || k === 'smooth' || k === 'incline' || k === 'fuel' || k === 'under' || k === 'signals' || k === 'peds' || k === 'calm') return k;
   if (k === 'rail') return /^Passage à niveau/.test(t) ? 'level' : 'railway';
   if (k === 'stop') return t === 'STOP' ? 'stop' : 'giveway';
   if (k === 'par') return /clôture/.test(t) ? 'fence' : /mur/.test(t) ? 'wall' : 'hedge';
@@ -4266,6 +4267,11 @@ function osmExtras(g, notes) {
     const run = []; for (let d = -10; d <= 10; d += 5) { const q = smp[clamp(Math.round((sPass + d) / STEP), 0, smp.length - 1)]; if (q && q.w) run.push(q.w); }
     if (!run.length) return true;
     return run.some(w => (w.nodes || []).includes(n.id));
+  };
+  const wrongDir = (n, sPass) => {      // balise direction=forward/backward contraire à notre sens de parcours
+    const d = (n.tags['traffic_signals:direction'] || n.tags.direction || '').toLowerCase(); if (d !== 'forward' && d !== 'backward') return false;
+    const qd = smp[clamp(Math.round((sPass - 4) / STEP), 0, smp.length - 1)];
+    return !!(qd && qd.dir && ((d === 'forward' && qd.dir < 0) || (d === 'backward' && qd.dir > 0)));
   };
   let skipWhy = '';
   const stopIsMine = (n, sPass) => {
@@ -4298,12 +4304,18 @@ function osmExtras(g, notes) {
       if (t.highway === 'give_way') it.push({ text: 'Cédez le passage', key: 'stop', stop: true });
       if (BARRIER_TXT[t.barrier]) it.push({ text: BARRIER_TXT[t.barrier] + (/^(private|no)$/.test(t.access || '') ? ' (privé)' : ''), key: 'barrier' });
       if (t.mountain_pass === 'yes' || t.natural === 'saddle') it.push({ text: (tName(t) || 'Col') + tEle(t), key: 'col' });
+      if (t.highway === 'traffic_signals' || t.crossing === 'traffic_signals') it.push({ text: t.highway === 'crossing' ? 'Feux tricolores (passage piéton)' : 'Feux tricolores', key: 'signals' });
+      else if (t.highway === 'crossing' && !t.railway) it.push({ text: 'Passage piéton', key: 'peds' });
+      if (/^(bump|hump|table|cushion)$/.test(t.traffic_calming || '')) it.push({ text: 'Ralentisseur', danger: 1, key: 'calm' });
+      else if (t.traffic_calming === 'rumble_strip') it.push({ text: 'Bandes sonores', key: 'calm' });
       if (t.hazard) it.push({ text: 'Danger : ' + (HAZARD_TXT[t.hazard] || t.hazard.replace(/_/g, ' ')), danger: 2, key: 'hazard' });
       if (!it.length) continue;
-      if (it.some(e => e.key === 'stop' || e.key === 'barrier')) for (const ps of passes(n.xy, 25)) if (ps.d > 6) skipped.push({ s: ps.s, lat: n.lat, lon: n.lon, text: it[0].text, why: 'à ' + Math.round(ps.d) + ' m de la trace (limite : 6 m)' });
+      if (it.some(e => /^(stop|barrier|hazard|signals|peds|calm)$/.test(e.key))) for (const ps of passes(n.xy, 25)) if (ps.d > 6) skipped.push({ s: ps.s, lat: n.lat, lon: n.lon, text: it[0].text, why: 'à ' + Math.round(ps.d) + ' m de la trace (limite : 6 m)' });
       for (const ps of passes(n.xy, 6)) for (const e of it) {
         if (e.stop && !stopIsMine(n, ps.s)) { skipped.push({ s: ps.s, lat: n.lat, lon: n.lon, text: e.text, why: skipWhy }); continue; }      // panneau de la route que l'on croise : pas pour nous
-        if (!e.stop && /^(barrier|ford|rail|hazard)$/.test(e.key) && !onMyWay(n, ps.s)) { skipped.push({ s: ps.s, lat: n.lat, lon: n.lon, text: e.text, why: 'posé sur une autre voie que la nôtre' }); continue; }      // objet posé à côté de la route (entrée de propriété, chemin croisé)
+        if (/^(hazard|signals|calm)$/.test(e.key) && wrongDir(n, ps.s)) { skipped.push({ s: ps.s, lat: n.lat, lon: n.lon, text: e.text, why: 'direction=' + (n.tags['traffic_signals:direction'] || n.tags.direction) + ' contraire à notre sens' }); continue; }
+        if (e.key === 'peds') { const mw = wayAtS(ps.s); if (!mw || hwr(mw) < 3) continue; }      // pas de passage piéton noté sur un sentier
+        if (!e.stop && /^(barrier|ford|rail|hazard|signals|peds|calm)$/.test(e.key) && !onMyWay(n, ps.s)) { skipped.push({ s: ps.s, lat: n.lat, lon: n.lon, text: e.text, why: 'posé sur une autre voie que la nôtre' }); continue; }      // objet posé à côté de la route (entrée de propriété, chemin croisé)
         if (e.stop) {               // le panneau ne compte que si l'on arrive au carrefour
           const ahead = jS.find(js => js >= ps.s - 2 && js - ps.s <= 45);
           if (ahead == null && jS.some(js => js < ps.s - 2 && ps.s - js <= 30)) { skipped.push({ s: ps.s, lat: n.lat, lon: n.lon, text: e.text, why: 'après le carrefour (on l\'a déjà passé)' }); continue; }
@@ -4380,8 +4392,12 @@ function osmExtras(g, notes) {
       for (const q of inn) { if (q.P) { if (cs && q.s - cs.s1 <= 120) { cs.s1 = q.s; } else { cs = { s0: q.s, s1: q.s, P: q.P }; segs.push(cs); } } }
       const places = g.pois.filter(q => /^(city|town|village|hamlet)$/.test(q.tags.place || '') && tName(q.tags));
       const nameAt = (s, P) => { if (tName(P.tags)) return tName(P.tags); const p = pointAt(s); let b = null; for (const q of places) { const d = dxy(q.xy, p); if (d < 2500 && (!b || d < b.d)) b = { d, n: tName(q.tags) }; } return b ? b.n : ''; };
+      /* panneaux d'agglomération (traffic_sign=city_limit) : s'il y en a un près d'une entrée / sortie, on y cale la note (position fiable) */
+      const cl = [...g.pois, ...[...g.nodes.values()].filter(q => q.tags && q.tags.traffic_sign)].filter(q => q.tags.traffic_sign === 'city_limit');
+      const clAt = s0 => { let b = null; for (const q of cl) { const pr = nearestPass(q.xy, 30); if (pr && Math.abs(pr.s - s0) <= 150 && (!b || Math.abs(pr.s - s0) < Math.abs(b - s0))) b = pr.s; } return b; };
       for (const sg of segs) {
         if (sg.s1 - sg.s0 < 80) continue;
+        if (cl.length) { const a = clAt(sg.s0), z = clAt(sg.s1); if (a != null) sg.s0 = a; if (z != null) sg.s1 = z; }
         const name = nameAt((sg.s0 + sg.s1) / 2, sg.P);
         if (sg.s0 > 30) ev.push({ s: sg.s0, text: 'Entrée ' + (name || 'agglomération'), key: 'village-in', own: true });
         if (sg.s1 < T.L - 30) ev.push({ s: sg.s1, text: 'Sortie ' + (name || 'agglomération'), key: 'village-out', own: true });
@@ -4407,6 +4423,10 @@ function osmExtras(g, notes) {
     if (!txt) continue;
     if ((kind === 'land' || kind === 'place') ? !st.landmarks : !st.pois) continue;
     const pr = nearestPass(P.xy, maxD); if (!pr) continue;
+    if (kind === 'hazard') {      // panneau isolé (hors de tout chemin) : il doit être au bord de notre route, pas sur la voisine
+      if (pr.d > 15) { skipped.push({ s: pr.s, lat: P.lat, lon: P.lon, text: txt, why: 'à ' + Math.round(pr.d) + ' m de la trace (limite : 15 m pour un danger isolé)' }); continue; }
+      if (wrongDir(P, pr.s)) { skipped.push({ s: pr.s, lat: P.lat, lon: P.lon, text: txt, why: 'direction=' + t.direction + ' contraire à notre sens' }); continue; }
+    }
     const side = pr.d > 8 ? ' à ' + sideOf(pr.s, P.xy) : '';
     if (kind === 'col' || kind === 'hazard') ev.push({ s: pr.s, text: txt, key: kind, own: true, danger });
     else if (kind === 'fuel') ev.push({ s: pr.s, text: txt + side, key: 'fuel', attach: 40, own: true });
@@ -4434,7 +4454,7 @@ function osmExtras(g, notes) {
     } else if (e.own) {
       const tt = trackTulip(e.s, 'info');
       const nn = mkNote({ s: e.s, xy: tt.xy, text: e.text, cap: Math.round(trackBearing(e.s, e.s + 30)) % 360, kind: 'info', tulip: tt.tulip });
-      nn.why = 'Repère trouvé dans les données ' + dataLbl() + ' le long de la trace' + (e.dbg ? ' · ' + e.dbg : ''); nn.src = { t: 'trk', kind: 'info' }; nn.danger = e.danger || 0;
+      nn.why = 'Repère trouvé dans les données ' + srcLbl(g) + ' le long de la trace' + (e.dbg ? ' · ' + e.dbg : ''); nn.src = { t: 'trk', kind: 'info' }; nn.danger = e.danger || 0;
       notes.push(nn); notes.sort((a, b) => a.s - b.s); added++;
     }
   }
