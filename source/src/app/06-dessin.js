@@ -105,8 +105,8 @@ const tooFarMsg = d => `🧲 Point trop loin d’une route ou d’un chemin (${M
 let magBusy = false;
 async function magnet(nb, p, nbFirst, mode) {      // → { pt: point replacé, d: distance du clic, other: voisin replacé } ou null si le calcul est indisponible
   const seg = nbFirst ? await routeSeg(nb, p, mode) : await routeSeg(p, nb, mode), q = nbFirst ? seg.snapB : seg.snapA;
-  if (!q) return null;
-  return { pt: [+q[0].toFixed(6), +q[1].toFixed(6)], d: dMeters(p, q), other: nbFirst ? seg.snapA : seg.snapB };
+  if (!q || seg.via === 'osrm') return null;      // serveur de secours (OSRM) : il place le point n'importe où, on ne s'y fie pas → point posé comme avant
+  return { pt: [+q[0].toFixed(6), +q[1].toFixed(6)], d: dMeters(p, q), other: nbFirst ? seg.snapA : seg.snapB, seg: nbFirst ? seg : null };
 }
 /* essaie le mode choisi, puis « Au plus court » (sentiers inclus) si le chemin n'est pas connu du premier : { r, mode } */
 async function magnetTry(nb, p, nbFirst, mode) {
@@ -116,11 +116,11 @@ async function magnetTry(nb, p, nbFirst, mode) {
 }
 async function addCtrl(p) {
   if (magBusy) { toast('Calcul du point précédent en cours…', 'ok'); return; }
-  let pt = [+p[0].toFixed(6), +p[1].toFixed(6)], first = null, pm = null;
+  let pt = [+p[0].toFixed(6), +p[1].toFixed(6)], first = null, pm = null, rSeg = null;
   if (snapIsOn() && S.ctrl.length) {
     magBusy = true;
     try {
-      const last = S.ctrl[S.ctrl.length - 1], t = await magnetTry(last.slice(0, 2), pt, true, S.routeMode), r = t.r; pm = t.mode !== S.routeMode ? t.mode : null;
+      const last = S.ctrl[S.ctrl.length - 1], t = await magnetTry(last.slice(0, 2), pt, true, S.routeMode), r = t.r; pm = t.mode !== S.routeMode ? t.mode : null; if (r && r.d <= MAG_MAX) rSeg = r.seg;
       if (r) {
         if (r.d > MAG_MAX) { toast(tooFarMsg(r.d), 'err'); return; }
         pt = r.pt;
@@ -130,6 +130,7 @@ async function addCtrl(p) {
   }
   pushHist();
   if (first) S.ctrl[0] = [first[0], first[1], null];
+  if (rSeg && !first && rSeg.length >= 3 && !pm) { const k0 = segKey(S.ctrl[S.ctrl.length - 1], pt, curMode()); if (!routeCache.has(k0)) routeCache.set(k0, cleanEnds([...rSeg.slice(0, -1), pt])); }      // le tronçon déjà calculé pour l'aimant sert tel quel (un seul calcul par clic)
   S.ctrl.push([pt[0], pt[1], S.ctrl.length ? (pm || curMode()) : null]);
   S.src = 'draw';
   renderCtrl(); reroute();
@@ -289,7 +290,7 @@ function orsDialog() {
     [{ label: 'Effacer la clé', onClick: () => { try { localStorage.removeItem('rbgen.orsKey'); } catch (_) {} toast('Clé effacée.', 'ok'); } }, 'sp', { label: 'Annuler' },
      { label: 'Enregistrer', cls: 'primary', onClick: mm => { const v = mm.querySelector('#orsK').value.trim(); try { localStorage.setItem('rbgen.orsKey', v); } catch (_) {} toast(v ? 'Clé enregistrée.' : 'Clé effacée.', 'ok'); } }]);
 }
-const snapInfo = (r, c) => { r.snapA = [c[0][1], c[0][0]]; r.snapB = [c[c.length - 1][1], c[c.length - 1][0]]; return r; };      // où le routeur a réellement posé les extrémités (sur la route)
+const snapInfo = (r, c, via) => { r.via = via; r.snapA = [c[0][1], c[0][0]]; r.snapB = [c[c.length - 1][1], c[c.length - 1][0]]; return r; };      // où le routeur a réellement posé les extrémités (sur la route)
 async function routeSeg(a, b, mode) {
   if (mode === 'trace') mode = S.routeMode;      // tronçon d'une trace chargée dont un point a bougé : on suit le mode « Tracé » du menu
   if (!mode || mode === 'line') return [a.slice(0, 2), b.slice(0, 2)];
@@ -301,7 +302,7 @@ async function routeSeg(a, b, mode) {
         const j = await fetchJSON(`https://api.openrouteservice.org/v2/directions/${mode.slice(4)}/geojson`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: key },
           body: JSON.stringify({ coordinates: [[a[1], a[0]], [b[1], b[0]]], radiuses: [1000, 1000] }) }, 25000);
         const c = j.features[0].geometry.coordinates;
-        if (c.length >= 2) return snapInfo(cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]), c);
+        if (c.length >= 2) return snapInfo(cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]), c, 'ors');
       } catch (e) { if (Date.now() - routeWarned > 8000) { routeWarned = Date.now(); toast('OpenRouteService : ' + (e.status === 401 || e.status === 403 ? 'clé refusée' : e.status === 429 ? 'quota du jour atteint' : 'indisponible') + ' : calcul avec BRouter.', 'err'); } mode = 'trekking'; }
     }
   }
@@ -309,14 +310,14 @@ async function routeSeg(a, b, mode) {
     const url = `https://brouter.de/brouter?lonlats=${a[1].toFixed(6)},${a[0].toFixed(6)}|${b[1].toFixed(6)},${b[0].toFixed(6)}&profile=${encodeURIComponent(mode)}&alternativeidx=0&format=geojson`;
     const j = await fetchJSON(url, null, 25000);
     const c = j.features[0].geometry.coordinates;
-    if (c.length >= 2) return snapInfo(cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]), c);
+    if (c.length >= 2) return snapInfo(cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]), c, 'brouter');
   } catch (e) { /* on essaie le serveur de secours */ }
   try {
     const prof = mode === 'car-fast' ? 'routed-car' : mode === 'shortest' ? 'routed-foot' : 'routed-bike';
     const url = `https://routing.openstreetmap.de/${prof}/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson`;
     const j = await fetchJSON(url, null, 25000);
     const c = j.routes[0].geometry.coordinates;
-    if (c.length >= 2) return snapInfo(cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]), c);
+    if (c.length >= 2) return snapInfo(cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]), c, 'osrm');
   } catch (e) { /* ligne droite */ }
   if (Date.now() - routeWarned > 8000) { routeWarned = Date.now(); toast('Itinéraire indisponible (pas d’internet ?) : tracé en ligne droite.', 'err'); }
   return [a.slice(0, 2), b.slice(0, 2)];
