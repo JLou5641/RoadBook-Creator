@@ -367,7 +367,14 @@ function orsDialog() {
 }
 const snapInfo = (r, c, via) => { r.via = via; r.snapA = [c[0][1], c[0][0]]; r.snapB = [c[c.length - 1][1], c[c.length - 1][0]]; return r; };      // où le routeur a réellement posé les extrémités (sur la route)
 async function routeSeg(a, b, mode) {
-  if (mode === 'osmway') return [a.slice(0, 2), b.slice(0, 2)];      // tronçon calé sur un chemin OSM (géométrie gardée en cache) ; sans cache : ligne droite
+  if (mode === 'osmway') {      // tronçon calé sur un chemin OSM : sans cache (point précédent déplacé, projet rouvert…), on le recalcule : route jusqu'à la jonction puis chemin
+    const A = a.slice(0, 2), B = b.slice(0, 2), line = [A, B];
+    try {
+      const o = await osmSnap(B, A); if (!o || !o.pt || o.d > MAG_MAX) return line;
+      const poly = o.poly || await connectViaRoad(A, o, S.routeMode === 'line' ? 'trekking' : S.routeMode);
+      return poly ? [A, ...poly.slice(1, -1), B] : line;
+    } catch (e) { return line; }
+  }
   if (mode === 'trace') mode = S.routeMode;      // tronçon d'une trace chargée dont un point a bougé : on suit le mode « Tracé » du menu
   if (!mode || mode === 'line') return [a.slice(0, 2), b.slice(0, 2)];
   if (/^ors:/.test(mode)) {
