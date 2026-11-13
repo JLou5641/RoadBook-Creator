@@ -1039,7 +1039,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261113.2249</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261113.2306</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1070,7 +1070,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="help">❓ Aide</button>
           <button data-act="report">📋 Dernier rapport de génération</button>
           <button data-act="manual">📖 Manuel d'utilisation</button>
-          <div class="ver">Version v0.261113.2249</div>
+          <div class="ver">Version v0.261113.2306</div>
         </div>
       </div>
     </div>
@@ -1149,6 +1149,7 @@ body.dragNote .leaflet-tooltip{display:none}
             <option value="line">Ligne droite</option>
           </select>
           <button id="bSnapMode" class="on">🧲 Routage : activé</button>
+          <select id="magMax" title="Aimant : distance maximale entre ton clic et la route ou le chemin"><option value="0">🧲 Aimant coupé</option><option value="5">🧲 5 m</option><option value="10">🧲 10 m</option><option value="20">🧲 20 m</option><option value="30">🧲 30 m</option><option value="40" selected>🧲 40 m</option><option value="50">🧲 50 m</option></select>
           <button id="orsBtn" title="Clé OpenRouteService (profils rando, VTT, vélo de route)">🔑</button>
         </div>
         <div class="dgrp">Dessin</div>
@@ -2057,7 +2058,7 @@ function simplifyDP(pts, tol) {         // Douglas-Peucker, renvoie les indices 
 const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, mixY: false, mixT: true, lmOff: [], followLvl: 3, bends: true, offroad: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true, marksExport: true, showRO: true, showPI: true, showTR: true, arrows: true };
 const S = {
   name: 'Mon roadbook', desc: '', src: '', ll: [], mm: null, ctrl: [], segs: [], notes: [], settings: { ...DEF_SETTINGS }, stages: [], marks: [], ele: null, timing: null,
-  stale: false, routeMode: 'trekking', snapOn: true, prevRoute: 'trekking', nextId: 1, sel: null
+  stale: false, routeMode: 'trekking', snapOn: true, magMax: 40, prevRoute: 'trekking', nextId: 1, sel: null
 };
 let T = null;    // parcours dérivé : {xy, cum, L, grid}
 let G = null;    // réseau OSM : {nodes, ways, key}
@@ -2074,7 +2075,7 @@ let saveTimer = null, saveWarned = false;
 
 function snapshot() {
   return { v: 2, name: S.name, desc: S.desc, src: S.src, ll: S.ll, mm: S.mm, ctrl: S.ctrl, segs: S.segs, notes: S.notes, settings: S.settings,
-    stale: S.stale, routeMode: S.routeMode, snapOn: S.snapOn, prevRoute: S.prevRoute, nextId: S.nextId, stages: S.stages, marks: S.marks, ele: S.ele, timing: S.timing, dataSrc: S.dataSrc || '', dataSrcN: S.dataSrcN || '', mySyms: MYS };
+    stale: S.stale, routeMode: S.routeMode, snapOn: S.snapOn, magMax: S.magMax, prevRoute: S.prevRoute, nextId: S.nextId, stages: S.stages, marks: S.marks, ele: S.ele, timing: S.timing, dataSrc: S.dataSrc || '', dataSrcN: S.dataSrcN || '', mySyms: MYS };
 }
 let dirty = false;
 function setDirty(v) { dirty = v; try { localStorage.setItem('rbgen.dirty', v ? '1' : ''); } catch (e) { } const b = document.getElementById('bSave'); if (b) { b.classList.toggle('dirty', v); b.title = v ? 'Modifications non sauvegardées dans un fichier : clique pour sauvegarder le projet' : 'Sauvegarder le projet en cours (fichier .json à rouvrir plus tard)'; } }
@@ -2113,7 +2114,7 @@ function restore(o) {
   S.name = o.name || 'Mon roadbook'; S.desc = o.desc || ''; S.src = o.src || ''; S.ctrl = o.ctrl || []; S.segs = o.segs || [];
   S.notes = o.notes || []; S.settings = { ...DEF_SETTINGS, ...(o.settings || {}) }; S.stale = !!o.stale;
   if ((o.settings || {}).sv !== DEF_SETTINGS.sv) S.settings = { ...S.settings, sv: DEF_SETTINGS.sv, tol: DEF_SETTINGS.tol, water: true, bld: true };
-  S.routeMode = o.routeMode || 'trekking'; S.snapOn = o.snapOn !== false; S.prevRoute = o.prevRoute || (S.routeMode !== 'line' ? S.routeMode : 'trekking'); S.nextId = o.nextId || (Math.max(0, ...S.notes.map(n => n.id)) + 1); S.sel = null;
+  S.routeMode = o.routeMode || 'trekking'; S.snapOn = o.snapOn !== false; S.magMax = [0, 5, 10, 20, 30, 40, 50].includes(o.magMax) ? o.magMax : 40; S.prevRoute = o.prevRoute || (S.routeMode !== 'line' ? S.routeMode : 'trekking'); S.nextId = o.nextId || (Math.max(0, ...S.notes.map(n => n.id)) + 1); S.sel = null;
   for (let i = 1; i < S.ctrl.length; i++) if (S.segs[i - 1]) routeCache.set(segKey(S.ctrl[i - 1], S.ctrl[i], S.ctrl[i][2]), S.segs[i - 1]);
   if (o.mySyms) { regMySyms(o.mySyms); saveMySyms(); }      // symboles importés contenus dans le projet
   S.stages = o.stages || []; S.marks = o.marks || []; S.ele = o.ele || null; S.timing = o.timing || null; S.dataSrc = o.dataSrc || ''; S.dataSrcN = o.dataSrcN || ''; renderMarks();
@@ -2827,7 +2828,7 @@ function renderCtrl() {
     m.on('dragend', async () => {
       const p = m.getLatLng(); let pt = [p.lat, p.lng], dm = null;
       const md0 = S.ctrl.length > 1 ? (i > 0 ? S.ctrl[i][2] : S.ctrl[1][2]) : null, md = md0 === 'osmway' ? S.routeMode : md0;
-      if (snapIsOn() && !magBusy && md && !/^(line|trace)$/.test(md)) {      // aimant : le point déplacé se replace sur la route (les tronçons en ligne droite ou de trace chargée ne sont pas touchés)
+      if (snapIsOn() && magOn() && !magBusy && md && !/^(line|trace)$/.test(md)) {      // aimant : le point déplacé se replace sur la route (les tronçons en ligne droite ou de trace chargée ne sont pas touchés)
         magBusy = true;
         try {
           const t = i > 0 ? await magnetTry(S.ctrl[i - 1].slice(0, 2), pt, true, md) : await magnetTry(S.ctrl[1].slice(0, 2), pt, false, md), r = t.r;
@@ -2848,9 +2849,11 @@ function renderCtrl() {
   updHist();
 }
 /* « 🧲 Route » : activé, les points posés suivent les chemins (menu « Tracé ») ; désactivé, ils sont reliés en ligne droite (hors-piste). Réglage changeable à tout moment, chaque tronçon garde celui de sa pose. */
+const magOn = () => S.magMax !== 0;      // 0 = aimant coupé : le routage reste actif mais les points sont posés tels quels
 const snapIsOn = () => S.snapOn !== false && S.routeMode !== 'line';
 const curMode = () => snapIsOn() ? S.routeMode : 'line';
 function updSnapBtn() {
+  MAG_MAX = S.magMax || 40; const mg = $('#magMax'); if (mg) mg.value = String(S.magMax === 0 ? 0 : MAG_MAX);
   const b = $('#bSnapMode'); if (!b) return; const on = snapIsOn();
   b.textContent = on ? '🧲 Routage : activé' : '🧲 Routage : désactivé'; b.classList.toggle('on', on);
   b.title = on ? 'Les points suivants suivent les chemins. Cliquer (ou touche R) pour les relier en ligne droite (hors-piste).' : 'Les points suivants sont reliés en ligne droite. Cliquer (ou touche R) pour qu’ils suivent de nouveau les chemins.';
@@ -2861,7 +2864,7 @@ function toggleSnap() {
   updSnapBtn(); save(); toast(snapIsOn() ? 'Routage activé : les points suivent les chemins.' : 'Routage désactivé : lignes droites.', 'ok');
 }
 /* Mode aimant : un point posé est replacé sur la route / le chemin le plus proche (là où le routeur le pose) ; trop loin (> MAG_MAX m), il est refusé. Sans internet : posé tel quel. */
-const MAG_MAX = 40;
+let MAG_MAX = 40;      // distance maxi clic ↔ route (réglable : 5 à 50 m, S.magMax)
 const dMeters = (p, q) => { const k = Math.cos(p[0] * Math.PI / 180); return Math.hypot((q[1] - p[1]) * k * 111320, (q[0] - p[0]) * 110540); };
 const tooFarMsg = d => `🧲 Point trop loin d’une route ou d’un chemin${isFinite(d) ? ' (' + Math.round(d) + ' m)' : ''}. Rapproche-le, ou désactive « Routage » (touche R).`;
 let magBusy = false;
@@ -2939,7 +2942,7 @@ async function magnetTry(nb, p, nbFirst, mode) {
 async function addCtrl(p) {
   if (magBusy) { toast('Calcul du point précédent en cours…', 'ok'); return; }
   let pt = [+p[0].toFixed(6), +p[1].toFixed(6)], first = null, pm = null, rSeg = null, osmPoly = null;
-  if (snapIsOn() && S.ctrl.length) {
+  if (snapIsOn() && magOn() && S.ctrl.length) {
     magBusy = true;
     try {
       const last = S.ctrl[S.ctrl.length - 1], t = await magnetTry(last.slice(0, 2), pt, true, S.routeMode), r = t.r; pm = t.mode !== S.routeMode ? t.mode : null;
@@ -6802,6 +6805,7 @@ $('#bSnapMode').onclick = toggleSnap;
 $('#bRedo').onclick = redo;
 $('#bFree').onclick = () => setTool('free');
 $('#bErase').onclick = () => setTool('erase');
+$('#magMax').onchange = e => { S.magMax = +e.target.value; updSnapBtn(); save(); toast(S.magMax ? 'Aimant : ' + S.magMax + ' m maximum entre ton clic et la route.' : 'Aimant coupé : les points sont posés tels quels (le routage reste actif).', 'ok'); };
 $('#routeMode').onchange = e => { S.routeMode = e.target.value; if (S.routeMode !== 'line') { S.prevRoute = S.routeMode; S.snapOn = true; } updSnapBtn(); save(); if (/^ors:/.test(S.routeMode) && !orsKey()) orsDialog(); };
 $('#orsBtn').onclick = orsDialog;
 $('#bGen').onclick = generate;
