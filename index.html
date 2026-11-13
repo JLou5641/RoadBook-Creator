@@ -1027,6 +1027,11 @@ body.dragNote .leaflet-tooltip{display:none}
 .svlnk{color:#3a2a14;text-decoration:none;display:block;padding:4px 2px}
 .svlnk:hover{text-decoration:underline}
 .svco{font:11px/1.2 ui-monospace,monospace;color:#6b6558;margin-top:2px}
+
+.rptgo{cursor:pointer;padding:2px 4px;border-radius:4px}.rptgo:hover{background:rgba(255,140,0,.18)}.rptgo.on{background:rgba(255,106,26,.28);font-weight:600}
+#modal.rptmini{max-height:42vh;overflow:auto;width:min(440px,94vw)}
+#drawBox #bSnapMode{background:#2e8b57;color:#fff;border-color:#1f6b40}
+#drawBox #bSnapMode:not(.on){background:#fff;color:#444;border-color:#aaa}
 </style>
 </head>
 <body>
@@ -1034,7 +1039,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261111.2311</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261113.2242</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1063,8 +1068,9 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
+          <button data-act="report">📋 Dernier rapport de génération</button>
           <button data-act="manual">📖 Manuel d'utilisation</button>
-          <div class="ver">Version v0.261111.2311</div>
+          <div class="ver">Version v0.261113.2242</div>
         </div>
       </div>
     </div>
@@ -1142,6 +1148,7 @@ body.dragNote .leaflet-tooltip{display:none}
             <option value="ors:foot-walking">🚶 Marche (OpenRoute 🔑)</option>
             <option value="line">Ligne droite</option>
           </select>
+          <button id="bSnapMode" class="on">🧲 Routage : activé</button>
           <button id="orsBtn" title="Clé OpenRouteService (profils rando, VTT, vélo de route)">🔑</button>
         </div>
         <div class="dgrp">Dessin</div>
@@ -1425,8 +1432,11 @@ const FIA_LEX = {
   const ROPE = { c: "Symboles", l: "Corde", en: "Rope", w: 72, h: 72, d: 'data:image/png;base64,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' };
   const MOTO = { c: "Symboles", l: "Barrière anti-moto", en: "Anti-motorbike barrier", w: 72, h: 72, d: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAAEmUlEQVR4Xu2bu08jVxTGP2ObVyAoSAj6QIFEQY2UhoYO7VagFUVSQENDAYKKV0VBQ4EEf0BS0ATRIS00kfgDgIpHtWkQRCxr3gYcfXfnOIODZ+Z6YMzA+UlXMxgfzz2fzzlz58wYUBRFURRFURRFURRFURTFmgRgxlvhWf2pcKni3o8rL+JPFWDGW+FZ/BGlPwA4dAb3SRwj6Vn9kRytBvA3gJwzvjiR9Kw5HAEl++MVCRSl1hkPgBk/OIP/ixsl+ZPy8VIiR4SUv+OKtT9+AhH36Z37FCvpvB6XSOK8OVfOvdAfT4II5IYHyQC4j2kIce5WX6qtQGkAvwD4ZhlBtCPZEoUNay8R9COQ/6xA2AhE5esBfDZ5l0ggl8uZrRd8T0VFBR4eWOP/Iyr7QjgfJ4q8J+5gI5AhmUzm7u/v5UD5rRducZLJJKK2LyCQMNYC8RvnaGxsTIyOjqKqqgp3d3cmOopBYfi+g4MDLCwsiD2isnfDuVRXV2N/fz8/FyeaPAkcQfwwjuPjY6yvr2NmZgZXV1fmw73SjBPr7OzE9fU1lpeXI7cXOI/a2tr/pbofgQVKp9Nob2/H9vY2Njc3UVdXh5GREZydnXlGEaGQ/f39ODo6wurqauT2RNL85ubGT5NHFM8PF4wQptPg4CC6u7vNf9bW1rCyssKUyxdipluxkclkMDw8jK6urrLYy7z8TiqFBBKIML2y2SwmJibQ2tpqXmPKbGxsoKGhwQhYDDlj3d7eYnx8HG1tbZHahyGwQIQisOhOTU2hqanJiDY/P4/d3V3U19ebs1Mx+A2K/fT0dOT2pWIlEJ1kPWlubsbk5KQpepeXl5idnTX1paamxrMI0p7Fulz2pWAlEOE65vz8HB0dHeZ0zfThmY1nNRbAVCrlKRLtWY/KZW+LtUAiEs9eLNhDQ0Pmtb29PczNzaGysjJfc4pBEctpb4OVQKw5PF1yMHJOT0/R19eH3t5ec8ytrS0sLi6aeiTvK7Ytl32QxaGbwOsgwgLNukNYT3gwFt6xsTGTdlwfcZ3T0tKCgYEBXFxceK6RorSXhSJ9sMFKoMPDw3yhlUsMHpgp09PTg52dHZycnGBpaclMhMsB1iW/y5Eo7OVSgz7YUOzCTdoDPznNem55GSyvP4lciJZKRPbiA7enAH52tk/6ZhVBJFGwFJWWB7fudZC0OPxWrlHbv2QNosKZXC73sbBh9sRB0861TzbIhCKwdzfM/nT6WoGwjSB2BP8CcBvo018flbZdTVuB+E2wq/jVrx69MiSCOPeXaZi5YO+UF12eBfuVIXN93PcNgNVC8T2iAvmgAqlA4dAI0ggKh0aQRlA4NII0gsKhEaQRFA6NII2gcGgEaQSFo7CjKI/3SoPpqY4jX+OIY8MsiD+8e2P1FO8/rp8icD/uWPkjikqf9hMAPrwj98D4W43vt1K/w/05ANcxVcnLH/F5H8Afjn/mkVgR6VdXpMgj+9zyySjezeDgvvt/cdwP4s9vjkCpIHc1WJfeEkH8yTf3JbXkNxhMMd6KlXB7T4jPvHn/uytTFC8Kb6IFSbn3QPEnUpXH/AtzLJSMmQ8zHwAAAABJRU5ErkJggg==' };
   const MURET = { c: "Symboles", l: "Muret", en: "Low wall", w: 72, h: 72, d: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAYAAABV7bNHAAADSElEQVR4Xu2avY7TQBSFjxNQol2k0PAESbpVIm1DAw9CSwNNFFHxCiCqVRoKeh6EimYl0HZJajqkSPsXLcmgM+sbzVq2Z+z8OKvcT3I2msw9ax/P3x0bUBRFURRFURRFURRFURRFURRFURRFURRFUfaXCLBHHYDZ39OsBPqyqOQ/Pybo0gsAHwF0YsdYdsiwJ7FHTQB8fgLgE4C3riO1Wq2UQcvl0saVjfexK32H5zSo4RTYPicnUpZ1431sWz9uQaRBgz4A+APgJYDXLD05OUGr1cJisUAU5fc4Ywzq9TpmsxkuLi6sapF4H1XoA/gB4CeAL+7V96Io+mWMMaPRKDo9PcXV1ZW3u/BuHh8f4/z8HIPBwF7vaDRCaLyPHeubKIoiY0wfwG+eG1sQD/JMTvbm5gaXl5e4vr4OMoh3mTFl4n3QoF3rx15YX/jBUZtjz/0IGw+yHGjl8JGs58ZuYsDetX7sxT+OReWmqwNCDfKgBqlB66EtyINM8Q/gtMrpNWTFKvUYIxSJ91GFvkuqQY1GA0dHR6spPw9eAOsyRigS76MK/SyDVk1gOp3atcft7a13HcMLaDabNkYoEu+jCv3k3hhTe/LKWTTSrMIHV+k8ysSGxGxbP14w8y+9IPXULpZEElZ3nEnD93tZXWHb+g6r3uQadEcjjDHRcDhEp8P9M2AymeDs7Mx+Z3m32w3qellIlxmPxxvVFYrqJ+ozV6UHTDMsrkGrzL7dbqPX69kK7l1jeb/fD0pi8wzioO7OkJvQdQ0qoi+TQGLGXnmR2sXm87k1gfC7IOUhWX6eQdvQdQ0qoi/GuNfpkmoQm5lk4e6GmZSHZvlZMH4bukJR/WR9F11Je1CD1KD10BakLWg9crN5suksvYrsPG93Ie180qZ55mOSkz3IxjedpVeRneftLqSdT+yF9UNaEJ9q/BXnkpm5Wx6a5WdRRXaet7uQdj6xF/TEmsSPNwC+xY87gjLrkOz7kdbh4y96QU/qzDneAfga3/G7+H2hzAze9yg6lGRmvildoai+U5839mms814eHAryQ+bWQtEth1C2pZtlWCBG3i5jc+L+Bt3T94PuPRgD+B5o5OEirSVoZ/EAWW2cKYqiKHvIfzQ9wqN5w6QOAAAAAElFTkSuQmCC' };
+  const TLIGHT = { c: "Sécurité", l: "Feux tricolores", en: "Traffic lights", w: 72, h: 72, d: 'data:image/png;base64,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' };
+  const PEDX = { c: "Sécurité", l: "Passage piéton", en: "Pedestrian crossing", w: 72, h: 72, d: 'data:image/png;base64,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' };
+  const SBUMP = { c: "Sécurité", l: "Ralentisseur", en: "Speed bump", w: 72, h: 72, d: 'data:image/png;base64,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' };
   const all = Object.entries(FIA_LEX), i = all.findIndex(([, v]) => v.c === 'Symboles');
-  all.splice(i < 0 ? all.length : i, 0, ['roundabout', ROUND], ['wind', WIND], ['chimney', CHIM], ['bollard', BOL], ['yield', YIELD], ['mud', MUD], ['locality', LOCAL], ['toll', TOLL], ['T', TRAIL], ['windmill', MILL], ['lighthouse', LIGHT], ['tower', TOWER], ['snow', SNOW], ['ice', ICE], ['chain', CHAIN], ['blocks', BLOCKS], ['chicane', CHIC], ['customs', CUST], ['log', LOG], ['debris', DEB], ['rope', ROPE], ['motobar', MOTO], ['lowwall', MURET]);
+  all.splice(i < 0 ? all.length : i, 0, ['roundabout', ROUND], ['wind', WIND], ['chimney', CHIM], ['bollard', BOL], ['yield', YIELD], ['mud', MUD], ['locality', LOCAL], ['toll', TOLL], ['T', TRAIL], ['windmill', MILL], ['lighthouse', LIGHT], ['tower', TOWER], ['snow', SNOW], ['ice', ICE], ['chain', CHAIN], ['blocks', BLOCKS], ['chicane', CHIC], ['customs', CUST], ['log', LOG], ['debris', DEB], ['rope', ROPE], ['motobar', MOTO], ['lowwall', MURET], ['trafficlight', TLIGHT], ['pedcross', PEDX], ['speedbump', SBUMP]);
   for (const k of Object.keys(FIA_LEX)) delete FIA_LEX[k];
   for (const [k, v] of all) FIA_LEX[k] = v;
 })();
@@ -2047,7 +2057,7 @@ function simplifyDP(pts, tol) {         // Douglas-Peucker, renvoie les indices 
 const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, mixY: false, mixT: true, lmOff: [], followLvl: 3, bends: true, offroad: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true, marksExport: true, showRO: true, showPI: true, showTR: true, arrows: true };
 const S = {
   name: 'Mon roadbook', desc: '', src: '', ll: [], mm: null, ctrl: [], segs: [], notes: [], settings: { ...DEF_SETTINGS }, stages: [], marks: [], ele: null, timing: null,
-  stale: false, routeMode: 'trekking', nextId: 1, sel: null
+  stale: false, routeMode: 'trekking', snapOn: true, prevRoute: 'trekking', nextId: 1, sel: null
 };
 let T = null;    // parcours dérivé : {xy, cum, L, grid}
 let G = null;    // réseau OSM : {nodes, ways, key}
@@ -2064,7 +2074,7 @@ let saveTimer = null, saveWarned = false;
 
 function snapshot() {
   return { v: 2, name: S.name, desc: S.desc, src: S.src, ll: S.ll, mm: S.mm, ctrl: S.ctrl, segs: S.segs, notes: S.notes, settings: S.settings,
-    stale: S.stale, routeMode: S.routeMode, nextId: S.nextId, stages: S.stages, marks: S.marks, ele: S.ele, timing: S.timing, dataSrc: S.dataSrc || '', dataSrcN: S.dataSrcN || '', mySyms: MYS };
+    stale: S.stale, routeMode: S.routeMode, snapOn: S.snapOn, prevRoute: S.prevRoute, nextId: S.nextId, stages: S.stages, marks: S.marks, ele: S.ele, timing: S.timing, dataSrc: S.dataSrc || '', dataSrcN: S.dataSrcN || '', mySyms: MYS };
 }
 let dirty = false;
 function setDirty(v) { dirty = v; try { localStorage.setItem('rbgen.dirty', v ? '1' : ''); } catch (e) { } const b = document.getElementById('bSave'); if (b) { b.classList.toggle('dirty', v); b.title = v ? 'Modifications non sauvegardées dans un fichier : clique pour sauvegarder le projet' : 'Sauvegarder le projet en cours (fichier .json à rouvrir plus tard)'; } }
@@ -2103,7 +2113,7 @@ function restore(o) {
   S.name = o.name || 'Mon roadbook'; S.desc = o.desc || ''; S.src = o.src || ''; S.ctrl = o.ctrl || []; S.segs = o.segs || [];
   S.notes = o.notes || []; S.settings = { ...DEF_SETTINGS, ...(o.settings || {}) }; S.stale = !!o.stale;
   if ((o.settings || {}).sv !== DEF_SETTINGS.sv) S.settings = { ...S.settings, sv: DEF_SETTINGS.sv, tol: DEF_SETTINGS.tol, water: true, bld: true };
-  S.routeMode = o.routeMode || 'trekking'; S.nextId = o.nextId || (Math.max(0, ...S.notes.map(n => n.id)) + 1); S.sel = null;
+  S.routeMode = o.routeMode || 'trekking'; S.snapOn = o.snapOn !== false; S.prevRoute = o.prevRoute || (S.routeMode !== 'line' ? S.routeMode : 'trekking'); S.nextId = o.nextId || (Math.max(0, ...S.notes.map(n => n.id)) + 1); S.sel = null;
   for (let i = 1; i < S.ctrl.length; i++) if (S.segs[i - 1]) routeCache.set(segKey(S.ctrl[i - 1], S.ctrl[i], S.ctrl[i][2]), S.segs[i - 1]);
   if (o.mySyms) { regMySyms(o.mySyms); saveMySyms(); }      // symboles importés contenus dans le projet
   S.stages = o.stages || []; S.marks = o.marks || []; S.ele = o.ele || null; S.timing = o.timing || null; S.dataSrc = o.dataSrc || ''; S.dataSrcN = o.dataSrcN || ''; renderMarks();
@@ -2777,7 +2787,7 @@ function setDrawing(on) {
   $('#bDraw').classList.toggle('on', on);
   $('#drawBox').classList.toggle('show', on);
   map.getContainer().classList.toggle('drawing', on);
-  $('#routeMode').value = S.routeMode;
+  $('#routeMode').value = S.routeMode; updSnapBtn();
   clearSel(); if (on) resetHist(); else { tool = null; $('#bSel').classList.remove('on'); spaceDown = false; $('#bFree').classList.remove('on'); $('#bErase').classList.remove('on'); $('#bCut').classList.remove('on'); }
   setCursorCls(); renderCtrl(); renderInfo();
 }
@@ -2807,22 +2817,153 @@ function renderCtrl() {
       : selR.a === selR.b ? 'Point n° ' + (selR.a + 1) + ' sélectionné : le bouton ci-dessous ne traitera que lui (et ses abords).'
       : 'Section du point ' + (selR.a + 1) + ' au point ' + (selR.b + 1) + ' (' + (selR.b - selR.a + 1) + ' points) : le bouton ci-dessous ne traitera qu’elle.';
   }
-  if (bs) bs.textContent = selR ? (selR.a === selR.b ? '🛣 Coller ce point à la route' : '🛣 Coller cette section à la route') : '🛣 Coller toute la trace à la route';
+  if (bs) { bs.textContent = selR ? (selR.a === selR.b ? '🛣 Coller ce point à la route' : '🛣 Coller cette section à la route') : '🛣 Coller à la route : choisis d’abord un départ et une arrivée'; bs.disabled = !selR; }
   S.ctrl.forEach((c, i) => {
     const lk = !!(ls && ls.has(i));
     const inSel = !!selR && i >= selR.a && i <= selR.b;
     const m = L.marker([c[0], c[1]], { draggable: !lk, keyboard: false, icon: L.divIcon({ className: 'cpt' + (i === 0 ? ' first' : '') + (lk ? ' locked' : '') + (inSel ? ' sel' : ''), iconSize: [16, 16] }) });
     let pre = null;
     m.on('dragstart', () => { pre = snap(); });
-    m.on('dragend', () => { const p = m.getLatLng(); pushHist(pre); S.ctrl[i] = [p.lat, p.lng, S.ctrl[i][2]]; reroute(); });
+    m.on('dragend', async () => {
+      const p = m.getLatLng(); let pt = [p.lat, p.lng], dm = null;
+      const md0 = S.ctrl.length > 1 ? (i > 0 ? S.ctrl[i][2] : S.ctrl[1][2]) : null, md = md0 === 'osmway' ? S.routeMode : md0;
+      if (snapIsOn() && !magBusy && md && !/^(line|trace)$/.test(md)) {      // aimant : le point déplacé se replace sur la route (les tronçons en ligne droite ou de trace chargée ne sont pas touchés)
+        magBusy = true;
+        try {
+          const t = i > 0 ? await magnetTry(S.ctrl[i - 1].slice(0, 2), pt, true, md) : await magnetTry(S.ctrl[1].slice(0, 2), pt, false, md), r = t.r;
+          if (r && r.d <= MAG_MAX) { pt = r.pt; if (t.mode !== md) { if (i > 0) dm = t.mode; else S.ctrl[1][2] = t.mode; } }
+          else if (r) {      // « trop loin » d'après le calculateur : on cale sur les données OSM (calculateur indisponible ou peu fiable : le point garde son tronçon, recalculé sur la route)
+            const o = await osmDecide(pt, i > 0 ? S.ctrl[i - 1].slice(0, 2) : null, r.d, md);
+            if (o.kind === 'refuse') { toast(tooFarMsg(o.d), 'err'); renderCtrl(); return; }
+            if (o.kind === 'ok') { pt = o.pt; if (i > 0) { dm = o.poly || md0 === 'osmway' ? 'osmway' : null;      // sans chemin commun : un point de route garde son mode (le tronçon est recalculé sur la route, jamais figé en ligne droite)
+               if (o.poly) routeCache.set(segKey(S.ctrl[i - 1], pt, 'osmway'), [S.ctrl[i - 1].slice(0, 2), ...o.poly.slice(1, -1), pt]); } }
+          }
+        } finally { magBusy = false; }
+      }
+      pushHist(pre); S.ctrl[i] = [pt[0], pt[1], i > 0 && !snapIsOn() ? 'line' : dm || S.ctrl[i][2]]; renderCtrl(); reroute();
+    });
     m.on('click', () => { if (tool === 'sel') { selClick(i); return; } if (lk) { toast('Étape verrouillée 🔒', 'err'); return; } pushHist(); S.ctrl.splice(i, 1); if (i === 0 && S.ctrl.length) S.ctrl[0][2] = null; renderCtrl(); reroute(); });
     m.addTo(ctrlLayer);
   });
   updHist();
 }
-function addCtrl(p) {
+/* « 🧲 Route » : activé, les points posés suivent les chemins (menu « Tracé ») ; désactivé, ils sont reliés en ligne droite (hors-piste). Réglage changeable à tout moment, chaque tronçon garde celui de sa pose. */
+const snapIsOn = () => S.snapOn !== false && S.routeMode !== 'line';
+const curMode = () => snapIsOn() ? S.routeMode : 'line';
+function updSnapBtn() {
+  const b = $('#bSnapMode'); if (!b) return; const on = snapIsOn();
+  b.textContent = on ? '🧲 Routage : activé' : '🧲 Routage : désactivé'; b.classList.toggle('on', on);
+  b.title = on ? 'Les points suivants suivent les chemins. Cliquer (ou touche R) pour les relier en ligne droite (hors-piste).' : 'Les points suivants sont reliés en ligne droite. Cliquer (ou touche R) pour qu’ils suivent de nouveau les chemins.';
+}
+function toggleSnap() {
+  if (snapIsOn()) S.snapOn = false;
+  else { S.snapOn = true; if (S.routeMode === 'line') { S.routeMode = S.prevRoute && S.prevRoute !== 'line' ? S.prevRoute : 'trekking'; $('#routeMode').value = S.routeMode; } }
+  updSnapBtn(); save(); toast(snapIsOn() ? 'Routage activé : les points suivent les chemins.' : 'Routage désactivé : lignes droites.', 'ok');
+}
+/* Mode aimant : un point posé est replacé sur la route / le chemin le plus proche (là où le routeur le pose) ; trop loin (> MAG_MAX m), il est refusé. Sans internet : posé tel quel. */
+const MAG_MAX = 40;
+const dMeters = (p, q) => { const k = Math.cos(p[0] * Math.PI / 180); return Math.hypot((q[1] - p[1]) * k * 111320, (q[0] - p[0]) * 110540); };
+const tooFarMsg = d => `🧲 Point trop loin d’une route ou d’un chemin${isFinite(d) ? ' (' + Math.round(d) + ' m)' : ''}. Rapproche-le, ou désactive « Routage » (touche R).`;
+let magBusy = false;
+async function magnet(nb, p, nbFirst, mode) {      // → { pt: point replacé, d: distance du clic, other: voisin replacé } ou null si le calcul est indisponible
+  const seg = nbFirst ? await routeSeg(nb, p, mode) : await routeSeg(p, nb, mode), q = nbFirst ? seg.snapB : seg.snapA;
+  if (!q || seg.via === 'osrm') return null;      // serveur de secours (OSRM) : il place le point n'importe où, on ne s'y fie pas → point posé comme avant
+  return { pt: [+q[0].toFixed(6), +q[1].toFixed(6)], d: dMeters(p, q), other: nbFirst ? seg.snapA : seg.snapB, seg: nbFirst ? seg : null };
+}
+/* Chemin que le calculateur de route ne connaît pas : on cale le point sur le chemin OSM le plus proche (Overpass) et, si le point précédent est sur le même chemin, le tronçon suit ce chemin. */
+async function osmNearWays(pt) {
+  const q = `[out:json][timeout:15];way["highway"](around:${MAG_MAX + 25},${pt[0]},${pt[1]});out geom;`;
+  let servers; try { servers = await liveServers(); } catch (e) { servers = OVERPASS; }
+  for (const ep of servers.slice(0, 3)) { try { const j = await fetchJSON(ep + '?data=' + encodeURIComponent(q), null, 12000); return j.elements || []; } catch (e) { /* serveur suivant */ } }
+  return null;      // service indisponible
+}
+async function osmSnap(pt, prev) {      // → null (service indisponible) | { d } (rien d'assez proche) | { d, pt, way, poly, prevPt }
+  const ws = await osmNearWays(pt); if (!ws) return null;
+  const k = Math.cos(pt[0] * Math.PI / 180), X = (la, lo) => [(lo - pt[1]) * k * 111320, (la - pt[0]) * 110540];
+  const proj = (way, p) => {
+    let best = null; const g = way.geometry, q = X(p[0], p[1]);
+    for (let i = 0; i < g.length - 1; i++) {
+      const a = X(g[i].lat, g[i].lon), b = X(g[i + 1].lat, g[i + 1].lon), dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
+      const t = L2 ? Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / L2)) : 0, d = Math.hypot(q[0] - (a[0] + t * dx), q[1] - (a[1] + t * dy));
+      if (!best || d < best.d) best = { d, i, t, ll: [g[i].lat + t * (g[i + 1].lat - g[i].lat), g[i].lon + t * (g[i + 1].lon - g[i].lon)] };
+    }
+    return best;
+  };
+  let best = null;
+  for (const w of ws) { if (!w.geometry || w.geometry.length < 2 || /^(steps|elevator|corridor|proposed|construction|platform)$/.test((w.tags || {}).highway || '')) continue; const r = proj(w, pt); if (r && (!best || r.d < best.d)) best = { ...r, w }; }
+  if (!best) return { d: Infinity };
+  const out = { d: best.d, pt: [+best.ll[0].toFixed(6), +best.ll[1].toFixed(6)], way: best.w, bi: best.i };
+  if (prev) {
+    const pr = proj(best.w, prev);
+    if (pr && pr.d <= 15) {      // le point précédent est sur le même chemin : le tronçon en suit le tracé
+      const g = best.w.geometry, mid = [];
+      if (pr.i < best.i || (pr.i === best.i && pr.t <= best.t)) for (let m = pr.i + 1; m <= best.i; m++) mid.push([g[m].lat, g[m].lon]);
+      else for (let m = pr.i; m >= best.i + 1; m--) mid.push([g[m].lat, g[m].lon]);
+      out.poly = [pr.ll, ...mid, best.ll].map(q => [+q[0].toFixed(6), +q[1].toFixed(6)]); out.prevPt = out.poly[0];
+    }
+  }
+  return out;
+}
+/* Le point précédent est sur une route, le nouveau sur un chemin inconnu du calculateur : on cherche où le chemin rejoint une route connue (une de ses deux extrémités),
+   le tronçon suit la route jusque-là puis le chemin jusqu'au point (au lieu d'une diagonale). */
+async function connectViaRoad(prev, o, mode) {
+  const g = o.way.geometry, n = g.length, bi = o.bi, L = pts => pts.reduce((a, q, k) => k ? a + dMeters(pts[k - 1], q) : 0, 0);
+  const toEnd1 = [], toEnd0 = [];
+  for (let m = bi + 1; m < n; m++) toEnd1.push([g[m].lat, g[m].lon]);
+  for (let m = bi; m >= 0; m--) toEnd0.push([g[m].lat, g[m].lon]);
+  const opts = [toEnd1, toEnd0].filter(a => a.length).map(path => ({ path, end: path[path.length - 1], len: L([o.pt, ...path]) })).sort((a, b) => a.len - b.len);
+  for (const x of opts) {
+    const r = await magnet(prev, x.end, true, mode);      // le calculateur atteint-il cette extrémité ?
+    if (r && r.d <= 10 && r.seg && r.seg.length >= 2) {
+      const route = r.seg.slice(0, -1), back = x.path.slice().reverse();
+      return [...route, ...back, o.pt].map(q => [+q[0].toFixed(6), +q[1].toFixed(6)]);
+    }
+  }
+  return null;
+}
+/* décision quand le calculateur de route ne convient pas (point trop loin d'après lui, ou réponse non fiable) */
+async function osmDecide(pt, prev, rd, mode) {      // → { kind: 'asis' } | { kind: 'refuse', d } | { kind: 'ok', pt, poly, prevPt }
+  const o = await osmSnap(pt, prev);
+  if (!o) return rd != null ? { kind: 'refuse', d: rd } : { kind: 'asis' };      // service indisponible : refus si le calculateur a déjà dit « trop loin », sinon on pose comme avant
+  if (o.d > MAG_MAX) return { kind: 'refuse', d: rd != null ? Math.min(rd, o.d) : o.d };
+  let poly = o.poly, prevPt = o.prevPt;
+  if (!poly && prev && mode) { poly = await connectViaRoad(prev, o, mode); prevPt = null; }      // route jusqu'à la jonction puis chemin
+  return { kind: 'ok', pt: o.pt, poly, prevPt };
+}
+/* essaie le mode choisi, puis « Au plus court » (sentiers inclus) si le chemin n'est pas connu du premier : { r, mode } */
+async function magnetTry(nb, p, nbFirst, mode) {
+  let r = await magnet(nb, p, nbFirst, mode);
+  if (r && r.d > MAG_MAX && mode !== 'shortest' && !/^ors:/.test(mode)) { const r2 = await magnet(nb, p, nbFirst, 'shortest'); if (r2 && r2.d < r.d) return { r: r2, mode: r2.d <= MAG_MAX ? 'shortest' : mode, far: r.d < r2.d ? r : r2 }; }
+  return { r, mode };
+}
+async function addCtrl(p) {
+  if (magBusy) { toast('Calcul du point précédent en cours…', 'ok'); return; }
+  let pt = [+p[0].toFixed(6), +p[1].toFixed(6)], first = null, pm = null, rSeg = null, osmPoly = null;
+  if (snapIsOn() && S.ctrl.length) {
+    magBusy = true;
+    try {
+      const last = S.ctrl[S.ctrl.length - 1], t = await magnetTry(last.slice(0, 2), pt, true, S.routeMode), r = t.r; pm = t.mode !== S.routeMode ? t.mode : null;
+      if (r && r.d <= MAG_MAX) {
+        rSeg = r.seg; pt = r.pt;
+        if (S.ctrl.length === 1 && r.other && dMeters(last, r.other) <= MAG_MAX) first = [+r.other[0].toFixed(6), +r.other[1].toFixed(6)];      // le tout premier point est replacé à son tour
+      } else if (r) {      // le calculateur dit « trop loin » : chemin qu'il ne connaît pas, on le cherche dans les données OSM (s'il est indisponible ou peu fiable, on pose le point comme avant)
+        pm = null;
+        const o = await osmDecide(pt, last.slice(0, 2), r.d, S.routeMode);
+        if (o.kind === 'refuse') { toast(tooFarMsg(o.d), 'err'); return; }
+        if (o.kind === 'ok') {
+          pt = o.pt;
+          if (o.poly) { pm = 'osmway'; osmPoly = o.poly; if (S.ctrl.length === 1 && o.prevPt && dMeters(last, o.prevPt) <= 15) first = o.prevPt; }
+          else { pm = 'line'; toast('Chemin trouvé sur la carte, mais pas celui du point précédent : tronçon en ligne droite.', 'ok'); }
+        }
+      }
+    } finally { magBusy = false; }
+  }
   pushHist();
-  S.ctrl.push([+p[0].toFixed(6), +p[1].toFixed(6), S.ctrl.length ? S.routeMode : null]);
+  if (first) S.ctrl[0] = [first[0], first[1], null];
+  const prevC = S.ctrl[S.ctrl.length - 1];
+  if (osmPoly && prevC) routeCache.set(segKey(prevC, pt, 'osmway'), [prevC.slice(0, 2), ...osmPoly.slice(1, -1), pt]);      // le tracé du chemin sert de tronçon
+  if (rSeg && !first && rSeg.length >= 3 && !pm) { const k0 = segKey(prevC, pt, curMode()); if (!routeCache.has(k0)) routeCache.set(k0, cleanEnds([...rSeg.slice(0, -1), pt])); }      // le tronçon déjà calculé pour l'aimant sert tel quel (un seul calcul par clic)
+  S.ctrl.push([pt[0], pt[1], S.ctrl.length ? (pm || curMode()) : null]);
   S.src = 'draw';
   renderCtrl(); reroute();
 }
@@ -2981,7 +3122,16 @@ function orsDialog() {
     [{ label: 'Effacer la clé', onClick: () => { try { localStorage.removeItem('rbgen.orsKey'); } catch (_) {} toast('Clé effacée.', 'ok'); } }, 'sp', { label: 'Annuler' },
      { label: 'Enregistrer', cls: 'primary', onClick: mm => { const v = mm.querySelector('#orsK').value.trim(); try { localStorage.setItem('rbgen.orsKey', v); } catch (_) {} toast(v ? 'Clé enregistrée.' : 'Clé effacée.', 'ok'); } }]);
 }
+const snapInfo = (r, c, via) => { r.via = via; r.snapA = [c[0][1], c[0][0]]; r.snapB = [c[c.length - 1][1], c[c.length - 1][0]]; return r; };      // où le routeur a réellement posé les extrémités (sur la route)
 async function routeSeg(a, b, mode) {
+  if (mode === 'osmway') {      // tronçon calé sur un chemin OSM : sans cache (point précédent déplacé, projet rouvert…), on le recalcule : route jusqu'à la jonction puis chemin
+    const A = a.slice(0, 2), B = b.slice(0, 2), line = [A, B];
+    try {
+      const o = await osmSnap(B, A); if (!o || !o.pt || o.d > MAG_MAX) return line;
+      const poly = o.poly || await connectViaRoad(A, o, S.routeMode === 'line' ? 'trekking' : S.routeMode);
+      return poly ? [A, ...poly.slice(1, -1), B] : line;
+    } catch (e) { return line; }
+  }
   if (mode === 'trace') mode = S.routeMode;      // tronçon d'une trace chargée dont un point a bougé : on suit le mode « Tracé » du menu
   if (!mode || mode === 'line') return [a.slice(0, 2), b.slice(0, 2)];
   if (/^ors:/.test(mode)) {
@@ -2992,7 +3142,7 @@ async function routeSeg(a, b, mode) {
         const j = await fetchJSON(`https://api.openrouteservice.org/v2/directions/${mode.slice(4)}/geojson`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: key },
           body: JSON.stringify({ coordinates: [[a[1], a[0]], [b[1], b[0]]], radiuses: [1000, 1000] }) }, 25000);
         const c = j.features[0].geometry.coordinates;
-        if (c.length >= 2) return cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]);
+        if (c.length >= 2) return snapInfo(cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]), c, 'ors');
       } catch (e) { if (Date.now() - routeWarned > 8000) { routeWarned = Date.now(); toast('OpenRouteService : ' + (e.status === 401 || e.status === 403 ? 'clé refusée' : e.status === 429 ? 'quota du jour atteint' : 'indisponible') + ' : calcul avec BRouter.', 'err'); } mode = 'trekking'; }
     }
   }
@@ -3000,14 +3150,14 @@ async function routeSeg(a, b, mode) {
     const url = `https://brouter.de/brouter?lonlats=${a[1].toFixed(6)},${a[0].toFixed(6)}|${b[1].toFixed(6)},${b[0].toFixed(6)}&profile=${encodeURIComponent(mode)}&alternativeidx=0&format=geojson`;
     const j = await fetchJSON(url, null, 25000);
     const c = j.features[0].geometry.coordinates;
-    if (c.length >= 2) return cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]);
+    if (c.length >= 2) return snapInfo(cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]), c, 'brouter');
   } catch (e) { /* on essaie le serveur de secours */ }
   try {
     const prof = mode === 'car-fast' ? 'routed-car' : mode === 'shortest' ? 'routed-foot' : 'routed-bike';
     const url = `https://routing.openstreetmap.de/${prof}/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson`;
     const j = await fetchJSON(url, null, 25000);
     const c = j.routes[0].geometry.coordinates;
-    if (c.length >= 2) return cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]);
+    if (c.length >= 2) return snapInfo(cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]), c, 'osrm');
   } catch (e) { /* ligne droite */ }
   if (Date.now() - routeWarned > 8000) { routeWarned = Date.now(); toast('Itinéraire indisponible (pas d’internet ?) : tracé en ligne droite.', 'err'); }
   return [a.slice(0, 2), b.slice(0, 2)];
@@ -3098,7 +3248,7 @@ function routeBoxes(margin) {
   return boxes;
 }
 /* ---------- Mémoire des chemins : carreaux de 0,0025° gardés dans le navigateur (sans limite de durée) ---------- */
-const TS = 0.0025, TILE_V = 2, memTiles = new Map();   // TILE_V : version du contenu des carreaux (2 = avec repères)
+const TS = 0.0025, TILE_V = 3, memTiles = new Map();   // TILE_V : version du contenu des carreaux (2 = avec repères, 3 = + panneaux d'agglomération)
 const tkey = (la, lo) => Math.floor(lo / TS) + ',' + Math.floor(la / TS);
 const tileBox = k => { const [tx, ty] = k.split(',').map(Number); return [ty * TS, tx * TS, (ty + 1) * TS, (tx + 1) * TS]; };
 const TileDB = (() => {
@@ -3163,7 +3313,7 @@ function osmQuery(keys) {
   const po = boxes.map(b => `node["amenity"~"^(place_of_worship|fuel)$"](${b});way["amenity"~"^(place_of_worship|fuel)$"](${b});`
     + `node["man_made"~"^(water_tower|mast|tower|communications_tower|chimney|windmill|lighthouse)$"](${b});way["man_made"~"^(water_tower|tower|chimney|windmill|lighthouse)$"](${b});`
     + `node["power"="generator"]["generator:source"="wind"](${b});node["natural"~"^(peak|saddle)$"](${b});node["mountain_pass"="yes"](${b});`
-    + `node["place"~"^(city|town|village|hamlet|locality|isolated_dwelling)$"](${b});node["hazard"](${b});`).join('');
+    + `node["place"~"^(city|town|village|hamlet|locality|isolated_dwelling)$"](${b});node["hazard"](${b});node["traffic_sign"="city_limit"](${b});`).join('');
   return `[out:json][timeout:180];(${hw})->.h;.h out body;.h >;out qt;(${ft});out geom qt;(${po});out center qt;`;
 }
 function attribute(j, keys) {          // répartit la réponse Overpass dans les carreaux demandés
@@ -3515,7 +3665,7 @@ function buildGraph(els) {
   const nodes = new Map(), ways = [], feats = [];
   for (const e of els) if (e.type === 'node') nodes.set(e.id, { id: e.id, lat: e.lat, lon: e.lon, xy: fwd(e.lat, e.lon), br: [], tags: e.tags || null });
   const pois = [], lines = [];
-  for (const e of els) if (e.type === 'poi') pois.push({ id: e.id, xy: fwd(e.lat, e.lon), tags: e.tags || {} });
+  for (const e of els) if (e.type === 'poi') pois.push({ id: e.id, lat: e.lat, lon: e.lon, xy: fwd(e.lat, e.lon), tags: e.tags || {} });
   for (const e of els) if (e.type === 'way' && e.geometry) {          // cours d'eau, plans d'eau, bâtiments, lignes
     const lk = lineKind(e.tags || {});
     if (lk) {
@@ -4092,6 +4242,7 @@ function detectOffroad(known) {
   return out;
 }
 const dataLbl = () => ({ osm: 'OSM', vt: 'OSM', ign: 'IGN', ignd: 'IGN détaillé' }[S.settings.data] || 'OSM');
+const srcLbl = g => ({ bdtopo: 'IGN BD TOPO', ofm: 'OpenFreeMap (OSM)', osm: 'OSM' }[g && g.used] || dataLbl());      // source réellement lue pour les repères
 // raison d'une note ; pour une note sans raison enregistrée, on explique pourquoi (gardée à la main, ou générée avant cette version)
 const whyOf = n => n.why || (n.auto === false || n.edited || n.manual ? 'Note modifiée ou ajoutée à la main : elle est conservée telle quelle quand on régénère le roadbook.' : 'Note générée avec une ancienne version : relance « Générer » pour connaître la raison (tes notes modifiées à la main sont conservées).');
 function mkNote(o) {
@@ -4227,13 +4378,13 @@ const LM_TYPES = [      // [id, libellé, groupe : p = « Notes de repères », 
   ['ford', 'Gué', 'p'], ['level', 'Passage à niveau', 'p'], ['railway', 'Voie ferrée (croisement, pont sur / sous voie ferrée)', 'p'], ['stop', 'STOP', 'p'], ['giveway', 'Cédez le passage', 'p'],
   ['barrier', 'Portail, barrière, grille à bétail, chaîne, plots, chicane', 'p'], ['bridge', 'Pont', 'p'], ['under', 'Sous pont', 'p'], ['tunnel', 'Tunnel, passage sous bâtiment', 'p'],
   ['steps', 'Marches', 'p'], ['surf', 'Sable, boue, cailloux…', 'p'], ['smooth', 'Piste dégradée, très dégradée, impraticable', 'p'], ['incline', 'Montée / descente raide', 'p'],
-  ['fence', 'Longer une clôture', 'p'], ['wall', 'Longer un mur', 'p'], ['hedge', 'Longer une haie', 'p'], ['village', 'Entrée / sortie de village', 'p'], ['col', 'Col', 'p'], ['fuel', 'Station-service', 'p'], ['hazard', 'Danger (panneau)', 'p'],
+  ['fence', 'Longer une clôture', 'p'], ['wall', 'Longer un mur', 'p'], ['hedge', 'Longer une haie', 'p'], ['village', 'Entrée / sortie de village', 'p'], ['col', 'Col', 'p'], ['fuel', 'Station-service', 'p'], ['hazard', 'Danger (panneau)', 'p'], ['signals', 'Feux tricolores', 'p'], ['peds', 'Passage piéton', 'p'], ['calm', 'Ralentisseur, bandes sonores', 'p'],
   ['watertower', 'Château d’eau', 'v'], ['antenna', 'Antenne', 'v'], ['tower', 'Tour', 'v'], ['chimney', 'Cheminée', 'v'], ['mill', 'Moulin', 'v'], ['lighthouse', 'Phare', 'v'], ['wind', 'Éolienne', 'v'],
   ['church', 'Église, lieu de culte', 'v'], ['peak', 'Sommet', 'v'], ['place', 'Lieu-dit, hameau', 'v'], ['trackname', 'Nom de la rue ou de la piste prise au carrefour', 'v']];
 const lmOn = id => !id || !(S.settings.lmOff || []).includes(id);
 function lmId(e) {
   const t = e.text || '', k = e.key || '';
-  if (k === 'ford' || k === 'barrier' || k === 'col' || k === 'hazard' || k === 'bridge' || k === 'tunnel' || k === 'steps' || k === 'surf' || k === 'smooth' || k === 'incline' || k === 'fuel' || k === 'under') return k;
+  if (k === 'ford' || k === 'barrier' || k === 'col' || k === 'hazard' || k === 'bridge' || k === 'tunnel' || k === 'steps' || k === 'surf' || k === 'smooth' || k === 'incline' || k === 'fuel' || k === 'under' || k === 'signals' || k === 'peds' || k === 'calm') return k;
   if (k === 'rail') return /^Passage à niveau/.test(t) ? 'level' : 'railway';
   if (k === 'stop') return t === 'STOP' ? 'stop' : 'giveway';
   if (k === 'par') return /clôture/.test(t) ? 'fence' : /mur/.test(t) ? 'wall' : 'hedge';
@@ -4252,19 +4403,41 @@ function osmExtras(g, notes) {
      – nœud partagé au carrefour : ignoré si notre route est plus importante que celles qui la croisent (la route prioritaire n'a pas de stop). */
   const HWR = { motorway: 9, motorway_link: 9, trunk: 8, trunk_link: 8, primary: 7, primary_link: 7, secondary: 6, secondary_link: 6, tertiary: 5, tertiary_link: 5, unclassified: 4, residential: 4, living_street: 3, service: 3, track: 2, path: 1, footway: 1, cycleway: 1, bridleway: 1 };
   const hwr = w => HWR[(w.tags || {}).highway] || 2;
-  let nodeWays = null;
+  const skipped = [];      // panneaux / obstacles repérés mais écartés (affichés dans le rapport)
+  let nodeWays = null, stopDbg = '';
+  const ensureNW = () => { if (!nodeWays) { nodeWays = new Map(); for (const w of g.ways) for (const id of w.nodes || []) { let a = nodeWays.get(id); if (!a) nodeWays.set(id, a = []); a.push(w); } } };
+  /* Portail, gué, passage à niveau, danger : seulement s'ils sont sur la route que l'on suit (nœud du chemin emprunté).
+     Un portail posé sur l'entrée d'une propriété ou à la sortie d'un chemin croisé est sur une autre voie : ignoré. */
+  const onMyWay = (n, sPass) => {
+    ensureNW(); if (n.id == null || !nodeWays.size) return true;
+    const run = []; for (let d = -10; d <= 10; d += 5) { const q = smp[clamp(Math.round((sPass + d) / STEP), 0, smp.length - 1)]; if (q && q.w) run.push(q.w); }
+    if (!run.length) return true;
+    return run.some(w => (w.nodes || []).includes(n.id));
+  };
+  const wrongDir = (n, sPass) => {      // balise direction=forward/backward contraire à notre sens de parcours
+    const d = (n.tags['traffic_signals:direction'] || n.tags.direction || '').toLowerCase(); if (d !== 'forward' && d !== 'backward') return false;
+    const qd = smp[clamp(Math.round((sPass - 4) / STEP), 0, smp.length - 1)];
+    return !!(qd && qd.dir && ((d === 'forward' && qd.dir < 0) || (d === 'backward' && qd.dir > 0)));
+  };
+  let skipWhy = '';
   const stopIsMine = (n, sPass) => {
-    if (!nodeWays) { nodeWays = new Map(); for (const w of g.ways) for (const id of w.nodes || []) { let a = nodeWays.get(id); if (!a) nodeWays.set(id, a = []); a.push(w); } }
+    ensureNW();
+    const mine = []; for (let d = -12; d <= 3; d += 3) { const q0 = smp[clamp(Math.round((sPass + d) / STEP), 0, smp.length - 1)]; if (q0 && q0.w && !mine.includes(q0.w)) mine.push(q0.w); }      // chemins parcourus juste avant le panneau
     const q = smp[clamp(Math.round((sPass - 8) / STEP), 0, smp.length - 1)];
-    const my = (q && q.w) || wayAtS(sPass), ws = n.id != null ? nodeWays.get(n.id) : null;
-    if (!my || !ws) return true;                          // données incomplètes : on garde le panneau
-    if (!ws.includes(my)) return false;
-    const d = (n.tags.direction || '').toLowerCase();
-    if (q && q.dir && ((d === 'forward' && q.dir < 0) || (d === 'backward' && q.dir > 0))) return false;
+    const ws = n.id != null ? nodeWays.get(n.id) : null;
+    const my = (ws && mine.find(w => ws.includes(w))) || (q && q.w) || wayAtS(sPass);
+    const nm = w => (w.tags.highway || '?') + (w.tags.ref ? ' ' + w.tags.ref : w.tags.name ? ' ' + w.tags.name : '') + ' #' + w.id;
+    stopDbg = `nœud OSM ${n.id}, direction=${n.tags.direction || '—'} ; notre route : ${my ? nm(my) : '?'} ; ways au nœud : ${ws ? ws.map(nm).join(', ') : 'inconnus'}`;
+    if (!my) return true;                                 // données incomplètes : on garde le panneau
+    if (!ws) { if (n.id == null || !nodeWays.size) return true; skipWhy = 'point hors de tous les chemins connus (route croisée non chargée)'; return false; }
+    if (!ws.includes(my)) { skipWhy = 'point d\'une autre route que la nôtre'; return false; }
+    const d = (n.tags.direction || '').toLowerCase(), qd = smp[clamp(Math.round((sPass - 4) / STEP), 0, smp.length - 1)];
+    if (qd && qd.w === my && qd.dir && ((d === 'forward' && qd.dir < 0) || (d === 'backward' && qd.dir > 0))) { skipWhy = 'direction=' + d + ' contraire à notre sens'; return false; }
     const hdg = trackBearing(sPass - 14, sPass - 2), at = id => { const q2 = g.nodes.get(id); return q2 && q2.xy; };
     const straight = w => { const i = w.nodes.indexOf(n.id); return [w.nodes[i - 1], w.nodes[i + 1]].some(id => id != null && at(id) && Math.abs(angDiff(bxy(n.xy, at(id)), hdg)) < 30); };      // suite de notre route (voie coupée au carrefour)
     const others = ws.filter(w => w !== my && !straight(w));
-    return !others.length || hwr(my) <= Math.max(...others.map(hwr));
+    if (others.length && hwr(my) > Math.max(...others.map(hwr))) { skipWhy = 'notre route est prioritaire sur celle qui la croise'; return false; }
+    return true;
   };
   if (st.pois) {
     // 1. nœuds du chemin : gués, passages à niveau, stops, barrières, cols, dangers
@@ -4277,14 +4450,22 @@ function osmExtras(g, notes) {
       if (t.highway === 'give_way') it.push({ text: 'Cédez le passage', key: 'stop', stop: true });
       if (BARRIER_TXT[t.barrier]) it.push({ text: BARRIER_TXT[t.barrier] + (/^(private|no)$/.test(t.access || '') ? ' (privé)' : ''), key: 'barrier' });
       if (t.mountain_pass === 'yes' || t.natural === 'saddle') it.push({ text: (tName(t) || 'Col') + tEle(t), key: 'col' });
+      if (t.highway === 'traffic_signals' || t.crossing === 'traffic_signals') it.push({ text: t.highway === 'crossing' ? 'Feux tricolores (passage piéton)' : 'Feux tricolores', key: 'signals' });
+      else if (t.highway === 'crossing' && !t.railway) it.push({ text: 'Passage piéton', key: 'peds' });
+      if (/^(bump|hump|table|cushion)$/.test(t.traffic_calming || '')) it.push({ text: 'Ralentisseur', danger: 1, key: 'calm' });
+      else if (t.traffic_calming === 'rumble_strip') it.push({ text: 'Bandes sonores', key: 'calm' });
       if (t.hazard) it.push({ text: 'Danger : ' + (HAZARD_TXT[t.hazard] || t.hazard.replace(/_/g, ' ')), danger: 2, key: 'hazard' });
       if (!it.length) continue;
+      if (it.some(e => /^(stop|barrier|hazard|signals|peds|calm)$/.test(e.key))) for (const ps of passes(n.xy, 25)) if (ps.d > 6) skipped.push({ s: ps.s, lat: n.lat, lon: n.lon, text: it[0].text, why: 'à ' + Math.round(ps.d) + ' m de la trace (limite : 6 m)' });
       for (const ps of passes(n.xy, 6)) for (const e of it) {
-        if (e.stop && !stopIsMine(n, ps.s)) continue;      // panneau de la route que l'on croise : pas pour nous
+        if (e.stop && !stopIsMine(n, ps.s)) { skipped.push({ s: ps.s, lat: n.lat, lon: n.lon, text: e.text, why: skipWhy }); continue; }      // panneau de la route que l'on croise : pas pour nous
+        if (/^(hazard|signals|calm)$/.test(e.key) && wrongDir(n, ps.s)) { skipped.push({ s: ps.s, lat: n.lat, lon: n.lon, text: e.text, why: 'direction=' + (n.tags['traffic_signals:direction'] || n.tags.direction) + ' contraire à notre sens' }); continue; }
+        if (e.key === 'peds') { const mw = wayAtS(ps.s); if (!mw || hwr(mw) < 3) continue; }      // pas de passage piéton noté sur un sentier
+        if (!e.stop && /^(barrier|ford|rail|hazard|signals|peds|calm)$/.test(e.key) && !onMyWay(n, ps.s)) { skipped.push({ s: ps.s, lat: n.lat, lon: n.lon, text: e.text, why: 'posé sur une autre voie que la nôtre' }); continue; }      // objet posé à côté de la route (entrée de propriété, chemin croisé)
         if (e.stop) {               // le panneau ne compte que si l'on arrive au carrefour
           const ahead = jS.find(js => js >= ps.s - 2 && js - ps.s <= 45);
-          if (ahead == null && jS.some(js => js < ps.s - 2 && ps.s - js <= 30)) continue;
-          ev.push({ ...e, s: ahead != null ? ahead : ps.s, own: true });
+          if (ahead == null && jS.some(js => js < ps.s - 2 && ps.s - js <= 30)) { skipped.push({ s: ps.s, lat: n.lat, lon: n.lon, text: e.text, why: 'après le carrefour (on l\'a déjà passé)' }); continue; }
+          ev.push({ ...e, s: ahead != null ? ahead : ps.s, own: true, dbg: stopDbg });
         } else ev.push({ ...e, s: ps.s, own: true });
       }
     }
@@ -4357,8 +4538,12 @@ function osmExtras(g, notes) {
       for (const q of inn) { if (q.P) { if (cs && q.s - cs.s1 <= 120) { cs.s1 = q.s; } else { cs = { s0: q.s, s1: q.s, P: q.P }; segs.push(cs); } } }
       const places = g.pois.filter(q => /^(city|town|village|hamlet)$/.test(q.tags.place || '') && tName(q.tags));
       const nameAt = (s, P) => { if (tName(P.tags)) return tName(P.tags); const p = pointAt(s); let b = null; for (const q of places) { const d = dxy(q.xy, p); if (d < 2500 && (!b || d < b.d)) b = { d, n: tName(q.tags) }; } return b ? b.n : ''; };
+      /* panneaux d'agglomération (traffic_sign=city_limit) : s'il y en a un près d'une entrée / sortie, on y cale la note (position fiable) */
+      const cl = [...g.pois, ...[...g.nodes.values()].filter(q => q.tags && q.tags.traffic_sign)].filter(q => q.tags.traffic_sign === 'city_limit');
+      const clAt = s0 => { let b = null; for (const q of cl) { const pr = nearestPass(q.xy, 30); if (pr && Math.abs(pr.s - s0) <= 150 && (!b || Math.abs(pr.s - s0) < Math.abs(b - s0))) b = pr.s; } return b; };
       for (const sg of segs) {
         if (sg.s1 - sg.s0 < 80) continue;
+        if (cl.length) { const a = clAt(sg.s0), z = clAt(sg.s1); if (a != null) sg.s0 = a; if (z != null) sg.s1 = z; }
         const name = nameAt((sg.s0 + sg.s1) / 2, sg.P);
         if (sg.s0 > 30) ev.push({ s: sg.s0, text: 'Entrée ' + (name || 'agglomération'), key: 'village-in', own: true });
         if (sg.s1 < T.L - 30) ev.push({ s: sg.s1, text: 'Sortie ' + (name || 'agglomération'), key: 'village-out', own: true });
@@ -4384,6 +4569,10 @@ function osmExtras(g, notes) {
     if (!txt) continue;
     if ((kind === 'land' || kind === 'place') ? !st.landmarks : !st.pois) continue;
     const pr = nearestPass(P.xy, maxD); if (!pr) continue;
+    if (kind === 'hazard') {      // panneau isolé (hors de tout chemin) : il doit être au bord de notre route, pas sur la voisine
+      if (pr.d > 15) { skipped.push({ s: pr.s, lat: P.lat, lon: P.lon, text: txt, why: 'à ' + Math.round(pr.d) + ' m de la trace (limite : 15 m pour un danger isolé)' }); continue; }
+      if (wrongDir(P, pr.s)) { skipped.push({ s: pr.s, lat: P.lat, lon: P.lon, text: txt, why: 'direction=' + t.direction + ' contraire à notre sens' }); continue; }
+    }
     const side = pr.d > 8 ? ' à ' + sideOf(pr.s, P.xy) : '';
     if (kind === 'col' || kind === 'hazard') ev.push({ s: pr.s, text: txt, key: kind, own: true, danger });
     else if (kind === 'fuel') ev.push({ s: pr.s, text: txt + side, key: 'fuel', attach: 40, own: true });
@@ -4411,11 +4600,12 @@ function osmExtras(g, notes) {
     } else if (e.own) {
       const tt = trackTulip(e.s, 'info');
       const nn = mkNote({ s: e.s, xy: tt.xy, text: e.text, cap: Math.round(trackBearing(e.s, e.s + 30)) % 360, kind: 'info', tulip: tt.tulip });
-      nn.why = 'Repère trouvé dans les données ' + dataLbl() + ' le long de la trace'; nn.src = { t: 'trk', kind: 'info' }; nn.danger = e.danger || 0;
+      nn.why = 'Repère trouvé dans les données ' + srcLbl(g) + ' le long de la trace' + (e.dbg ? ' · ' + e.dbg : ''); nn.src = { t: 'trk', kind: 'info' }; nn.danger = e.danger || 0;
       notes.push(nn); notes.sort((a, b) => a.s - b.s); added++;
     }
   }
-  return { events: kept.length, added };
+  skipped.sort((a, b) => a.s - b.s);
+  return { events: kept.length, added, skipped };
 }
 
 /* ============================================================
@@ -4884,6 +5074,9 @@ const AUTO_SYM = [      // [ligne de texte, () → { keys: symboles, text: texte
   [/^Marches$/, () => ({ keys: ['stepup'] })],
   [/^Piste (?:dégradée|très dégradée|impraticable)$/, () => ({ keys: ['BAD'] })],      // le niveau est donné par les « ! » (danger 1, 2, 3)
   [/^Cédez le passage$/, () => ({ keys: ['yield'] })],
+  [/^Feux tricolores(?: \(passage piéton\))?$/, () => ({ keys: ['trafficlight'] })],
+  [/^Passage piéton$/, () => ({ keys: ['pedcross'] })],
+  [/^(?:Ralentisseur|Bandes sonores)$/, () => ({ keys: ['speedbump'] })],
   [/^Boue$/, () => ({ keys: ['mud'] })],
   [/^Péage$/, () => ({ keys: ['toll'] })],
   [/^Lieu-dit (.+)$/, m => ({ keys: ['locality'], text: m[1] })],
@@ -5413,6 +5606,23 @@ async function generate() {
 const keepOnRegen = n => !n.auto || n.moved || n.edited || n.wp || n.zone || n.fuel || (n.sym && n.sym.length) || (n.lex && n.lex.length) || n.tpos || n.tulipEdited || n.symLocked;
 let GENLOG = [];
 const WEBAPP_URL = 'https://jlou5641.github.io/RoadBook-Creator/';
+let rptLayer = null;
+function rptClear() { if (rptLayer) { map.removeLayer(rptLayer); rptLayer = null; } $('#modal').classList.remove('rptmini'); }
+function rptGo(li) {      // clic sur un panneau écarté : zoom sur la carte, le rapport reste ouvert (réduit, déplaçable)
+  const la = +li.dataset.lat, lo = +li.dataset.lon; if (!isFinite(la) || !isFinite(lo)) return;
+  $('#modalBg').classList.add('free', 'top'); $('#modal').classList.add('rptmini');
+  document.querySelectorAll('#modal .rptgo.on').forEach(e => e.classList.remove('on')); li.classList.add('on');
+  if (rptLayer) map.removeLayer(rptLayer);
+  rptLayer = L.layerGroup([L.circle([la, lo], { radius: 6, color: '#ff6a1a', weight: 3, fillOpacity: .15, interactive: false }), L.marker([la, lo], { icon: L.divIcon({ className: 'ctlw', html: '✕', iconSize: [22, 22] }), interactive: false })]).addTo(map);
+  map.setView([la, lo], Math.max(map.getZoom(), 19));
+}
+function showReport(title, html) {      // fenêtre du rapport de génération (aussi rouverte depuis le menu ⋯)
+  const m = openModal(title, html, [
+      { label: '📋 Copier', keep: 1, onClick: (m, el) => { const t = reportText(m); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { el.textContent = '✓ Copié'; }, () => { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); el.textContent = '✓ Copié'; } catch (_) { el.textContent = 'Copie impossible'; } ta.remove(); }); } },
+      { label: '💾 Enregistrer (.txt)', keep: 1, onClick: m => { download('rapport-roadbook-' + new Date().toISOString().slice(0, 10) + '.txt', reportText(m), 'text/plain'); } },
+      'sp', { label: 'Fermer', cls: 'primary' }]);
+  m.querySelectorAll('.rptgo').forEach(li => li.onclick = () => rptGo(li));
+}
 function reportText(m) {      // rapport de génération en texte brut (copie / fichier .txt)
   const body = m.querySelector('.mb').cloneNode(true);
   body.querySelectorAll('li').forEach(li => { li.prepend('• '); li.append('\n'); });
@@ -5481,12 +5691,12 @@ async function runGenerate() {
     rows.push(S.settings.tol === 0 ? 'Trace non recalée.' : `Parcours reconnu sur les chemins : <b>${pc} %</b>.`);
     const sn = typeof srcNote === 'function' ? srcNote() : ''; if (sn) rows.push(esc(sn) + '.');
     let html = rows.map(r => `<p style="margin:0 0 6px">${r}</p>`).join('');
+    if (rep && rep.skipped && rep.skipped.length) html += `<details style="margin-top:8px;padding:6px 8px;border-radius:8px;background:rgba(255,140,0,.10)"><summary style="cursor:pointer"><b>${rep.skipped.length}</b> panneau${rep.skipped.length > 1 ? 'x' : ''} / obstacle${rep.skipped.length > 1 ? 's' : ''} repéré${rep.skipped.length > 1 ? 's' : ''} mais écarté${rep.skipped.length > 1 ? 's' : ''} <span style="color:#b8590a;font-weight:600">— clique ici pour dérouler la liste, puis sur un point pour zoomer dessus</span></summary><ul style="margin:4px 0 0 18px;padding:0;font-size:13px">${rep.skipped.slice(0, 80).map(k => `<li${k.lat != null ? ` class="rptgo" data-lat="${k.lat}" data-lon="${k.lon}" title="Voir sur la carte"` : ''}>${k.lat != null ? '📍 ' : ''}km ${(k.s / 1000).toFixed(2).replace('.', ',')} · ${esc(k.text)} — ${esc(k.why)}</li>`).join('')}${rep.skipped.length > 80 ? '<li>…</li>' : ''}</ul></details>`;
     if (GENLOG.length) html += `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(224,138,0,.14)"><b>À savoir :</b><ul style="margin:4px 0 0 18px;padding:0">${GENLOG.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`;
     if (pc < 60 && S.settings.tol !== 0) html += `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(224,138,0,.14)"><b>Parcours peu reconnu.</b> Seulement ${pc} % de ta trace a pu être recalée sur les chemins (trait noir sur la carte) : les intersections ne sont repérées que sur cette partie. Si la trace a été dessinée à main levée, augmente <b>« Écart maxi trace ↔ chemins »</b> dans ⋯ › Réglages (par ex. 70 m), puis régénère.</div>`;
-    openModal(GENLOG.length || (pc < 60 && S.settings.tol !== 0) ? 'Roadbook généré — rapport (avec avertissements)' : 'Roadbook généré — rapport', html, [
-      { label: '📋 Copier', keep: 1, onClick: (m, el) => { const t = reportText(m); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { el.textContent = '✓ Copié'; }, () => { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); el.textContent = '✓ Copié'; } catch (_) { el.textContent = 'Copie impossible'; } ta.remove(); }); } },
-      { label: '💾 Enregistrer (.txt)', keep: 1, onClick: m => { download('rapport-roadbook-' + new Date().toISOString().slice(0, 10) + '.txt', reportText(m), 'text/plain'); } },
-      'sp', { label: 'Fermer', cls: 'primary' }]);
+    const rtitle = GENLOG.length || (pc < 60 && S.settings.tol !== 0) ? 'Roadbook généré — rapport (avec avertissements)' : 'Roadbook généré — rapport';
+    try { localStorage.setItem('rbgen.report', JSON.stringify({ title: rtitle, html })); } catch (_) { }
+    showReport(rtitle, html);
   } catch (e) {
     closeModal();
     if (e.message === 'annulé') { toast('Génération annulée.'); return; }
@@ -5648,6 +5858,7 @@ function saveProject() {
    ============================================================ */
 let modalOpts = null;
 function openModal(title, body, buttons, opts) {
+  if (typeof rptClear === 'function') rptClear();
   const m = $('#modal'); modalOpts = opts || {};
   m.innerHTML = `<h2>${esc(title)}</h2><div class="mb">${body}</div><div class="mf"></div>`;
   const mf = m.querySelector('.mf');
@@ -5678,7 +5889,7 @@ function openModal(title, body, buttons, opts) {
   const end = () => { d = null; };
   m.addEventListener('pointerup', end); m.addEventListener('pointercancel', end);
 })();
-function closeModal() { $('#modalBg').classList.remove('show'); }
+function closeModal() { $('#modalBg').classList.remove('show'); if (typeof rptClear === 'function') rptClear(); }
 function cancelModal() { if (!$('#modalBg').classList.contains('show') || (modalOpts && modalOpts.noEsc)) return; const o = modalOpts; modalOpts = null; closeModal(); if (o && o.onCancel) o.onCancel(); }
 $('#modalBg').addEventListener('mousedown', e => { if (e.target.id === 'modalBg') cancelModal(); });
 function ask(title, html, okLabel, onOk) { openModal(title, html, ['sp', { label: 'Annuler' }, { label: okLabel, cls: 'primary', onClick: onOk }]); }
@@ -6586,11 +6797,12 @@ $('#bMerge').onclick = () => $('#mergeIn').click();
 $('#mergeIn').onchange = e => { const f = e.target.files[0]; if (f) mergeFile(f); e.target.value = ''; };
 $('#bReduce').onclick = reduceDialog;
 $('#bSel').onclick = () => setTool('sel');
-$('#bSnap').onclick = () => { if (selR) snapSel(); else snapDialog(); };
+$('#bSnap').onclick = () => { if (selR) snapSel(); else toast('Choisis d’abord un point de départ et un point d’arrivée avec « 👆 Sélectionner ».', 'err'); };
+$('#bSnapMode').onclick = toggleSnap;
 $('#bRedo').onclick = redo;
 $('#bFree').onclick = () => setTool('free');
 $('#bErase').onclick = () => setTool('erase');
-$('#routeMode').onchange = e => { S.routeMode = e.target.value; save(); if (/^ors:/.test(S.routeMode) && !orsKey()) orsDialog(); };
+$('#routeMode').onchange = e => { S.routeMode = e.target.value; if (S.routeMode !== 'line') { S.prevRoute = S.routeMode; S.snapOn = true; } updSnapBtn(); save(); if (/^ors:/.test(S.routeMode) && !orsKey()) orsDialog(); };
 $('#orsBtn').onclick = orsDialog;
 $('#bGen').onclick = generate;
 $('#bSave').onclick = saveProject;
@@ -6620,6 +6832,7 @@ $('#moreMenu').addEventListener('click', e => {
   else if (act === 'loadOsm') $('#fileIn').click();
   else if (act === 'theme') cycleTheme();
   else if (act === 'help') openHelp();
+  else if (act === 'report') { let r = null; try { r = JSON.parse(localStorage.getItem('rbgen.report')); } catch (_) { } if (r && r.html) showReport(r.title, r.html); else toast('Aucun rapport : génère d’abord le roadbook.'); }
   else if (act === 'manual') window.open(location.protocol === 'file:' ? 'https://jlou5641.github.io/RoadBook-Creator/manuel/' : 'manuel/', '_blank');
   else if (act === 'new') ask('Nouveau roadbook ?', 'Le parcours et les notes en cours seront effacés (pense à exporter ou enregistrer le projet avant).', 'Tout effacer', () => {
     if (drawing) setDrawing(false);
@@ -6636,6 +6849,7 @@ document.addEventListener('keydown', e => {
     const k = e.key.toLowerCase();
     if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); } else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
   }
+  if (drawing && !typing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'r' && !$('#modalBg').classList.contains('show')) { e.preventDefault(); toggleSnap(); }
   if (drawing && e.code === 'Space' && !typing && !$('#modalBg').classList.contains('show')) { e.preventDefault(); if (!spaceDown) { spaceDown = true; setCursorCls(); } }
 });
 document.addEventListener('keyup', e => { if (e.code === 'Space' && spaceDown) { spaceDown = false; setCursorCls(); } });
@@ -6650,14 +6864,14 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
 (function init() {
   try { const raw = localStorage.getItem(LS_KEY); if (raw) { restore(JSON.parse(raw)); $('#rbName').value = S.name; } } catch (e) { console.warn(e); }
   if (!(S.notes.length || S.ll.length)) ProjDB.get().then(raw => { if (!raw || S.notes.length || S.ll.length) return; try { restore(JSON.parse(raw)); ProjDB.has = true; $('#rbName').value = S.name; $('#routeMode').value = S.routeMode; histPush(raw); renderRoadbook(); renderMarkers(); renderTrack(true); renderInfo(); } catch (e) { console.warn(e); } });      // reprise d'un gros projet gardé dans IndexedDB
-  $('#routeMode').value = S.routeMode;
+  $('#routeMode').value = S.routeMode; updSnapBtn();
   try { setDirty(localStorage.getItem('rbgen.dirty') === '1'); } catch (e) { }
   if (S.notes.length || S.ll.length) histPush(JSON.stringify(snapshot()));
   renderRoadbook(); renderMarkers(); renderTrack(true); renderInfo();
 })();
 
 // accès pour les tests automatisés
-window.__rb = { svgToPNG, tulipSVG, pointAt, inv, tulipEditor, measureForNote, openMeasure, measureAtLL, bendList, bendAt, editNote, altDialog, view3D, cleanEle, timeSeries, timeAt, buildGPX, stagesDialog, stageList, addStage, marksDialog, markForm, pickTrack, parseGPX, cutAt, reverseCtrl, mergeFile, reduceDialog, snapDialog, cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, addManualNote, notesSVG, renderAll, renderRadii, noteRadii };
+window.__rb = { noteView, svgToPNG, tulipSVG, pointAt, inv, tulipEditor, measureForNote, openMeasure, measureAtLL, bendList, bendAt, editNote, altDialog, view3D, cleanEle, timeSeries, timeAt, buildGPX, stagesDialog, stageList, addStage, marksDialog, markForm, pickTrack, parseGPX, cutAt, reverseCtrl, mergeFile, reduceDialog, snapDialog, cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, addManualNote, notesSVG, renderAll, renderRadii, noteRadii };
 })();
 
 // Version installable (PWA) : actif seulement quand la page est servie en https (pas en fichier local)
