@@ -1,0 +1,12 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+(async () => { const b = await chromium.launch(); const p = await (await b.newContext({ viewport: { width: 1000, height: 900 } })).newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/^(?!file)(?!https:\/\/(data\.geopf\.fr\/(wfs|tms)|tiles\.openfreemap\.org)).*/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(400);
+  await p.click('#bMore'); await p.click('[data-act=report]'); await p.waitForTimeout(300); console.log('avant génération :', await p.evaluate(() => (document.querySelector('#toast') || {}).innerText), await p.isVisible('#modal h2'));
+  await p.evaluate(t => window.__rb.loadText(t, 't.gpx'), fs.readFileSync('/home/claude/scan/seg.gpx', 'utf8')); await p.waitForTimeout(500);
+  await p.click('#bGen'); await p.waitForTimeout(300); await p.selectOption('#gsT', 'ign'); await p.selectOption('#gsN', 'vt'); await p.click('#modal .mbtn.primary');
+  await p.waitForSelector('#modal h2:has-text("rapport")', { timeout: 280000 }); await p.click('#modal .mbtn.primary'); await p.waitForTimeout(400);
+  console.log('fermé :', !(await p.isVisible('#modal h2')));
+  await p.click('#bMore'); await p.click('[data-act=report]'); await p.waitForTimeout(300); console.log('rouvert :', await p.innerText('#modal h2'), '|', (await p.innerText('#modal .mb')).slice(0, 80).replace(/\n/g, ' '));
+  await p.reload(); await p.waitForTimeout(600); await p.click('#bMore'); await p.click('[data-act=report]'); await p.waitForTimeout(300); console.log('après rechargement :', await p.isVisible('#modal h2'));
+  console.log('erreurs', errs.join('|') || 0); await b.close(); })();

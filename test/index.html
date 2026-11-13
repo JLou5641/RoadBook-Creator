@@ -1034,7 +1034,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261113.2017</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261113.2023</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1063,8 +1063,9 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
+          <button data-act="report">📋 Dernier rapport de génération</button>
           <button data-act="manual">📖 Manuel d'utilisation</button>
-          <div class="ver">Version v0.261113.2017 · VERSION DE TEST</div>
+          <div class="ver">Version v0.261113.2023 · VERSION DE TEST</div>
         </div>
       </div>
     </div>
@@ -5433,6 +5434,12 @@ async function generate() {
 const keepOnRegen = n => !n.auto || n.moved || n.edited || n.wp || n.zone || n.fuel || (n.sym && n.sym.length) || (n.lex && n.lex.length) || n.tpos || n.tulipEdited || n.symLocked;
 let GENLOG = [];
 const WEBAPP_URL = 'https://jlou5641.github.io/RoadBook-Creator/';
+function showReport(title, html) {      // fenêtre du rapport de génération (aussi rouverte depuis le menu ⋯)
+  openModal(title, html, [
+      { label: '📋 Copier', keep: 1, onClick: (m, el) => { const t = reportText(m); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { el.textContent = '✓ Copié'; }, () => { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); el.textContent = '✓ Copié'; } catch (_) { el.textContent = 'Copie impossible'; } ta.remove(); }); } },
+      { label: '💾 Enregistrer (.txt)', keep: 1, onClick: m => { download('rapport-roadbook-' + new Date().toISOString().slice(0, 10) + '.txt', reportText(m), 'text/plain'); } },
+      'sp', { label: 'Fermer', cls: 'primary' }]);
+}
 function reportText(m) {      // rapport de génération en texte brut (copie / fichier .txt)
   const body = m.querySelector('.mb').cloneNode(true);
   body.querySelectorAll('li').forEach(li => { li.prepend('• '); li.append('\n'); });
@@ -5504,10 +5511,9 @@ async function runGenerate() {
     if (rep && rep.skipped && rep.skipped.length) html += `<details style="margin-top:8px"><summary style="cursor:pointer"><b>${rep.skipped.length}</b> panneau${rep.skipped.length > 1 ? 'x' : ''} / obstacle${rep.skipped.length > 1 ? 's' : ''} repéré${rep.skipped.length > 1 ? 's' : ''} mais écarté${rep.skipped.length > 1 ? 's' : ''}</summary><ul style="margin:4px 0 0 18px;padding:0;font-size:13px">${rep.skipped.slice(0, 80).map(k => `<li>km ${(k.s / 1000).toFixed(2).replace('.', ',')} · ${esc(k.text)} — ${esc(k.why)}</li>`).join('')}${rep.skipped.length > 80 ? '<li>…</li>' : ''}</ul></details>`;
     if (GENLOG.length) html += `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(224,138,0,.14)"><b>À savoir :</b><ul style="margin:4px 0 0 18px;padding:0">${GENLOG.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`;
     if (pc < 60 && S.settings.tol !== 0) html += `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(224,138,0,.14)"><b>Parcours peu reconnu.</b> Seulement ${pc} % de ta trace a pu être recalée sur les chemins (trait noir sur la carte) : les intersections ne sont repérées que sur cette partie. Si la trace a été dessinée à main levée, augmente <b>« Écart maxi trace ↔ chemins »</b> dans ⋯ › Réglages (par ex. 70 m), puis régénère.</div>`;
-    openModal(GENLOG.length || (pc < 60 && S.settings.tol !== 0) ? 'Roadbook généré — rapport (avec avertissements)' : 'Roadbook généré — rapport', html, [
-      { label: '📋 Copier', keep: 1, onClick: (m, el) => { const t = reportText(m); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { el.textContent = '✓ Copié'; }, () => { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); el.textContent = '✓ Copié'; } catch (_) { el.textContent = 'Copie impossible'; } ta.remove(); }); } },
-      { label: '💾 Enregistrer (.txt)', keep: 1, onClick: m => { download('rapport-roadbook-' + new Date().toISOString().slice(0, 10) + '.txt', reportText(m), 'text/plain'); } },
-      'sp', { label: 'Fermer', cls: 'primary' }]);
+    const rtitle = GENLOG.length || (pc < 60 && S.settings.tol !== 0) ? 'Roadbook généré — rapport (avec avertissements)' : 'Roadbook généré — rapport';
+    try { localStorage.setItem('rbgen.report', JSON.stringify({ title: rtitle, html })); } catch (_) { }
+    showReport(rtitle, html);
   } catch (e) {
     closeModal();
     if (e.message === 'annulé') { toast('Génération annulée.'); return; }
@@ -6641,6 +6647,7 @@ $('#moreMenu').addEventListener('click', e => {
   else if (act === 'loadOsm') $('#fileIn').click();
   else if (act === 'theme') cycleTheme();
   else if (act === 'help') openHelp();
+  else if (act === 'report') { let r = null; try { r = JSON.parse(localStorage.getItem('rbgen.report')); } catch (_) { } if (r && r.html) showReport(r.title, r.html); else toast('Aucun rapport : génère d’abord le roadbook.'); }
   else if (act === 'manual') window.open(location.protocol === 'file:' ? 'https://jlou5641.github.io/RoadBook-Creator/manuel/' : 'manuel/', '_blank');
   else if (act === 'new') ask('Nouveau roadbook ?', 'Le parcours et les notes en cours seront effacés (pense à exporter ou enregistrer le projet avant).', 'Tout effacer', () => {
     if (drawing) setDrawing(false);
