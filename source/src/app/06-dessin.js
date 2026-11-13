@@ -70,12 +70,17 @@ function renderCtrl() {
     m.on('dragstart', () => { pre = snap(); });
     m.on('dragend', async () => {
       const p = m.getLatLng(); let pt = [p.lat, p.lng], dm = null;
-      const md = S.ctrl.length > 1 ? (i > 0 ? S.ctrl[i][2] : S.ctrl[1][2]) : null;
+      const md0 = S.ctrl.length > 1 ? (i > 0 ? S.ctrl[i][2] : S.ctrl[1][2]) : null, md = md0 === 'osmway' ? S.routeMode : md0;
       if (snapIsOn() && !magBusy && md && !/^(line|trace)$/.test(md)) {      // aimant : le point déplacé se replace sur la route (les tronçons en ligne droite ou de trace chargée ne sont pas touchés)
         magBusy = true;
         try {
           const t = i > 0 ? await magnetTry(S.ctrl[i - 1].slice(0, 2), pt, true, md) : await magnetTry(S.ctrl[1].slice(0, 2), pt, false, md), r = t.r;
-          if (r) { if (r.d > MAG_MAX) { toast(tooFarMsg(r.d), 'err'); renderCtrl(); return; } pt = r.pt; if (t.mode !== md) { if (i > 0) dm = t.mode; else S.ctrl[1][2] = t.mode; } }
+          if (r && r.d <= MAG_MAX) { pt = r.pt; if (t.mode !== md) { if (i > 0) dm = t.mode; else S.ctrl[1][2] = t.mode; } }
+          else {      // chemin inconnu du calculateur : on cale sur les données OSM
+            const o = await osmDecide(pt, i > 0 ? S.ctrl[i - 1].slice(0, 2) : null, r ? r.d : null);
+            if (o.kind === 'refuse') { toast(tooFarMsg(o.d), 'err'); renderCtrl(); return; }
+            if (o.kind === 'ok') { pt = o.pt; if (i > 0) { dm = o.poly ? 'osmway' : 'line'; if (o.poly) routeCache.set(segKey(S.ctrl[i - 1], pt, 'osmway'), [S.ctrl[i - 1].slice(0, 2), ...o.poly.slice(1, -1), pt]); } }
+          }
         } finally { magBusy = false; }
       }
       pushHist(pre); S.ctrl[i] = [pt[0], pt[1], i > 0 && !snapIsOn() ? 'line' : dm || S.ctrl[i][2]]; renderCtrl(); reroute();
@@ -101,12 +106,53 @@ function toggleSnap() {
 /* Mode aimant : un point posé est replacé sur la route / le chemin le plus proche (là où le routeur le pose) ; trop loin (> MAG_MAX m), il est refusé. Sans internet : posé tel quel. */
 const MAG_MAX = 40;
 const dMeters = (p, q) => { const k = Math.cos(p[0] * Math.PI / 180); return Math.hypot((q[1] - p[1]) * k * 111320, (q[0] - p[0]) * 110540); };
-const tooFarMsg = d => `🧲 Point trop loin d’une route ou d’un chemin (${Math.round(d)} m). Rapproche-le, ou désactive « Route » (touche R).`;
+const tooFarMsg = d => `🧲 Point trop loin d’une route ou d’un chemin${isFinite(d) ? ' (' + Math.round(d) + ' m)' : ''}. Rapproche-le, ou désactive « Route » (touche R).`;
 let magBusy = false;
 async function magnet(nb, p, nbFirst, mode) {      // → { pt: point replacé, d: distance du clic, other: voisin replacé } ou null si le calcul est indisponible
   const seg = nbFirst ? await routeSeg(nb, p, mode) : await routeSeg(p, nb, mode), q = nbFirst ? seg.snapB : seg.snapA;
   if (!q || seg.via === 'osrm') return null;      // serveur de secours (OSRM) : il place le point n'importe où, on ne s'y fie pas → point posé comme avant
   return { pt: [+q[0].toFixed(6), +q[1].toFixed(6)], d: dMeters(p, q), other: nbFirst ? seg.snapA : seg.snapB, seg: nbFirst ? seg : null };
+}
+/* Chemin que le calculateur de route ne connaît pas : on cale le point sur le chemin OSM le plus proche (Overpass) et, si le point précédent est sur le même chemin, le tronçon suit ce chemin. */
+async function osmNearWays(pt) {
+  const q = `[out:json][timeout:15];way["highway"](around:${MAG_MAX + 25},${pt[0]},${pt[1]});out geom;`;
+  let servers; try { servers = await liveServers(); } catch (e) { servers = OVERPASS; }
+  for (const ep of servers.slice(0, 3)) { try { const j = await fetchJSON(ep + '?data=' + encodeURIComponent(q), null, 12000); return j.elements || []; } catch (e) { /* serveur suivant */ } }
+  return null;      // service indisponible
+}
+async function osmSnap(pt, prev) {      // → null (service indisponible) | { d } (rien d'assez proche) | { d, pt, way, poly, prevPt }
+  const ws = await osmNearWays(pt); if (!ws) return null;
+  const k = Math.cos(pt[0] * Math.PI / 180), X = (la, lo) => [(lo - pt[1]) * k * 111320, (la - pt[0]) * 110540];
+  const proj = (way, p) => {
+    let best = null; const g = way.geometry, q = X(p[0], p[1]);
+    for (let i = 0; i < g.length - 1; i++) {
+      const a = X(g[i].lat, g[i].lon), b = X(g[i + 1].lat, g[i + 1].lon), dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
+      const t = L2 ? Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / L2)) : 0, d = Math.hypot(q[0] - (a[0] + t * dx), q[1] - (a[1] + t * dy));
+      if (!best || d < best.d) best = { d, i, t, ll: [g[i].lat + t * (g[i + 1].lat - g[i].lat), g[i].lon + t * (g[i + 1].lon - g[i].lon)] };
+    }
+    return best;
+  };
+  let best = null;
+  for (const w of ws) { if (!w.geometry || w.geometry.length < 2 || /^(steps|elevator|corridor|proposed|construction|platform)$/.test((w.tags || {}).highway || '')) continue; const r = proj(w, pt); if (r && (!best || r.d < best.d)) best = { ...r, w }; }
+  if (!best) return { d: Infinity };
+  const out = { d: best.d, pt: [+best.ll[0].toFixed(6), +best.ll[1].toFixed(6)], way: best.w };
+  if (prev) {
+    const pr = proj(best.w, prev);
+    if (pr && pr.d <= 15) {      // le point précédent est sur le même chemin : le tronçon en suit le tracé
+      const g = best.w.geometry, mid = [];
+      if (pr.i < best.i || (pr.i === best.i && pr.t <= best.t)) for (let m = pr.i + 1; m <= best.i; m++) mid.push([g[m].lat, g[m].lon]);
+      else for (let m = pr.i; m >= best.i + 1; m--) mid.push([g[m].lat, g[m].lon]);
+      out.poly = [pr.ll, ...mid, best.ll].map(q => [+q[0].toFixed(6), +q[1].toFixed(6)]); out.prevPt = out.poly[0];
+    }
+  }
+  return out;
+}
+/* décision quand le calculateur de route ne convient pas (point trop loin d'après lui, ou réponse non fiable) */
+async function osmDecide(pt, prev, rd) {      // → { kind: 'asis' } | { kind: 'refuse', d } | { kind: 'ok', pt, poly, prevPt }
+  const o = await osmSnap(pt, prev);
+  if (!o) return rd != null ? { kind: 'refuse', d: rd } : { kind: 'asis' };      // service indisponible : refus si le calculateur a déjà dit « trop loin », sinon on pose comme avant
+  if (o.d > MAG_MAX) return { kind: 'refuse', d: rd != null ? Math.min(rd, o.d) : o.d };
+  return { kind: 'ok', pt: o.pt, poly: o.poly, prevPt: o.prevPt };
 }
 /* essaie le mode choisi, puis « Au plus court » (sentiers inclus) si le chemin n'est pas connu du premier : { r, mode } */
 async function magnetTry(nb, p, nbFirst, mode) {
@@ -116,21 +162,31 @@ async function magnetTry(nb, p, nbFirst, mode) {
 }
 async function addCtrl(p) {
   if (magBusy) { toast('Calcul du point précédent en cours…', 'ok'); return; }
-  let pt = [+p[0].toFixed(6), +p[1].toFixed(6)], first = null, pm = null, rSeg = null;
+  let pt = [+p[0].toFixed(6), +p[1].toFixed(6)], first = null, pm = null, rSeg = null, osmPoly = null;
   if (snapIsOn() && S.ctrl.length) {
     magBusy = true;
     try {
-      const last = S.ctrl[S.ctrl.length - 1], t = await magnetTry(last.slice(0, 2), pt, true, S.routeMode), r = t.r; pm = t.mode !== S.routeMode ? t.mode : null; if (r && r.d <= MAG_MAX) rSeg = r.seg;
-      if (r) {
-        if (r.d > MAG_MAX) { toast(tooFarMsg(r.d), 'err'); return; }
-        pt = r.pt;
+      const last = S.ctrl[S.ctrl.length - 1], t = await magnetTry(last.slice(0, 2), pt, true, S.routeMode), r = t.r; pm = t.mode !== S.routeMode ? t.mode : null;
+      if (r && r.d <= MAG_MAX) {
+        rSeg = r.seg; pt = r.pt;
         if (S.ctrl.length === 1 && r.other && dMeters(last, r.other) <= MAG_MAX) first = [+r.other[0].toFixed(6), +r.other[1].toFixed(6)];      // le tout premier point est replacé à son tour
+      } else {      // chemin inconnu du calculateur (ou calculateur peu fiable) : on le cherche dans les données OSM
+        pm = null;
+        const o = await osmDecide(pt, last.slice(0, 2), r ? r.d : null);
+        if (o.kind === 'refuse') { toast(tooFarMsg(o.d), 'err'); return; }
+        if (o.kind === 'ok') {
+          pt = o.pt;
+          if (o.poly) { pm = 'osmway'; osmPoly = o.poly; if (S.ctrl.length === 1 && dMeters(last, o.prevPt) <= 15) first = o.prevPt; }
+          else { pm = 'line'; toast('Chemin trouvé sur la carte, mais pas celui du point précédent : tronçon en ligne droite.', 'ok'); }
+        }
       }
     } finally { magBusy = false; }
   }
   pushHist();
   if (first) S.ctrl[0] = [first[0], first[1], null];
-  if (rSeg && !first && rSeg.length >= 3 && !pm) { const k0 = segKey(S.ctrl[S.ctrl.length - 1], pt, curMode()); if (!routeCache.has(k0)) routeCache.set(k0, cleanEnds([...rSeg.slice(0, -1), pt])); }      // le tronçon déjà calculé pour l'aimant sert tel quel (un seul calcul par clic)
+  const prevC = S.ctrl[S.ctrl.length - 1];
+  if (osmPoly && prevC) routeCache.set(segKey(prevC, pt, 'osmway'), [prevC.slice(0, 2), ...osmPoly.slice(1, -1), pt]);      // le tracé du chemin sert de tronçon
+  if (rSeg && !first && rSeg.length >= 3 && !pm) { const k0 = segKey(prevC, pt, curMode()); if (!routeCache.has(k0)) routeCache.set(k0, cleanEnds([...rSeg.slice(0, -1), pt])); }      // le tronçon déjà calculé pour l'aimant sert tel quel (un seul calcul par clic)
   S.ctrl.push([pt[0], pt[1], S.ctrl.length ? (pm || curMode()) : null]);
   S.src = 'draw';
   renderCtrl(); reroute();
@@ -292,6 +348,7 @@ function orsDialog() {
 }
 const snapInfo = (r, c, via) => { r.via = via; r.snapA = [c[0][1], c[0][0]]; r.snapB = [c[c.length - 1][1], c[c.length - 1][0]]; return r; };      // où le routeur a réellement posé les extrémités (sur la route)
 async function routeSeg(a, b, mode) {
+  if (mode === 'osmway') return [a.slice(0, 2), b.slice(0, 2)];      // tronçon calé sur un chemin OSM (géométrie gardée en cache) ; sans cache : ligne droite
   if (mode === 'trace') mode = S.routeMode;      // tronçon d'une trace chargée dont un point a bougé : on suit le mode « Tracé » du menu
   if (!mode || mode === 'line') return [a.slice(0, 2), b.slice(0, 2)];
   if (/^ors:/.test(mode)) {
