@@ -25,5 +25,6 @@ const scen = {
     await p.waitForSelector('#modal h2:has-text("rapport")', { timeout: 20000 }).catch(() => { });
     await p.waitForTimeout(500);
     const t = await p.evaluate(() => window.__rb.S.notes.filter(n => /stop|cédez|giveway|portail|fencegate/i.test((n.text || '') + JSON.stringify(n.sym || ''))).map(n => n.why));
-    console.log(nm.padEnd(55), '→', t.length ? 'PANNEAU gardé ' + t.join('|') : 'ignoré'); await p.close(); }
+    const sk = await p.evaluate(() => { const d = document.querySelector('#modal details'); return d ? d.textContent.replace(/\n/g, ' ; ') : ''; });
+    console.log(nm.padEnd(55), '→', t.length ? 'PANNEAU gardé' : 'ignoré', sk ? '[' + sk + ']' : ''); await p.close(); }
   await b.close(); })();

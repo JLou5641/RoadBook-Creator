@@ -1034,7 +1034,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261113.2010</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261113.2017</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1064,7 +1064,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
           <button data-act="manual">📖 Manuel d'utilisation</button>
-          <div class="ver">Version v0.261113.2010 · VERSION DE TEST</div>
+          <div class="ver">Version v0.261113.2017 · VERSION DE TEST</div>
         </div>
       </div>
     </div>
@@ -4252,6 +4252,7 @@ function osmExtras(g, notes) {
      – nœud partagé au carrefour : ignoré si notre route est plus importante que celles qui la croisent (la route prioritaire n'a pas de stop). */
   const HWR = { motorway: 9, motorway_link: 9, trunk: 8, trunk_link: 8, primary: 7, primary_link: 7, secondary: 6, secondary_link: 6, tertiary: 5, tertiary_link: 5, unclassified: 4, residential: 4, living_street: 3, service: 3, track: 2, path: 1, footway: 1, cycleway: 1, bridleway: 1 };
   const hwr = w => HWR[(w.tags || {}).highway] || 2;
+  const skipped = [];      // panneaux / obstacles repérés mais écartés (affichés dans le rapport)
   let nodeWays = null, stopDbg = '';
   const ensureNW = () => { if (!nodeWays) { nodeWays = new Map(); for (const w of g.ways) for (const id of w.nodes || []) { let a = nodeWays.get(id); if (!a) nodeWays.set(id, a = []); a.push(w); } } };
   /* Portail, gué, passage à niveau, danger : seulement s'ils sont sur la route que l'on suit (nœud du chemin emprunté).
@@ -4262,21 +4263,25 @@ function osmExtras(g, notes) {
     if (!run.length) return true;
     return run.some(w => (w.nodes || []).includes(n.id));
   };
+  let skipWhy = '';
   const stopIsMine = (n, sPass) => {
     ensureNW();
+    const mine = []; for (let d = -12; d <= 3; d += 3) { const q0 = smp[clamp(Math.round((sPass + d) / STEP), 0, smp.length - 1)]; if (q0 && q0.w && !mine.includes(q0.w)) mine.push(q0.w); }      // chemins parcourus juste avant le panneau
     const q = smp[clamp(Math.round((sPass - 8) / STEP), 0, smp.length - 1)];
-    const my = (q && q.w) || wayAtS(sPass), ws = n.id != null ? nodeWays.get(n.id) : null;
+    const ws = n.id != null ? nodeWays.get(n.id) : null;
+    const my = (ws && mine.find(w => ws.includes(w))) || (q && q.w) || wayAtS(sPass);
     const nm = w => (w.tags.highway || '?') + (w.tags.ref ? ' ' + w.tags.ref : w.tags.name ? ' ' + w.tags.name : '') + ' #' + w.id;
     stopDbg = `nœud OSM ${n.id}, direction=${n.tags.direction || '—'} ; notre route : ${my ? nm(my) : '?'} ; ways au nœud : ${ws ? ws.map(nm).join(', ') : 'inconnus'}`;
     if (!my) return true;                                 // données incomplètes : on garde le panneau
-    if (!ws) return n.id == null || !nodeWays.size;       // nœud absent de tous les chemins connus, donc pas sur le nôtre : panneau d'une route croisée non chargée
-    if (!ws.includes(my)) return false;
-    const d = (n.tags.direction || '').toLowerCase();
-    if (q && q.dir && ((d === 'forward' && q.dir < 0) || (d === 'backward' && q.dir > 0))) return false;
+    if (!ws) { if (n.id == null || !nodeWays.size) return true; skipWhy = 'point hors de tous les chemins connus (route croisée non chargée)'; return false; }
+    if (!ws.includes(my)) { skipWhy = 'point d\'une autre route que la nôtre'; return false; }
+    const d = (n.tags.direction || '').toLowerCase(), qd = smp[clamp(Math.round((sPass - 4) / STEP), 0, smp.length - 1)];
+    if (qd && qd.w === my && qd.dir && ((d === 'forward' && qd.dir < 0) || (d === 'backward' && qd.dir > 0))) { skipWhy = 'direction=' + d + ' contraire à notre sens'; return false; }
     const hdg = trackBearing(sPass - 14, sPass - 2), at = id => { const q2 = g.nodes.get(id); return q2 && q2.xy; };
     const straight = w => { const i = w.nodes.indexOf(n.id); return [w.nodes[i - 1], w.nodes[i + 1]].some(id => id != null && at(id) && Math.abs(angDiff(bxy(n.xy, at(id)), hdg)) < 30); };      // suite de notre route (voie coupée au carrefour)
     const others = ws.filter(w => w !== my && !straight(w));
-    return !others.length || hwr(my) <= Math.max(...others.map(hwr));
+    if (others.length && hwr(my) > Math.max(...others.map(hwr))) { skipWhy = 'notre route est prioritaire sur celle qui la croise'; return false; }
+    return true;
   };
   if (st.pois) {
     // 1. nœuds du chemin : gués, passages à niveau, stops, barrières, cols, dangers
@@ -4291,12 +4296,13 @@ function osmExtras(g, notes) {
       if (t.mountain_pass === 'yes' || t.natural === 'saddle') it.push({ text: (tName(t) || 'Col') + tEle(t), key: 'col' });
       if (t.hazard) it.push({ text: 'Danger : ' + (HAZARD_TXT[t.hazard] || t.hazard.replace(/_/g, ' ')), danger: 2, key: 'hazard' });
       if (!it.length) continue;
+      if (it.some(e => e.key === 'stop' || e.key === 'barrier')) for (const ps of passes(n.xy, 25)) if (ps.d > 6) skipped.push({ s: ps.s, text: it[0].text, why: 'à ' + Math.round(ps.d) + ' m de la trace (limite : 6 m)' });
       for (const ps of passes(n.xy, 6)) for (const e of it) {
-        if (e.stop && !stopIsMine(n, ps.s)) continue;      // panneau de la route que l'on croise : pas pour nous
-        if (!e.stop && /^(barrier|ford|rail|hazard)$/.test(e.key) && !onMyWay(n, ps.s)) continue;      // objet posé à côté de la route (entrée de propriété, chemin croisé)
+        if (e.stop && !stopIsMine(n, ps.s)) { skipped.push({ s: ps.s, text: e.text, why: skipWhy }); continue; }      // panneau de la route que l'on croise : pas pour nous
+        if (!e.stop && /^(barrier|ford|rail|hazard)$/.test(e.key) && !onMyWay(n, ps.s)) { skipped.push({ s: ps.s, text: e.text, why: 'posé sur une autre voie que la nôtre' }); continue; }      // objet posé à côté de la route (entrée de propriété, chemin croisé)
         if (e.stop) {               // le panneau ne compte que si l'on arrive au carrefour
           const ahead = jS.find(js => js >= ps.s - 2 && js - ps.s <= 45);
-          if (ahead == null && jS.some(js => js < ps.s - 2 && ps.s - js <= 30)) continue;
+          if (ahead == null && jS.some(js => js < ps.s - 2 && ps.s - js <= 30)) { skipped.push({ s: ps.s, text: e.text, why: 'après le carrefour (on l\'a déjà passé)' }); continue; }
           ev.push({ ...e, s: ahead != null ? ahead : ps.s, own: true, dbg: stopDbg });
         } else ev.push({ ...e, s: ps.s, own: true });
       }
@@ -4428,7 +4434,8 @@ function osmExtras(g, notes) {
       notes.push(nn); notes.sort((a, b) => a.s - b.s); added++;
     }
   }
-  return { events: kept.length, added };
+  skipped.sort((a, b) => a.s - b.s);
+  return { events: kept.length, added, skipped };
 }
 
 /* ============================================================
@@ -5494,6 +5501,7 @@ async function runGenerate() {
     rows.push(S.settings.tol === 0 ? 'Trace non recalée.' : `Parcours reconnu sur les chemins : <b>${pc} %</b>.`);
     const sn = typeof srcNote === 'function' ? srcNote() : ''; if (sn) rows.push(esc(sn) + '.');
     let html = rows.map(r => `<p style="margin:0 0 6px">${r}</p>`).join('');
+    if (rep && rep.skipped && rep.skipped.length) html += `<details style="margin-top:8px"><summary style="cursor:pointer"><b>${rep.skipped.length}</b> panneau${rep.skipped.length > 1 ? 'x' : ''} / obstacle${rep.skipped.length > 1 ? 's' : ''} repéré${rep.skipped.length > 1 ? 's' : ''} mais écarté${rep.skipped.length > 1 ? 's' : ''}</summary><ul style="margin:4px 0 0 18px;padding:0;font-size:13px">${rep.skipped.slice(0, 80).map(k => `<li>km ${(k.s / 1000).toFixed(2).replace('.', ',')} · ${esc(k.text)} — ${esc(k.why)}</li>`).join('')}${rep.skipped.length > 80 ? '<li>…</li>' : ''}</ul></details>`;
     if (GENLOG.length) html += `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(224,138,0,.14)"><b>À savoir :</b><ul style="margin:4px 0 0 18px;padding:0">${GENLOG.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`;
     if (pc < 60 && S.settings.tol !== 0) html += `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(224,138,0,.14)"><b>Parcours peu reconnu.</b> Seulement ${pc} % de ta trace a pu être recalée sur les chemins (trait noir sur la carte) : les intersections ne sont repérées que sur cette partie. Si la trace a été dessinée à main levée, augmente <b>« Écart maxi trace ↔ chemins »</b> dans ⋯ › Réglages (par ex. 70 m), puis régénère.</div>`;
     openModal(GENLOG.length || (pc < 60 && S.settings.tol !== 0) ? 'Roadbook généré — rapport (avec avertissements)' : 'Roadbook généré — rapport', html, [
