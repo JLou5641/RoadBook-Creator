@@ -566,11 +566,12 @@ $('#bMerge').onclick = () => $('#mergeIn').click();
 $('#mergeIn').onchange = e => { const f = e.target.files[0]; if (f) mergeFile(f); e.target.value = ''; };
 $('#bReduce').onclick = reduceDialog;
 $('#bSel').onclick = () => setTool('sel');
-$('#bSnap').onclick = () => { if (selR) snapSel(); else snapDialog(); };
+$('#bSnap').onclick = () => { if (selR) snapSel(); else toast('Choisis d’abord un point de départ et un point d’arrivée avec « 👆 Sélectionner ».', 'err'); };
+$('#bSnapMode').onclick = toggleSnap;
 $('#bRedo').onclick = redo;
 $('#bFree').onclick = () => setTool('free');
 $('#bErase').onclick = () => setTool('erase');
-$('#routeMode').onchange = e => { S.routeMode = e.target.value; save(); if (/^ors:/.test(S.routeMode) && !orsKey()) orsDialog(); };
+$('#routeMode').onchange = e => { S.routeMode = e.target.value; if (S.routeMode !== 'line') { S.prevRoute = S.routeMode; S.snapOn = true; } updSnapBtn(); save(); if (/^ors:/.test(S.routeMode) && !orsKey()) orsDialog(); };
 $('#orsBtn').onclick = orsDialog;
 $('#bGen').onclick = generate;
 $('#bSave').onclick = saveProject;
@@ -617,6 +618,7 @@ document.addEventListener('keydown', e => {
     const k = e.key.toLowerCase();
     if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); } else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
   }
+  if (drawing && !typing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'r' && !$('#modalBg').classList.contains('show')) { e.preventDefault(); toggleSnap(); }
   if (drawing && e.code === 'Space' && !typing && !$('#modalBg').classList.contains('show')) { e.preventDefault(); if (!spaceDown) { spaceDown = true; setCursorCls(); } }
 });
 document.addEventListener('keyup', e => { if (e.code === 'Space' && spaceDown) { spaceDown = false; setCursorCls(); } });
@@ -631,7 +633,7 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
 (function init() {
   try { const raw = localStorage.getItem(LS_KEY); if (raw) { restore(JSON.parse(raw)); $('#rbName').value = S.name; } } catch (e) { console.warn(e); }
   if (!(S.notes.length || S.ll.length)) ProjDB.get().then(raw => { if (!raw || S.notes.length || S.ll.length) return; try { restore(JSON.parse(raw)); ProjDB.has = true; $('#rbName').value = S.name; $('#routeMode').value = S.routeMode; histPush(raw); renderRoadbook(); renderMarkers(); renderTrack(true); renderInfo(); } catch (e) { console.warn(e); } });      // reprise d'un gros projet gardé dans IndexedDB
-  $('#routeMode').value = S.routeMode;
+  $('#routeMode').value = S.routeMode; updSnapBtn();
   try { setDirty(localStorage.getItem('rbgen.dirty') === '1'); } catch (e) { }
   if (S.notes.length || S.ll.length) histPush(JSON.stringify(snapshot()));
   renderRoadbook(); renderMarkers(); renderTrack(true); renderInfo();

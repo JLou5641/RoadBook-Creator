@@ -31,7 +31,7 @@ function setDrawing(on) {
   $('#bDraw').classList.toggle('on', on);
   $('#drawBox').classList.toggle('show', on);
   map.getContainer().classList.toggle('drawing', on);
-  $('#routeMode').value = S.routeMode;
+  $('#routeMode').value = S.routeMode; updSnapBtn();
   clearSel(); if (on) resetHist(); else { tool = null; $('#bSel').classList.remove('on'); spaceDown = false; $('#bFree').classList.remove('on'); $('#bErase').classList.remove('on'); $('#bCut').classList.remove('on'); }
   setCursorCls(); renderCtrl(); renderInfo();
 }
@@ -61,22 +61,35 @@ function renderCtrl() {
       : selR.a === selR.b ? 'Point n° ' + (selR.a + 1) + ' sélectionné : le bouton ci-dessous ne traitera que lui (et ses abords).'
       : 'Section du point ' + (selR.a + 1) + ' au point ' + (selR.b + 1) + ' (' + (selR.b - selR.a + 1) + ' points) : le bouton ci-dessous ne traitera qu’elle.';
   }
-  if (bs) bs.textContent = selR ? (selR.a === selR.b ? '🛣 Coller ce point à la route' : '🛣 Coller cette section à la route') : '🛣 Coller toute la trace à la route';
+  if (bs) { bs.textContent = selR ? (selR.a === selR.b ? '🛣 Coller ce point à la route' : '🛣 Coller cette section à la route') : '🛣 Coller à la route : choisis d’abord un départ et une arrivée'; bs.disabled = !selR; }
   S.ctrl.forEach((c, i) => {
     const lk = !!(ls && ls.has(i));
     const inSel = !!selR && i >= selR.a && i <= selR.b;
     const m = L.marker([c[0], c[1]], { draggable: !lk, keyboard: false, icon: L.divIcon({ className: 'cpt' + (i === 0 ? ' first' : '') + (lk ? ' locked' : '') + (inSel ? ' sel' : ''), iconSize: [16, 16] }) });
     let pre = null;
     m.on('dragstart', () => { pre = snap(); });
-    m.on('dragend', () => { const p = m.getLatLng(); pushHist(pre); S.ctrl[i] = [p.lat, p.lng, S.ctrl[i][2]]; reroute(); });
+    m.on('dragend', () => { const p = m.getLatLng(); pushHist(pre); S.ctrl[i] = [p.lat, p.lng, i > 0 && !snapIsOn() ? 'line' : S.ctrl[i][2]]; reroute(); });
     m.on('click', () => { if (tool === 'sel') { selClick(i); return; } if (lk) { toast('Étape verrouillée 🔒', 'err'); return; } pushHist(); S.ctrl.splice(i, 1); if (i === 0 && S.ctrl.length) S.ctrl[0][2] = null; renderCtrl(); reroute(); });
     m.addTo(ctrlLayer);
   });
   updHist();
 }
+/* « 🧲 Route » : activé, les points posés suivent les chemins (menu « Tracé ») ; désactivé, ils sont reliés en ligne droite (hors-piste). Réglage changeable à tout moment, chaque tronçon garde celui de sa pose. */
+const snapIsOn = () => S.snapOn !== false && S.routeMode !== 'line';
+const curMode = () => snapIsOn() ? S.routeMode : 'line';
+function updSnapBtn() {
+  const b = $('#bSnapMode'); if (!b) return; const on = snapIsOn();
+  b.textContent = on ? '🧲 Route : activée' : '🧲 Route : désactivée'; b.classList.toggle('on', on);
+  b.title = on ? 'Les points suivants suivent les chemins. Cliquer (ou touche R) pour les relier en ligne droite (hors-piste).' : 'Les points suivants sont reliés en ligne droite. Cliquer (ou touche R) pour qu’ils suivent de nouveau les chemins.';
+}
+function toggleSnap() {
+  if (snapIsOn()) S.snapOn = false;
+  else { S.snapOn = true; if (S.routeMode === 'line') { S.routeMode = S.prevRoute && S.prevRoute !== 'line' ? S.prevRoute : 'trekking'; $('#routeMode').value = S.routeMode; } }
+  updSnapBtn(); save(); toast(snapIsOn() ? 'Route activée : les points suivent les chemins.' : 'Route désactivée : lignes droites.', 'ok');
+}
 function addCtrl(p) {
   pushHist();
-  S.ctrl.push([+p[0].toFixed(6), +p[1].toFixed(6), S.ctrl.length ? S.routeMode : null]);
+  S.ctrl.push([+p[0].toFixed(6), +p[1].toFixed(6), S.ctrl.length ? curMode() : null]);
   S.src = 'draw';
   renderCtrl(); reroute();
 }

@@ -359,3 +359,5 @@ body.dragNote .leaflet-tooltip{display:none}
 
 .rptgo{cursor:pointer;padding:2px 4px;border-radius:4px}.rptgo:hover{background:rgba(255,140,0,.18)}.rptgo.on{background:rgba(255,106,26,.28);font-weight:600}
 #modal.rptmini{max-height:42vh;overflow:auto;width:min(440px,94vw)}
+#drawBox #bSnapMode{background:#2e8b57;color:#fff;border-color:#1f6b40}
+#drawBox #bSnapMode:not(.on){background:#fff;color:#444;border-color:#aaa}

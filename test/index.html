@@ -1030,6 +1030,8 @@ body.dragNote .leaflet-tooltip{display:none}
 
 .rptgo{cursor:pointer;padding:2px 4px;border-radius:4px}.rptgo:hover{background:rgba(255,140,0,.18)}.rptgo.on{background:rgba(255,106,26,.28);font-weight:600}
 #modal.rptmini{max-height:42vh;overflow:auto;width:min(440px,94vw)}
+#drawBox #bSnapMode{background:#2e8b57;color:#fff;border-color:#1f6b40}
+#drawBox #bSnapMode:not(.on){background:#fff;color:#444;border-color:#aaa}
 </style>
 </head>
 <body>
@@ -1037,7 +1039,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261113.2113</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261113.2127</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1068,7 +1070,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="help">❓ Aide</button>
           <button data-act="report">📋 Dernier rapport de génération</button>
           <button data-act="manual">📖 Manuel d'utilisation</button>
-          <div class="ver">Version v0.261113.2113 · VERSION DE TEST</div>
+          <div class="ver">Version v0.261113.2127 · VERSION DE TEST</div>
         </div>
       </div>
     </div>
@@ -1146,6 +1148,7 @@ body.dragNote .leaflet-tooltip{display:none}
             <option value="ors:foot-walking">🚶 Marche (OpenRoute 🔑)</option>
             <option value="line">Ligne droite</option>
           </select>
+          <button id="bSnapMode" class="on">🧲 Route : activée</button>
           <button id="orsBtn" title="Clé OpenRouteService (profils rando, VTT, vélo de route)">🔑</button>
         </div>
         <div class="dgrp">Dessin</div>
@@ -2054,7 +2057,7 @@ function simplifyDP(pts, tol) {         // Douglas-Peucker, renvoie les indices 
 const DEF_SETTINGS = { sv: 2, routeExt: true, symAuto: true, showDir: true, showRoad: true, data: 'vt', tol: 40, merge: 30, tulipR: 50, straight: true, mixY: false, mixT: true, lmOff: [], followLvl: 3, bends: true, offroad: true, bendAngle: 100, goudron: true, foot: false, showCap: true, water: true, bld: true, pois: true, landmarks: true, marksExport: true, showRO: true, showPI: true, showTR: true, arrows: true };
 const S = {
   name: 'Mon roadbook', desc: '', src: '', ll: [], mm: null, ctrl: [], segs: [], notes: [], settings: { ...DEF_SETTINGS }, stages: [], marks: [], ele: null, timing: null,
-  stale: false, routeMode: 'trekking', nextId: 1, sel: null
+  stale: false, routeMode: 'trekking', snapOn: true, prevRoute: 'trekking', nextId: 1, sel: null
 };
 let T = null;    // parcours dérivé : {xy, cum, L, grid}
 let G = null;    // réseau OSM : {nodes, ways, key}
@@ -2071,7 +2074,7 @@ let saveTimer = null, saveWarned = false;
 
 function snapshot() {
   return { v: 2, name: S.name, desc: S.desc, src: S.src, ll: S.ll, mm: S.mm, ctrl: S.ctrl, segs: S.segs, notes: S.notes, settings: S.settings,
-    stale: S.stale, routeMode: S.routeMode, nextId: S.nextId, stages: S.stages, marks: S.marks, ele: S.ele, timing: S.timing, dataSrc: S.dataSrc || '', dataSrcN: S.dataSrcN || '', mySyms: MYS };
+    stale: S.stale, routeMode: S.routeMode, snapOn: S.snapOn, prevRoute: S.prevRoute, nextId: S.nextId, stages: S.stages, marks: S.marks, ele: S.ele, timing: S.timing, dataSrc: S.dataSrc || '', dataSrcN: S.dataSrcN || '', mySyms: MYS };
 }
 let dirty = false;
 function setDirty(v) { dirty = v; try { localStorage.setItem('rbgen.dirty', v ? '1' : ''); } catch (e) { } const b = document.getElementById('bSave'); if (b) { b.classList.toggle('dirty', v); b.title = v ? 'Modifications non sauvegardées dans un fichier : clique pour sauvegarder le projet' : 'Sauvegarder le projet en cours (fichier .json à rouvrir plus tard)'; } }
@@ -2110,7 +2113,7 @@ function restore(o) {
   S.name = o.name || 'Mon roadbook'; S.desc = o.desc || ''; S.src = o.src || ''; S.ctrl = o.ctrl || []; S.segs = o.segs || [];
   S.notes = o.notes || []; S.settings = { ...DEF_SETTINGS, ...(o.settings || {}) }; S.stale = !!o.stale;
   if ((o.settings || {}).sv !== DEF_SETTINGS.sv) S.settings = { ...S.settings, sv: DEF_SETTINGS.sv, tol: DEF_SETTINGS.tol, water: true, bld: true };
-  S.routeMode = o.routeMode || 'trekking'; S.nextId = o.nextId || (Math.max(0, ...S.notes.map(n => n.id)) + 1); S.sel = null;
+  S.routeMode = o.routeMode || 'trekking'; S.snapOn = o.snapOn !== false; S.prevRoute = o.prevRoute || (S.routeMode !== 'line' ? S.routeMode : 'trekking'); S.nextId = o.nextId || (Math.max(0, ...S.notes.map(n => n.id)) + 1); S.sel = null;
   for (let i = 1; i < S.ctrl.length; i++) if (S.segs[i - 1]) routeCache.set(segKey(S.ctrl[i - 1], S.ctrl[i], S.ctrl[i][2]), S.segs[i - 1]);
   if (o.mySyms) { regMySyms(o.mySyms); saveMySyms(); }      // symboles importés contenus dans le projet
   S.stages = o.stages || []; S.marks = o.marks || []; S.ele = o.ele || null; S.timing = o.timing || null; S.dataSrc = o.dataSrc || ''; S.dataSrcN = o.dataSrcN || ''; renderMarks();
@@ -2784,7 +2787,7 @@ function setDrawing(on) {
   $('#bDraw').classList.toggle('on', on);
   $('#drawBox').classList.toggle('show', on);
   map.getContainer().classList.toggle('drawing', on);
-  $('#routeMode').value = S.routeMode;
+  $('#routeMode').value = S.routeMode; updSnapBtn();
   clearSel(); if (on) resetHist(); else { tool = null; $('#bSel').classList.remove('on'); spaceDown = false; $('#bFree').classList.remove('on'); $('#bErase').classList.remove('on'); $('#bCut').classList.remove('on'); }
   setCursorCls(); renderCtrl(); renderInfo();
 }
@@ -2814,22 +2817,35 @@ function renderCtrl() {
       : selR.a === selR.b ? 'Point n° ' + (selR.a + 1) + ' sélectionné : le bouton ci-dessous ne traitera que lui (et ses abords).'
       : 'Section du point ' + (selR.a + 1) + ' au point ' + (selR.b + 1) + ' (' + (selR.b - selR.a + 1) + ' points) : le bouton ci-dessous ne traitera qu’elle.';
   }
-  if (bs) bs.textContent = selR ? (selR.a === selR.b ? '🛣 Coller ce point à la route' : '🛣 Coller cette section à la route') : '🛣 Coller toute la trace à la route';
+  if (bs) { bs.textContent = selR ? (selR.a === selR.b ? '🛣 Coller ce point à la route' : '🛣 Coller cette section à la route') : '🛣 Coller à la route : choisis d’abord un départ et une arrivée'; bs.disabled = !selR; }
   S.ctrl.forEach((c, i) => {
     const lk = !!(ls && ls.has(i));
     const inSel = !!selR && i >= selR.a && i <= selR.b;
     const m = L.marker([c[0], c[1]], { draggable: !lk, keyboard: false, icon: L.divIcon({ className: 'cpt' + (i === 0 ? ' first' : '') + (lk ? ' locked' : '') + (inSel ? ' sel' : ''), iconSize: [16, 16] }) });
     let pre = null;
     m.on('dragstart', () => { pre = snap(); });
-    m.on('dragend', () => { const p = m.getLatLng(); pushHist(pre); S.ctrl[i] = [p.lat, p.lng, S.ctrl[i][2]]; reroute(); });
+    m.on('dragend', () => { const p = m.getLatLng(); pushHist(pre); S.ctrl[i] = [p.lat, p.lng, i > 0 && !snapIsOn() ? 'line' : S.ctrl[i][2]]; reroute(); });
     m.on('click', () => { if (tool === 'sel') { selClick(i); return; } if (lk) { toast('Étape verrouillée 🔒', 'err'); return; } pushHist(); S.ctrl.splice(i, 1); if (i === 0 && S.ctrl.length) S.ctrl[0][2] = null; renderCtrl(); reroute(); });
     m.addTo(ctrlLayer);
   });
   updHist();
 }
+/* « 🧲 Route » : activé, les points posés suivent les chemins (menu « Tracé ») ; désactivé, ils sont reliés en ligne droite (hors-piste). Réglage changeable à tout moment, chaque tronçon garde celui de sa pose. */
+const snapIsOn = () => S.snapOn !== false && S.routeMode !== 'line';
+const curMode = () => snapIsOn() ? S.routeMode : 'line';
+function updSnapBtn() {
+  const b = $('#bSnapMode'); if (!b) return; const on = snapIsOn();
+  b.textContent = on ? '🧲 Route : activée' : '🧲 Route : désactivée'; b.classList.toggle('on', on);
+  b.title = on ? 'Les points suivants suivent les chemins. Cliquer (ou touche R) pour les relier en ligne droite (hors-piste).' : 'Les points suivants sont reliés en ligne droite. Cliquer (ou touche R) pour qu’ils suivent de nouveau les chemins.';
+}
+function toggleSnap() {
+  if (snapIsOn()) S.snapOn = false;
+  else { S.snapOn = true; if (S.routeMode === 'line') { S.routeMode = S.prevRoute && S.prevRoute !== 'line' ? S.prevRoute : 'trekking'; $('#routeMode').value = S.routeMode; } }
+  updSnapBtn(); save(); toast(snapIsOn() ? 'Route activée : les points suivent les chemins.' : 'Route désactivée : lignes droites.', 'ok');
+}
 function addCtrl(p) {
   pushHist();
-  S.ctrl.push([+p[0].toFixed(6), +p[1].toFixed(6), S.ctrl.length ? S.routeMode : null]);
+  S.ctrl.push([+p[0].toFixed(6), +p[1].toFixed(6), S.ctrl.length ? curMode() : null]);
   S.src = 'draw';
   renderCtrl(); reroute();
 }
@@ -6654,11 +6670,12 @@ $('#bMerge').onclick = () => $('#mergeIn').click();
 $('#mergeIn').onchange = e => { const f = e.target.files[0]; if (f) mergeFile(f); e.target.value = ''; };
 $('#bReduce').onclick = reduceDialog;
 $('#bSel').onclick = () => setTool('sel');
-$('#bSnap').onclick = () => { if (selR) snapSel(); else snapDialog(); };
+$('#bSnap').onclick = () => { if (selR) snapSel(); else toast('Choisis d’abord un point de départ et un point d’arrivée avec « 👆 Sélectionner ».', 'err'); };
+$('#bSnapMode').onclick = toggleSnap;
 $('#bRedo').onclick = redo;
 $('#bFree').onclick = () => setTool('free');
 $('#bErase').onclick = () => setTool('erase');
-$('#routeMode').onchange = e => { S.routeMode = e.target.value; save(); if (/^ors:/.test(S.routeMode) && !orsKey()) orsDialog(); };
+$('#routeMode').onchange = e => { S.routeMode = e.target.value; if (S.routeMode !== 'line') { S.prevRoute = S.routeMode; S.snapOn = true; } updSnapBtn(); save(); if (/^ors:/.test(S.routeMode) && !orsKey()) orsDialog(); };
 $('#orsBtn').onclick = orsDialog;
 $('#bGen').onclick = generate;
 $('#bSave').onclick = saveProject;
@@ -6705,6 +6722,7 @@ document.addEventListener('keydown', e => {
     const k = e.key.toLowerCase();
     if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); } else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
   }
+  if (drawing && !typing && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'r' && !$('#modalBg').classList.contains('show')) { e.preventDefault(); toggleSnap(); }
   if (drawing && e.code === 'Space' && !typing && !$('#modalBg').classList.contains('show')) { e.preventDefault(); if (!spaceDown) { spaceDown = true; setCursorCls(); } }
 });
 document.addEventListener('keyup', e => { if (e.code === 'Space' && spaceDown) { spaceDown = false; setCursorCls(); } });
@@ -6719,7 +6737,7 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
 (function init() {
   try { const raw = localStorage.getItem(LS_KEY); if (raw) { restore(JSON.parse(raw)); $('#rbName').value = S.name; } } catch (e) { console.warn(e); }
   if (!(S.notes.length || S.ll.length)) ProjDB.get().then(raw => { if (!raw || S.notes.length || S.ll.length) return; try { restore(JSON.parse(raw)); ProjDB.has = true; $('#rbName').value = S.name; $('#routeMode').value = S.routeMode; histPush(raw); renderRoadbook(); renderMarkers(); renderTrack(true); renderInfo(); } catch (e) { console.warn(e); } });      // reprise d'un gros projet gardé dans IndexedDB
-  $('#routeMode').value = S.routeMode;
+  $('#routeMode').value = S.routeMode; updSnapBtn();
   try { setDirty(localStorage.getItem('rbgen.dirty') === '1'); } catch (e) { }
   if (S.notes.length || S.ll.length) histPush(JSON.stringify(snapshot()));
   renderRoadbook(); renderMarkers(); renderTrack(true); renderInfo();
