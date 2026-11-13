@@ -1,0 +1,37 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1000, height: 800 } });
+  await p.route(/^(?!file).*/, r => r.abort()); p.on('pageerror', e => console.log('ERR', e.message));
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html'));
+  await p.evaluate(() => { localStorage.clear(); localStorage.setItem('rbLang', 'en'); }); await p.reload();
+  await p.evaluate(t => window.__rb.loadText(t, 'a.gpx'), fs.readFileSync(path.join(__dirname, 'andorra.gpx'), 'utf8')); await p.waitForTimeout(500);
+  await p.evaluate(() => { const R = window.__rb; const ll = R.S.ll;
+    R.S.notes = [{ id: 1, s: 300, lat: ll[10][0], lon: ll[10][1], text: 'À droite\nRoute D 976', kind: 'info', tulip: null, why: 'Rond-point : branches de la trace regroupées, sortie n°2', auto: true },
+                 { id: 2, s: 900, lat: ll[30][0], lon: ll[30][1], text: 'Serrer à G', kind: 'info', tulip: null, why: 'Virage serré à 95° en quelques mètres (seuil réglé à 70', auto: false }];
+    R.renderAll && R.renderAll(); });
+  await p.waitForTimeout(400);
+  const all = new Set(); const fs2 = require('fs');
+  const dsrc = fs2.readFileSync(path.join(__dirname,'..','..','src','app','00-i18n-en.js'),'utf8') + fs2.readFileSync(path.join(__dirname,'..','..','src','app','00-i18n-en2.js'),'utf8');
+  const pairs = [...dsrc.matchAll(/^"((?:[^"\\]|\\.)*)": "((?:[^"\\]|\\.)*)",$/gm)];
+  const W = t => (t.toLowerCase().match(/[a-zà-ÿ]{3,}/g) || []);
+  const FRV = new Set(), ENV = new Set(); pairs.forEach(m => { W(m[1]).forEach(w => FRV.add(w)); W(m[2]).forEach(w => ENV.add(w)); });
+  const FRONLY = [...FRV].filter(w => !ENV.has(w));
+  const grab = async () => { (await p.evaluate(() => I18N.missing())).forEach(x => all.add(x));
+    const txt = await p.evaluate(() => { const o = []; const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n; while ((n = tw.nextNode())) { const e = n.parentElement; if (e && !e.closest('script,style,.k3,textarea,[data-i18n-skip]') && e.offsetParent !== null) o.push(n.data.trim()); } return o; });
+    const set = new Set(FRONLY); txt.forEach(t => { if (W(t).some(w => set.has(w))) all.add('~' + t); }); };
+  await grab(); await p.screenshot({ path: '/tmp/en_rb.png' });
+  const close = () => p.evaluate(() => document.querySelector('#modalBg').dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+  await p.evaluate(() => window.__rb.editNote(1)); await p.waitForTimeout(500); await grab(); await p.screenshot({ path: '/tmp/en_edit.png' }); await close();
+  await p.evaluate(() => document.querySelector('#rb button[data-a="why"]').click()); await p.waitForTimeout(300); await grab(); await p.screenshot({ path: '/tmp/en_why.png' }); await close();
+  await p.evaluate(() => document.querySelector('#bPrint') && 0);
+  await p.evaluate(() => window.__rb.altDialog()); await p.waitForTimeout(300); await grab(); await close();
+  await p.evaluate(() => window.__rb.stagesDialog()); await p.waitForTimeout(300); await grab(); await close();
+  await p.evaluate(() => window.__rb.openMeasure()); await p.waitForTimeout(300); await grab(); await p.screenshot({ path: '/tmp/en_meas.png' });await close();
+  await p.evaluate(() => document.querySelector('#bExport').click()); await p.waitForTimeout(300); await grab(); await p.screenshot({ path: '/tmp/en_exp.png' }); await close();
+  await p.evaluate(() => document.querySelector('#bDraw').click()); await p.waitForTimeout(300); await grab(); await p.screenshot({ path: '/tmp/en_draw.png' });
+  await p.evaluate(() => document.querySelector('#bGen').click()); await p.waitForTimeout(300); await grab(); await p.screenshot({ path: '/tmp/en_gen.png' }); await close();
+  for (const a of ['settings', 'marks', 'ctl', 'help', 'report', 'new']) { await p.evaluate(a => document.querySelector('#moreMenu [data-act="' + a + '"]').click(), a); await p.waitForTimeout(400);
+    if (a === 'settings') await p.evaluate(() => document.querySelectorAll('details').forEach(d => d.open = true)); await grab(); await p.screenshot({ path: '/tmp/en2_' + a + '.png' }); await close(); }
+  await p.evaluate(() => document.querySelector('#rb .acts button[data-a="edit"]').click()); await p.waitForTimeout(400);
+  await p.evaluate(() => { const b = [...document.querySelectorAll('#modal button')].find(x => /symbol|sym/i.test(x.textContent)); b && b.click(); }); await p.waitForTimeout(300); await grab(); await p.screenshot({ path: '/tmp/en2_sym.png' }); await close();
+  [...all].forEach(x => console.log(JSON.stringify(x.slice(0, 240))));
+  await b.close(); })();
