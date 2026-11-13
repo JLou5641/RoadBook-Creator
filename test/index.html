@@ -1039,7 +1039,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261113.2204</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261113.2218</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1070,7 +1070,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="help">❓ Aide</button>
           <button data-act="report">📋 Dernier rapport de génération</button>
           <button data-act="manual">📖 Manuel d'utilisation</button>
-          <div class="ver">Version v0.261113.2204 · VERSION DE TEST</div>
+          <div class="ver">Version v0.261113.2218 · VERSION DE TEST</div>
         </div>
       </div>
     </div>
@@ -2832,8 +2832,8 @@ function renderCtrl() {
         try {
           const t = i > 0 ? await magnetTry(S.ctrl[i - 1].slice(0, 2), pt, true, md) : await magnetTry(S.ctrl[1].slice(0, 2), pt, false, md), r = t.r;
           if (r && r.d <= MAG_MAX) { pt = r.pt; if (t.mode !== md) { if (i > 0) dm = t.mode; else S.ctrl[1][2] = t.mode; } }
-          else {      // chemin inconnu du calculateur : on cale sur les données OSM
-            const o = await osmDecide(pt, i > 0 ? S.ctrl[i - 1].slice(0, 2) : null, r ? r.d : null);
+          else if (r) {      // « trop loin » d'après le calculateur : on cale sur les données OSM (calculateur indisponible ou peu fiable : le point garde son tronçon, recalculé sur la route)
+            const o = await osmDecide(pt, i > 0 ? S.ctrl[i - 1].slice(0, 2) : null, r.d);
             if (o.kind === 'refuse') { toast(tooFarMsg(o.d), 'err'); renderCtrl(); return; }
             if (o.kind === 'ok') { pt = o.pt; if (i > 0) { dm = o.poly ? 'osmway' : 'line'; if (o.poly) routeCache.set(segKey(S.ctrl[i - 1], pt, 'osmway'), [S.ctrl[i - 1].slice(0, 2), ...o.poly.slice(1, -1), pt]); } }
           }
@@ -2926,9 +2926,9 @@ async function addCtrl(p) {
       if (r && r.d <= MAG_MAX) {
         rSeg = r.seg; pt = r.pt;
         if (S.ctrl.length === 1 && r.other && dMeters(last, r.other) <= MAG_MAX) first = [+r.other[0].toFixed(6), +r.other[1].toFixed(6)];      // le tout premier point est replacé à son tour
-      } else {      // chemin inconnu du calculateur (ou calculateur peu fiable) : on le cherche dans les données OSM
+      } else if (r) {      // le calculateur dit « trop loin » : chemin qu'il ne connaît pas, on le cherche dans les données OSM (s'il est indisponible ou peu fiable, on pose le point comme avant)
         pm = null;
-        const o = await osmDecide(pt, last.slice(0, 2), r ? r.d : null);
+        const o = await osmDecide(pt, last.slice(0, 2), r.d);
         if (o.kind === 'refuse') { toast(tooFarMsg(o.d), 'err'); return; }
         if (o.kind === 'ok') {
           pt = o.pt;

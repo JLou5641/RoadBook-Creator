@@ -76,8 +76,8 @@ function renderCtrl() {
         try {
           const t = i > 0 ? await magnetTry(S.ctrl[i - 1].slice(0, 2), pt, true, md) : await magnetTry(S.ctrl[1].slice(0, 2), pt, false, md), r = t.r;
           if (r && r.d <= MAG_MAX) { pt = r.pt; if (t.mode !== md) { if (i > 0) dm = t.mode; else S.ctrl[1][2] = t.mode; } }
-          else {      // chemin inconnu du calculateur : on cale sur les données OSM
-            const o = await osmDecide(pt, i > 0 ? S.ctrl[i - 1].slice(0, 2) : null, r ? r.d : null);
+          else if (r) {      // « trop loin » d'après le calculateur : on cale sur les données OSM (calculateur indisponible ou peu fiable : le point garde son tronçon, recalculé sur la route)
+            const o = await osmDecide(pt, i > 0 ? S.ctrl[i - 1].slice(0, 2) : null, r.d);
             if (o.kind === 'refuse') { toast(tooFarMsg(o.d), 'err'); renderCtrl(); return; }
             if (o.kind === 'ok') { pt = o.pt; if (i > 0) { dm = o.poly ? 'osmway' : 'line'; if (o.poly) routeCache.set(segKey(S.ctrl[i - 1], pt, 'osmway'), [S.ctrl[i - 1].slice(0, 2), ...o.poly.slice(1, -1), pt]); } }
           }
@@ -170,9 +170,9 @@ async function addCtrl(p) {
       if (r && r.d <= MAG_MAX) {
         rSeg = r.seg; pt = r.pt;
         if (S.ctrl.length === 1 && r.other && dMeters(last, r.other) <= MAG_MAX) first = [+r.other[0].toFixed(6), +r.other[1].toFixed(6)];      // le tout premier point est replacé à son tour
-      } else {      // chemin inconnu du calculateur (ou calculateur peu fiable) : on le cherche dans les données OSM
+      } else if (r) {      // le calculateur dit « trop loin » : chemin qu'il ne connaît pas, on le cherche dans les données OSM (s'il est indisponible ou peu fiable, on pose le point comme avant)
         pm = null;
-        const o = await osmDecide(pt, last.slice(0, 2), r ? r.d : null);
+        const o = await osmDecide(pt, last.slice(0, 2), r.d);
         if (o.kind === 'refuse') { toast(tooFarMsg(o.d), 'err'); return; }
         if (o.kind === 'ok') {
           pt = o.pt;

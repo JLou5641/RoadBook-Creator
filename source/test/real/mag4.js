@@ -2,7 +2,7 @@
 const { chromium } = require('playwright'); const path = require('path');
 (async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1200, height: 800 } });
   let L = 0, L0 = 0;
-  await p.route(/brouter\.de/, r => r.abort());
+  await p.route(/brouter\.de/, r => { const m = /lonlats=([^&]+)/.exec(decodeURIComponent(r.request().url())); const [A, B] = m[1].split('|').map(q => q.split(',').map(Number)); r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ features: [{ geometry: { coordinates: [[A[0], L - 0.004], [B[0], L - 0.004]] } }] }) }); });
   await p.route(/routing\.openstreetmap/, r => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ routes: [{ geometry: { coordinates: [[3.0, L - 0.004], [3.002, L - 0.004]] } }] }) }));
   // chemin OSM : ligne brisée proche de L (lat) avec un coude
   await p.route(/overpass|kumi|private\.coffee|mail\.ru/, r => { const geom = [[L, 2.9990], [L, 3.0010], [L + 0.0003, 3.0020], [L + 0.0003, 3.0040]].map(q => ({ lat: q[0], lon: q[1] })); r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ elements: [{ type: 'way', id: 77, tags: { highway: 'track' }, geometry: geom }] }) }); });
