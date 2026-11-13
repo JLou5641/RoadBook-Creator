@@ -68,7 +68,18 @@ function renderCtrl() {
     const m = L.marker([c[0], c[1]], { draggable: !lk, keyboard: false, icon: L.divIcon({ className: 'cpt' + (i === 0 ? ' first' : '') + (lk ? ' locked' : '') + (inSel ? ' sel' : ''), iconSize: [16, 16] }) });
     let pre = null;
     m.on('dragstart', () => { pre = snap(); });
-    m.on('dragend', () => { const p = m.getLatLng(); pushHist(pre); S.ctrl[i] = [p.lat, p.lng, i > 0 && !snapIsOn() ? 'line' : S.ctrl[i][2]]; reroute(); });
+    m.on('dragend', async () => {
+      const p = m.getLatLng(); let pt = [p.lat, p.lng];
+      const md = S.ctrl.length > 1 ? (i > 0 ? S.ctrl[i][2] : S.ctrl[1][2]) : null;
+      if (snapIsOn() && !magBusy && md && !/^(line|trace)$/.test(md)) {      // aimant : le point déplacé se replace sur la route (les tronçons en ligne droite ou de trace chargée ne sont pas touchés)
+        magBusy = true;
+        try {
+          const r = i > 0 ? await magnet(S.ctrl[i - 1].slice(0, 2), pt, true, md) : await magnet(S.ctrl[1].slice(0, 2), pt, false, md);
+          if (r) { if (r.d > MAG_MAX) { toast(tooFarMsg(r.d), 'err'); renderCtrl(); return; } pt = r.pt; }
+        } finally { magBusy = false; }
+      }
+      pushHist(pre); S.ctrl[i] = [pt[0], pt[1], i > 0 && !snapIsOn() ? 'line' : S.ctrl[i][2]]; renderCtrl(); reroute();
+    });
     m.on('click', () => { if (tool === 'sel') { selClick(i); return; } if (lk) { toast('Étape verrouillée 🔒', 'err'); return; } pushHist(); S.ctrl.splice(i, 1); if (i === 0 && S.ctrl.length) S.ctrl[0][2] = null; renderCtrl(); reroute(); });
     m.addTo(ctrlLayer);
   });
@@ -87,9 +98,33 @@ function toggleSnap() {
   else { S.snapOn = true; if (S.routeMode === 'line') { S.routeMode = S.prevRoute && S.prevRoute !== 'line' ? S.prevRoute : 'trekking'; $('#routeMode').value = S.routeMode; } }
   updSnapBtn(); save(); toast(snapIsOn() ? 'Route activée : les points suivent les chemins.' : 'Route désactivée : lignes droites.', 'ok');
 }
-function addCtrl(p) {
+/* Mode aimant : un point posé est replacé sur la route / le chemin le plus proche (là où le routeur le pose) ; trop loin (> MAG_MAX m), il est refusé. Sans internet : posé tel quel. */
+const MAG_MAX = 40;
+const dMeters = (p, q) => { const k = Math.cos(p[0] * Math.PI / 180); return Math.hypot((q[1] - p[1]) * k * 111320, (q[0] - p[0]) * 110540); };
+const tooFarMsg = d => `🧲 Point trop loin d’une route ou d’un chemin (${Math.round(d)} m). Rapproche-le, ou désactive « Route » (touche R).`;
+let magBusy = false;
+async function magnet(nb, p, nbFirst, mode) {      // → { pt: point replacé, d: distance du clic, other: voisin replacé } ou null si le calcul est indisponible
+  const seg = nbFirst ? await routeSeg(nb, p, mode) : await routeSeg(p, nb, mode), q = nbFirst ? seg.snapB : seg.snapA;
+  if (!q) return null;
+  return { pt: [+q[0].toFixed(6), +q[1].toFixed(6)], d: dMeters(p, q), other: nbFirst ? seg.snapA : seg.snapB };
+}
+async function addCtrl(p) {
+  if (magBusy) return;
+  let pt = [+p[0].toFixed(6), +p[1].toFixed(6)], first = null;
+  if (snapIsOn() && S.ctrl.length) {
+    magBusy = true;
+    try {
+      const last = S.ctrl[S.ctrl.length - 1], r = await magnet(last.slice(0, 2), pt, true, S.routeMode);
+      if (r) {
+        if (r.d > MAG_MAX) { toast(tooFarMsg(r.d), 'err'); return; }
+        pt = r.pt;
+        if (S.ctrl.length === 1 && r.other && dMeters(last, r.other) <= MAG_MAX) first = [+r.other[0].toFixed(6), +r.other[1].toFixed(6)];      // le tout premier point est replacé à son tour
+      }
+    } finally { magBusy = false; }
+  }
   pushHist();
-  S.ctrl.push([+p[0].toFixed(6), +p[1].toFixed(6), S.ctrl.length ? curMode() : null]);
+  if (first) S.ctrl[0] = [first[0], first[1], null];
+  S.ctrl.push([pt[0], pt[1], S.ctrl.length ? curMode() : null]);
   S.src = 'draw';
   renderCtrl(); reroute();
 }
@@ -248,6 +283,7 @@ function orsDialog() {
     [{ label: 'Effacer la clé', onClick: () => { try { localStorage.removeItem('rbgen.orsKey'); } catch (_) {} toast('Clé effacée.', 'ok'); } }, 'sp', { label: 'Annuler' },
      { label: 'Enregistrer', cls: 'primary', onClick: mm => { const v = mm.querySelector('#orsK').value.trim(); try { localStorage.setItem('rbgen.orsKey', v); } catch (_) {} toast(v ? 'Clé enregistrée.' : 'Clé effacée.', 'ok'); } }]);
 }
+const snapInfo = (r, c) => { r.snapA = [c[0][1], c[0][0]]; r.snapB = [c[c.length - 1][1], c[c.length - 1][0]]; return r; };      // où le routeur a réellement posé les extrémités (sur la route)
 async function routeSeg(a, b, mode) {
   if (mode === 'trace') mode = S.routeMode;      // tronçon d'une trace chargée dont un point a bougé : on suit le mode « Tracé » du menu
   if (!mode || mode === 'line') return [a.slice(0, 2), b.slice(0, 2)];
@@ -259,7 +295,7 @@ async function routeSeg(a, b, mode) {
         const j = await fetchJSON(`https://api.openrouteservice.org/v2/directions/${mode.slice(4)}/geojson`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: key },
           body: JSON.stringify({ coordinates: [[a[1], a[0]], [b[1], b[0]]], radiuses: [1000, 1000] }) }, 25000);
         const c = j.features[0].geometry.coordinates;
-        if (c.length >= 2) return cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]);
+        if (c.length >= 2) return snapInfo(cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]), c);
       } catch (e) { if (Date.now() - routeWarned > 8000) { routeWarned = Date.now(); toast('OpenRouteService : ' + (e.status === 401 || e.status === 403 ? 'clé refusée' : e.status === 429 ? 'quota du jour atteint' : 'indisponible') + ' : calcul avec BRouter.', 'err'); } mode = 'trekking'; }
     }
   }
@@ -267,14 +303,14 @@ async function routeSeg(a, b, mode) {
     const url = `https://brouter.de/brouter?lonlats=${a[1].toFixed(6)},${a[0].toFixed(6)}|${b[1].toFixed(6)},${b[0].toFixed(6)}&profile=${encodeURIComponent(mode)}&alternativeidx=0&format=geojson`;
     const j = await fetchJSON(url, null, 25000);
     const c = j.features[0].geometry.coordinates;
-    if (c.length >= 2) return cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]);
+    if (c.length >= 2) return snapInfo(cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]), c);
   } catch (e) { /* on essaie le serveur de secours */ }
   try {
     const prof = mode === 'car-fast' ? 'routed-car' : mode === 'shortest' ? 'routed-foot' : 'routed-bike';
     const url = `https://routing.openstreetmap.de/${prof}/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson`;
     const j = await fetchJSON(url, null, 25000);
     const c = j.routes[0].geometry.coordinates;
-    if (c.length >= 2) return cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]);
+    if (c.length >= 2) return snapInfo(cleanEnds([a.slice(0, 2), ...c.map(q => [+q[1].toFixed(6), +q[0].toFixed(6)]), b.slice(0, 2)]), c);
   } catch (e) { /* ligne droite */ }
   if (Date.now() - routeWarned > 8000) { routeWarned = Date.now(); toast('Itinéraire indisponible (pas d’internet ?) : tracé en ligne droite.', 'err'); }
   return [a.slice(0, 2), b.slice(0, 2)];
