@@ -69,16 +69,16 @@ function renderCtrl() {
     let pre = null;
     m.on('dragstart', () => { pre = snap(); });
     m.on('dragend', async () => {
-      const p = m.getLatLng(); let pt = [p.lat, p.lng];
+      const p = m.getLatLng(); let pt = [p.lat, p.lng], dm = null;
       const md = S.ctrl.length > 1 ? (i > 0 ? S.ctrl[i][2] : S.ctrl[1][2]) : null;
       if (snapIsOn() && !magBusy && md && !/^(line|trace)$/.test(md)) {      // aimant : le point déplacé se replace sur la route (les tronçons en ligne droite ou de trace chargée ne sont pas touchés)
         magBusy = true;
         try {
-          const r = i > 0 ? await magnet(S.ctrl[i - 1].slice(0, 2), pt, true, md) : await magnet(S.ctrl[1].slice(0, 2), pt, false, md);
-          if (r) { if (r.d > MAG_MAX) { toast(tooFarMsg(r.d), 'err'); renderCtrl(); return; } pt = r.pt; }
+          const t = i > 0 ? await magnetTry(S.ctrl[i - 1].slice(0, 2), pt, true, md) : await magnetTry(S.ctrl[1].slice(0, 2), pt, false, md), r = t.r;
+          if (r) { if (r.d > MAG_MAX) { toast(tooFarMsg(r.d), 'err'); renderCtrl(); return; } pt = r.pt; if (t.mode !== md) { if (i > 0) dm = t.mode; else S.ctrl[1][2] = t.mode; } }
         } finally { magBusy = false; }
       }
-      pushHist(pre); S.ctrl[i] = [pt[0], pt[1], i > 0 && !snapIsOn() ? 'line' : S.ctrl[i][2]]; renderCtrl(); reroute();
+      pushHist(pre); S.ctrl[i] = [pt[0], pt[1], i > 0 && !snapIsOn() ? 'line' : dm || S.ctrl[i][2]]; renderCtrl(); reroute();
     });
     m.on('click', () => { if (tool === 'sel') { selClick(i); return; } if (lk) { toast('Étape verrouillée 🔒', 'err'); return; } pushHist(); S.ctrl.splice(i, 1); if (i === 0 && S.ctrl.length) S.ctrl[0][2] = null; renderCtrl(); reroute(); });
     m.addTo(ctrlLayer);
@@ -108,13 +108,19 @@ async function magnet(nb, p, nbFirst, mode) {      // → { pt: point replacé, 
   if (!q) return null;
   return { pt: [+q[0].toFixed(6), +q[1].toFixed(6)], d: dMeters(p, q), other: nbFirst ? seg.snapA : seg.snapB };
 }
+/* essaie le mode choisi, puis « Au plus court » (sentiers inclus) si le chemin n'est pas connu du premier : { r, mode } */
+async function magnetTry(nb, p, nbFirst, mode) {
+  let r = await magnet(nb, p, nbFirst, mode);
+  if (r && r.d > MAG_MAX && mode !== 'shortest' && !/^ors:/.test(mode)) { const r2 = await magnet(nb, p, nbFirst, 'shortest'); if (r2 && r2.d < r.d) return { r: r2, mode: r2.d <= MAG_MAX ? 'shortest' : mode, far: r.d < r2.d ? r : r2 }; }
+  return { r, mode };
+}
 async function addCtrl(p) {
-  if (magBusy) return;
-  let pt = [+p[0].toFixed(6), +p[1].toFixed(6)], first = null;
+  if (magBusy) { toast('Calcul du point précédent en cours…', 'ok'); return; }
+  let pt = [+p[0].toFixed(6), +p[1].toFixed(6)], first = null, pm = null;
   if (snapIsOn() && S.ctrl.length) {
     magBusy = true;
     try {
-      const last = S.ctrl[S.ctrl.length - 1], r = await magnet(last.slice(0, 2), pt, true, S.routeMode);
+      const last = S.ctrl[S.ctrl.length - 1], t = await magnetTry(last.slice(0, 2), pt, true, S.routeMode), r = t.r; pm = t.mode !== S.routeMode ? t.mode : null;
       if (r) {
         if (r.d > MAG_MAX) { toast(tooFarMsg(r.d), 'err'); return; }
         pt = r.pt;
@@ -124,7 +130,7 @@ async function addCtrl(p) {
   }
   pushHist();
   if (first) S.ctrl[0] = [first[0], first[1], null];
-  S.ctrl.push([pt[0], pt[1], S.ctrl.length ? curMode() : null]);
+  S.ctrl.push([pt[0], pt[1], S.ctrl.length ? (pm || curMode()) : null]);
   S.src = 'draw';
   renderCtrl(); reroute();
 }
