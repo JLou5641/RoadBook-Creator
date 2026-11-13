@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Générateur de Roadbook</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#1b1a17">
+<style>/*LEAFLET_CSS*/</style>
+<style>/*APP_CSS*/</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
+      <div>Roadbook<small>Générateur automatique · OSM</small></div>
+    </div>
+    <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
+    <div class="tools">
+      <button class="btn" id="bOpen" title="Ouvrir une trace GPX (ou un projet .json)"><span class="ic">📂</span><span class="lbl">Ouvrir GPX</span></button>
+      <button class="btn" id="bDraw" title="Dessiner le parcours sur la carte"><span class="ic">✏️</span><span class="lbl">Dessiner</span></button>
+      <button class="btn primary" id="bGen" title="Générer le roadbook depuis les chemins OSM"><span class="ic">⚙️</span><span class="lbl">Générer le roadbook</span></button>
+      <button class="btn" id="bExport" title="Exporter au format GPX OpenRally"><span class="ic">💾</span><span class="lbl">Exporter GPX</span></button>
+      <button class="btn" id="bPrint" title="Imprimer ou enregistrer en PDF"><span class="ic">🖨️</span><span class="lbl">Imprimer</span></button>
+      <div class="menuwrap">
+        <button class="btn" id="bMore" title="Plus">⋯</button>
+        <div class="dropdown" id="moreMenu">
+          <button data-act="settings">⚙️ Réglages de génération</button>
+          <button data-act="stages">🏁 Étapes (distance, dénivelé, verrouillage)</button>
+          <button data-act="meas">📐 Mesurer un cap / liste des virages</button>
+          <button data-act="alt">⛰️ Altitude et horaires (profil, 3D, horodatage)</button>
+          <button data-act="marks">📍 Marqueurs (refuges, eau, repères)</button>
+          <button data-act="saveProject">🗂️ Enregistrer le projet (.json)</button>
+          <button data-act="saveOsm">💾 Enregistrer les chemins OSM (dossier au choix)</button>
+          <button data-act="loadOsm">📥 Charger des chemins OSM</button>
+          <button data-act="new">🆕 Nouveau roadbook</button>
+          <button data-act="help">❓ Aide</button>
+          <div class="ver">Version du <!--BUILD_STAMP--></div>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="fileIn" accept=".gpx,.json,.rbosm,application/gpx+xml,application/json" hidden>
+  </header>
+  <main>
+    <div id="mapwrap">
+      <div id="map"></div>
+      <div class="mapbox" id="layerBox">
+        <select id="layerSel" aria-label="Fond de carte">
+          <option value="topo">🗻 OpenTopoMap</option>
+          <option value="scan25">🥾 IGN SCAN 25 (France)</option>
+          <option value="planign">🇫🇷 Plan IGN (France)</option>
+          <option value="cyclosm">🚵 CyclOSM (pistes)</option>
+          <option value="osm">🗺️ OSM standard</option>
+          <option value="sat">🛰️ Satellite</option>
+        </select>
+        <label class="radlab" title="Cercle d’ouverture (bleu, pointillé) et cercle de validation (violet) autour de chaque waypoint"><input type="checkbox" id="radChk"> ◎ Rayons des waypoints <span class="radkey"><i class="ro"></i> ouverture <i class="rc"></i> validation</span></label>
+      </div>
+      <div class="mapbox" id="measBox">
+        <div style="display:flex;justify-content:space-between;align-items:center"><b>📐 Mesure de cap</b><button id="measX" title="Fermer">✕</button></div>
+        <div class="help" style="margin:4px 0">Clique sur la trace près d’un coude. Les caps sont mesurés depuis le nord (0° = nord, 90° = est, 180° = sud, 270° = ouest).</div>
+        <div class="row2"><label>Entrée <select id="measWi"><option>15</option><option selected>30</option><option>50</option></select> m</label>
+          <label>Sortie <select id="measWo"><option>15</option><option selected>30</option><option>50</option><option>100</option><option>150</option><option>200</option></select> m</label>
+          <label>Virages ≥ <select id="measThr"><option>20</option><option selected>30</option><option>45</option><option>60</option><option>90</option></select>°</label></div>
+        <div id="measRes"></div>
+        <div class="row2"><label><input type="checkbox" id="measNo"> seulement les virages sans note</label></div>
+        <div id="measList"></div>
+      </div>
+      <div class="mapbox" id="drawBox">
+        <b>Mode dessin</b>
+        <div style="margin-top:3px">Clique sur la carte pour poser des points. Glisse un point pour le déplacer, clique dessus pour le retirer. Tire sur la trace pour y ajouter un point. Main levée : maintiens la barre espace (ou le bouton) et dessine.</div>
+        <div class="row2">
+          <label for="routeMode">Tracé :</label>
+          <select id="routeMode">
+            <option value="trekking">Suivre pistes &amp; chemins</option>
+            <option value="shortest">Au plus court (sentiers inclus)</option>
+            <option value="moped">Petites routes (cyclo)</option>
+            <option value="car-fast">Routes (voiture)</option>
+            <option value="line">Ligne droite</option>
+          </select>
+        </div>
+        <div class="row2">
+          <button id="bUndo" title="Annuler (Ctrl+Z)">↶ Annuler</button>
+          <button id="bRedo" title="Rétablir (Ctrl+Y)">↷ Rétablir</button>
+        </div>
+        <div class="row2">
+          <button id="bFree" title="Dessiner à main levée (ou maintenir la barre espace)">✍ Main levée</button>
+          <button id="bErase" title="Effacer des points en les survolant, bouton enfoncé">🧽 Gomme</button>
+          <button id="bDrawEnd">✔ Terminer</button>
+        </div>
+        <div class="row2">
+          <button id="bCut" title="Cliquer sur la trace : supprimer le début ou la fin, ou changer le point de départ d’une boucle">✂ Couper</button>
+          <button id="bRev" title="Inverser le sens du parcours">⇅ Inverser</button>
+          <button id="bMerge" title="Ajouter un autre fichier GPX à la suite (ou avant) de ce parcours">➕ Fusionner un GPX</button>
+        </div>
+        <div class="row2">
+          <button id="bReduce" title="Réduire le nombre de points de la trace">Réduire les points</button>
+          <button id="bSnap" title="Recalculer la trace pour qu’elle suive les chemins (mode « Tracé » choisi ci-dessus)">🛣 Coller à la route</button>
+          <input type="file" id="mergeIn" accept=".gpx,.xml" style="display:none">
+        </div>
+      </div>
+      <div id="status">Charge une trace GPX ou dessine ton parcours.</div>
+      <div id="dropHint">Dépose ton fichier GPX ici</div>
+    </div>
+    <aside id="side">
+      <div id="sideHead"><b id="sumKm">0,00 km</b><span id="sumNotes">0 note</span><span style="margin-left:auto;color:#8a8478" id="sumSrc"></span></div>
+      <div id="stale">Le parcours a changé depuis la dernière génération : clique sur <b>Générer le roadbook</b> pour mettre les notes à jour.</div>
+      <div id="rb"></div>
+    </aside>
+  </main>
+</div>
+<div id="print"></div>
+<div id="modalBg"><div class="modal" id="modal"></div></div>
+<div id="toast"></div>
+<script>/*LEAFLET_JS*/</script>
+<script>/*APP_JS*/</script>
+</body>
+</html>

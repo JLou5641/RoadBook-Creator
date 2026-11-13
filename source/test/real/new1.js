@@ -22,7 +22,7 @@ const scen = {
     await p.click('#bGen'); await p.waitForTimeout(300); await p.selectOption('#gsT', 'osm'); await p.selectOption('#gsN', 'osm'); await p.click('#modal .mbtn.primary');
     await p.waitForSelector('#modal h2:has-text("rapport")', { timeout: 20000 }).catch(() => { });
     await p.waitForTimeout(500);
-    const t = await p.evaluate(() => window.__rb.S.notes.filter(n => /feux|ralentisseur|piéton|danger/i.test((n.text || '') + JSON.stringify(n.sym || ''))).map(n => n.text));
+    const t = await p.evaluate(() => window.__rb.S.notes.filter(n => /feux|ralentisseur|piéton/i.test(n.text || '')).map(n => JSON.stringify(window.__rb.noteView(n).keys) + ' ' + JSON.stringify(window.__rb.noteView(n).lines)));
     const sk = await p.evaluate(() => { const d = document.querySelector('#modal details'); return d ? d.textContent.replace(/\n/g, ' ; ') : ''; });
-    console.log(nm.padEnd(55), '→', t.length ? 'PANNEAU gardé' : 'ignoré', sk ? '[' + sk + ']' : ''); await p.close(); }
+    console.log(nm.padEnd(40), '→', JSON.stringify(t), sk ? '[' + sk + ']' : ''); await p.close(); }
   await b.close(); })();
