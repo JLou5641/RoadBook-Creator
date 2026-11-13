@@ -9,6 +9,8 @@ const scen = {
   'stop partagé, direction=backward (contraire au sens)': e => { e.find(x => x.id === 1004).tags = { highway: 'stop', direction: 'backward' }; },
   'route principale coupée au carrefour + stop (doit être ignoré)': e => { const w = e.find(x => x.id === 5000); const i = w.nodes.indexOf(1004); e.push({ type: 'way', id: 5002, nodes: w.nodes.slice(i), tags: { ...w.tags } }); w.nodes = w.nodes.slice(0, i + 1); e.find(x => x.id === 1004).tags = { highway: 'give_way' }; },
   'stop sur un noeud hors de tous les chemins connus (doit être ignoré)': e => { const n = e.find(x => x.id === 1003); e.push({ type: 'node', id: 9999, lat: n.lat, lon: n.lon, tags: { highway: 'stop', direction: 'backward' } }); },
+  'portail sur notre route (noeud 1003) : doit être gardé': e => { e.find(x => x.id === 1003).tags = { barrier: 'gate' }; },
+  'portail hors de nos chemins (noeud isolé) : doit être ignoré': e => { const n = e.find(x => x.id === 1003); e.push({ type: 'node', id: 9998, lat: n.lat + 0.00002, lon: n.lon, tags: { barrier: 'gate' } }); },
   'cédez-le-passage sur noeud partagé': e => { e.find(x => x.id === 1004).tags = { highway: 'give_way' }; },
 };
 (async () => { const b = await chromium.launch();
@@ -22,6 +24,6 @@ const scen = {
     await p.click('#bGen'); await p.waitForTimeout(300); await p.selectOption('#gsT', 'osm'); await p.selectOption('#gsN', 'osm'); await p.click('#modal .mbtn.primary');
     await p.waitForSelector('#modal h2:has-text("rapport")', { timeout: 20000 }).catch(() => { });
     await p.waitForTimeout(500);
-    const t = await p.evaluate(() => window.__rb.S.notes.filter(n => /stop|cédez|giveway/i.test((n.text || '') + JSON.stringify(n.sym || ''))).map(n => n.why));
+    const t = await p.evaluate(() => window.__rb.S.notes.filter(n => /stop|cédez|giveway|portail|fencegate/i.test((n.text || '') + JSON.stringify(n.sym || ''))).map(n => n.why));
     console.log(nm.padEnd(55), '→', t.length ? 'PANNEAU gardé ' + t.join('|') : 'ignoré'); await p.close(); }
   await b.close(); })();

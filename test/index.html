@@ -1034,7 +1034,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261113.1947</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261113.2010</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1064,7 +1064,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="settings">⚙️ Réglages de génération</button>
           <button data-act="help">❓ Aide</button>
           <button data-act="manual">📖 Manuel d'utilisation</button>
-          <div class="ver">Version v0.261113.1947 · VERSION DE TEST</div>
+          <div class="ver">Version v0.261113.2010 · VERSION DE TEST</div>
         </div>
       </div>
     </div>
@@ -4253,8 +4253,17 @@ function osmExtras(g, notes) {
   const HWR = { motorway: 9, motorway_link: 9, trunk: 8, trunk_link: 8, primary: 7, primary_link: 7, secondary: 6, secondary_link: 6, tertiary: 5, tertiary_link: 5, unclassified: 4, residential: 4, living_street: 3, service: 3, track: 2, path: 1, footway: 1, cycleway: 1, bridleway: 1 };
   const hwr = w => HWR[(w.tags || {}).highway] || 2;
   let nodeWays = null, stopDbg = '';
+  const ensureNW = () => { if (!nodeWays) { nodeWays = new Map(); for (const w of g.ways) for (const id of w.nodes || []) { let a = nodeWays.get(id); if (!a) nodeWays.set(id, a = []); a.push(w); } } };
+  /* Portail, gué, passage à niveau, danger : seulement s'ils sont sur la route que l'on suit (nœud du chemin emprunté).
+     Un portail posé sur l'entrée d'une propriété ou à la sortie d'un chemin croisé est sur une autre voie : ignoré. */
+  const onMyWay = (n, sPass) => {
+    ensureNW(); if (n.id == null || !nodeWays.size) return true;
+    const run = []; for (let d = -10; d <= 10; d += 5) { const q = smp[clamp(Math.round((sPass + d) / STEP), 0, smp.length - 1)]; if (q && q.w) run.push(q.w); }
+    if (!run.length) return true;
+    return run.some(w => (w.nodes || []).includes(n.id));
+  };
   const stopIsMine = (n, sPass) => {
-    if (!nodeWays) { nodeWays = new Map(); for (const w of g.ways) for (const id of w.nodes || []) { let a = nodeWays.get(id); if (!a) nodeWays.set(id, a = []); a.push(w); } }
+    ensureNW();
     const q = smp[clamp(Math.round((sPass - 8) / STEP), 0, smp.length - 1)];
     const my = (q && q.w) || wayAtS(sPass), ws = n.id != null ? nodeWays.get(n.id) : null;
     const nm = w => (w.tags.highway || '?') + (w.tags.ref ? ' ' + w.tags.ref : w.tags.name ? ' ' + w.tags.name : '') + ' #' + w.id;
@@ -4284,6 +4293,7 @@ function osmExtras(g, notes) {
       if (!it.length) continue;
       for (const ps of passes(n.xy, 6)) for (const e of it) {
         if (e.stop && !stopIsMine(n, ps.s)) continue;      // panneau de la route que l'on croise : pas pour nous
+        if (!e.stop && /^(barrier|ford|rail|hazard)$/.test(e.key) && !onMyWay(n, ps.s)) continue;      // objet posé à côté de la route (entrée de propriété, chemin croisé)
         if (e.stop) {               // le panneau ne compte que si l'on arrive au carrefour
           const ahead = jS.find(js => js >= ps.s - 2 && js - ps.s <= 45);
           if (ahead == null && jS.some(js => js < ps.s - 2 && ps.s - js <= 30)) continue;
