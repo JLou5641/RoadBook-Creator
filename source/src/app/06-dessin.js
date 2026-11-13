@@ -79,7 +79,8 @@ function renderCtrl() {
           else if (r) {      // « trop loin » d'après le calculateur : on cale sur les données OSM (calculateur indisponible ou peu fiable : le point garde son tronçon, recalculé sur la route)
             const o = await osmDecide(pt, i > 0 ? S.ctrl[i - 1].slice(0, 2) : null, r.d, md);
             if (o.kind === 'refuse') { toast(tooFarMsg(o.d), 'err'); renderCtrl(); return; }
-            if (o.kind === 'ok') { pt = o.pt; if (i > 0) { dm = o.poly ? 'osmway' : 'line'; if (o.poly) routeCache.set(segKey(S.ctrl[i - 1], pt, 'osmway'), [S.ctrl[i - 1].slice(0, 2), ...o.poly.slice(1, -1), pt]); } }
+            if (o.kind === 'ok') { pt = o.pt; if (i > 0) { dm = o.poly || md0 === 'osmway' ? 'osmway' : null;      // sans chemin commun : un point de route garde son mode (le tronçon est recalculé sur la route, jamais figé en ligne droite)
+               if (o.poly) routeCache.set(segKey(S.ctrl[i - 1], pt, 'osmway'), [S.ctrl[i - 1].slice(0, 2), ...o.poly.slice(1, -1), pt]); } }
           }
         } finally { magBusy = false; }
       }
