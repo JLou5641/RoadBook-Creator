@@ -1,0 +1,14 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+const el = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'overpass.json'), 'utf8')).elements; el.find(x => x.id === 1004).tags = { highway: 'stop', direction: 'backward' };
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1200, height: 800 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(/overpass|kumi|private\.coffee|mail\.ru/, r => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ elements: el }) })); await p.route(/tile|arcgisonline/, r => r.abort());
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html')); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.evaluate(t => window.__rb.loadText(t, 'trace.gpx'), fs.readFileSync(path.join(__dirname, '..', 'trace.gpx'), 'utf8')); await p.waitForTimeout(400);
+  await p.click('#bGen'); await p.waitForTimeout(300); await p.selectOption('#gsT', 'osm'); await p.selectOption('#gsN', 'osm'); await p.click('#modal .mbtn.primary');
+  await p.waitForSelector('#modal h2:has-text("rapport")', { timeout: 30000 }); await p.click('#modal summary'); await p.screenshot({ path: '/tmp/rpt_a.png' });
+  const z0 = await p.evaluate(() => window.__rb.map.getZoom()); await p.click('#modal .rptgo'); await p.waitForTimeout(600);
+  const r = await p.evaluate(() => ({ z: window.__rb.map.getZoom(), c: window.__rb.map.getCenter(), vis: !!document.querySelector('#modalBg.show.free'), pe: getComputedStyle(document.querySelector('#modalBg')).pointerEvents }));
+  console.log('zoom', z0, '→', r.z, 'centre', r.c.lat.toFixed(5), r.c.lng.toFixed(5), 'rapport ouvert', r.vis, 'pointer-events fond', r.pe);
+  await p.mouse.move(300, 500); await p.mouse.wheel(0, 300); await p.waitForTimeout(500); console.log('zoom après molette sur la carte', await p.evaluate(() => window.__rb.map.getZoom()));
+  await p.screenshot({ path: '/tmp/rpt_b.png' }); await p.click('#modal .mbtn.primary'); await p.waitForTimeout(300); console.log('couche retirée', await p.evaluate(() => !document.querySelector('.ctlw')));
+  console.log('erreurs', errs.join('|') || 0); await b.close(); })();
