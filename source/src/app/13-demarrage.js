@@ -607,7 +607,7 @@ $('#moreMenu').addEventListener('click', e => {
   else if (act === 'theme') cycleTheme();
   else if (act === 'help') openHelp();
   else if (act === 'report') { let r = null; try { r = JSON.parse(localStorage.getItem('rbgen.report')); } catch (_) { } if (r && r.html) showReport(r.title, r.html); else toast('Aucun rapport : génère d’abord le roadbook.'); }
-  else if (act === 'manual') window.open(location.protocol === 'file:' ? 'https://jlou5641.github.io/RoadBook-Creator/manuel/' : 'manuel/', '_blank');
+  else if (act === 'manual') window.open((location.protocol === 'file:' ? 'https://jlou5641.github.io/RoadBook-Creator/manuel/' : 'manuel/') + (I18N.lang === 'en' ? 'en.html' : ''), '_blank');
   else if (act === 'new') ask('Nouveau roadbook ?', 'Le parcours et les notes en cours seront effacés (pense à exporter ou enregistrer le projet avant).', 'Tout effacer', () => {
     if (drawing) setDrawing(false);
     S.stages = []; S.ele = null; S.marks = []; renderMarks(); candLayer.clearLayers();

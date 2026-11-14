@@ -29,7 +29,7 @@ console.log('OK', out, (html.length / 1024).toFixed(0) + ' Ko', stamp, version);
   fs.writeFileSync(path.join(pd, 'index.html'), html);
   fs.cpSync(path.join(d, 'src', 'manuel'), path.join(pd, 'manuel'), { recursive: true });
   fs.cpSync(path.join(d, 'src', 'manuel'), path.join(d, 'dist', 'manuel'), { recursive: true });
-  const mf = ['./manuel/', './manuel/index.html'].concat(fs.readdirSync(path.join(d, 'src', 'manuel', 'img')).map(f => './manuel/img/' + f));
+  const mf = ['./manuel/', './manuel/index.html', './manuel/en.html'].concat(fs.readdirSync(path.join(d, 'src', 'manuel', 'img')).map(f => './manuel/img/' + f));
   fs.writeFileSync(path.join(pd, 'sw.js'), fs.readFileSync(path.join(d, 'src', 'sw.js'), 'utf8').replace('__STAMP__', stamp.replace(/\W/g, '')).replace("'./icon-512.png']", "'./icon-512.png'].concat(" + JSON.stringify(mf) + ")"));
   for (const f of ['manifest.webmanifest', 'icon-192.png', 'icon-512.png']) fs.copyFileSync(path.join('/home/claude/out', f), path.join(pd, f));
 }
