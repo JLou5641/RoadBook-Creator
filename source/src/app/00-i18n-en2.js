@@ -79,6 +79,7 @@ Object.assign(I18N_EN, {
 "🗂 Projet": "🗂 Project",
 "⚙️ Réglages": "⚙️ Settings",
 "❓ Aide": "❓ Help",
+"Clic : afficher le CAP · double clic : mesurer": "Click: show the heading CAP · double-click: measure",
 "sans note": "without note",
 "Pas de note": "No note",
 });

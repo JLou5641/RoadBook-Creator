@@ -77,7 +77,8 @@ main{flex:1;display:flex;min-height:0}
 .k3 .lx{display:flex;flex-wrap:wrap;align-items:center;gap:.6cqw;margin-top:.7cqw}
 .k3 .lx img{height:var(--lh,7.5cqw);width:auto;max-width:29.6cqw;object-fit:contain;display:block}
 .k3 .t2{font-size:3.3cqw;line-height:1.2;margin-top:.6cqw;white-space:pre-line;flex:1;min-height:0;overflow:hidden}
-.k3 .cap{position:absolute;left:0;bottom:0;background:#FFFF00;border-top:.3cqw solid #000;border-right:.3cqw solid #000;font-family:var(--cond);font-weight:800;font-size:4.3cqw;line-height:1.15;padding:.2cqw 1cqw}
+.k3 .cap{position:absolute;left:0;bottom:0;box-sizing:border-box;width:10.4cqw;text-align:center;background:#FFFF00;border-top:.3cqw solid #000;border-right:.3cqw solid #000;font-family:var(--cond);font-weight:800;font-size:4.3cqw;line-height:1.15;padding:.2cqw 0}
+.k3 .cap.off{background:#ececec;color:#b5b5b5;border-color:#c4c4c4;cursor:pointer}.k3 .cap{cursor:pointer}
 .k3 .man{position:absolute;right:1cqw;bottom:1cqw;font-size:2.4cqw;color:#777;border:1px dashed #999;border-radius:1cqw;padding:0 .8cqw}
 .rbr .fr{position:absolute;inset:-.45cqw;border:1.1cqw solid;pointer-events:none;z-index:2}
 .rbr .fr.zone{border-color:#FB8300;border-top-width:0;border-bottom-width:0;border-left-width:2.2cqw;border-right-width:2.2cqw}
