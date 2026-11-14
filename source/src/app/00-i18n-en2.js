@@ -80,6 +80,7 @@ Object.assign(I18N_EN, {
 "⚙️ Réglages": "⚙️ Settings",
 "❓ Aide": "❓ Help",
 "Clic : afficher le CAP · double clic : mesurer": "Click: show the heading CAP · double-click: measure",
+"Glisse pour déplacer la fenêtre": "Drag to move the window",
 "sans note": "without note",
 "Pas de note": "No note",
 });

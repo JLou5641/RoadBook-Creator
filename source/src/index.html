@@ -109,7 +109,7 @@
         <label class="radlab" title="Cercle d’ouverture (bleu, pointillé) et cercle de validation (violet) autour de chaque waypoint"><input type="checkbox" id="radChk"> ◎ Rayons des waypoints <span class="radkey"><i class="ro"></i> ouverture <i class="rc"></i> validation</span></label>
       </div>
       <div class="mapbox" id="measBox">
-        <div style="display:flex;justify-content:space-between;align-items:center"><b>📐 Mesure de cap</b><button id="measX" title="Fermer">✕</button></div>
+        <div id="measHd" title="Glisse pour déplacer la fenêtre" style="display:flex;justify-content:space-between;align-items:center;cursor:move;touch-action:none;user-select:none"><b>📐 Mesure de cap</b><button id="measX" title="Fermer">✕</button></div>
         <div class="help" style="margin:4px 0">Clique sur la trace près d’un coude. Les caps sont mesurés depuis le nord (0° = nord, 90° = est, 180° = sud, 270° = ouest).</div>
         <div class="row2"><label>Entrée <select id="measWi"><option>15</option><option selected>30</option><option>50</option></select> m</label>
           <label>Sortie <select id="measWo"><option>15</option><option selected>30</option><option>50</option><option>100</option><option>150</option><option>200</option></select> m</label>

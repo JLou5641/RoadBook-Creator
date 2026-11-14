@@ -130,3 +130,19 @@ function openHelp() {
     <p style="color:#8a8478;font-size:12px">Données © contributeurs OpenStreetMap (ODbL). Chemins du mode rapide : OpenFreeMap © OpenMapTiles. Mode IGN : BD TOPO® © IGN (Licence Ouverte). Itinéraires BRouter / OSRM. Fonds OpenTopoMap, IGN, CyclOSM, Esri.</p>`, [{ label: 'OK', cls: 'primary' }]);
 }
 
+// Boîte « Mesure de cap » : déplaçable en tirant son titre
+(function () {
+  const bx = $('#measBox'), hd = $('#measHd'); let d = null;
+  hd.addEventListener('pointerdown', e => {
+    if (e.target.closest('button') || e.button > 0) return;
+    const tr = /translate\(([-\d.]+)px, ?([-\d.]+)px\)/.exec(bx.style.transform || '');
+    d = { x: e.clientX, y: e.clientY, tx: tr ? +tr[1] : 0, ty: tr ? +tr[2] : 0, r: bx.getBoundingClientRect(), pr: bx.parentElement.getBoundingClientRect() };
+    hd.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  hd.addEventListener('pointermove', e => {
+    if (!d) return;
+    const dx = clamp(e.clientX - d.x, d.pr.left - d.r.left, d.pr.right - d.r.right), dy = clamp(e.clientY - d.y, d.pr.top - d.r.top, d.pr.bottom - d.r.bottom);
+    bx.style.transform = `translate(${Math.round(d.tx + dx)}px, ${Math.round(d.ty + dy)}px)`;
+  });
+  const end = () => { d = null; }; hd.addEventListener('pointerup', end); hd.addEventListener('pointercancel', end);
+})();
