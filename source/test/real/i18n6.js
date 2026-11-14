@@ -1,0 +1,15 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1100, height: 900 }, locale: 'en-GB' });
+  await p.route(/^(?!file).*/, r => r.abort()); p.on('pageerror', e => { if (!/LatLng/.test(e.message)) console.log('ERR', e.message); });
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html'));
+  await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(300);
+  await p.evaluate(t => window.__rb.loadText(t, 'a.gpx'), fs.readFileSync(path.join(__dirname, 'andorra.gpx'), 'utf8')); await p.waitForTimeout(500);
+  const miss = async tag => { const m = await p.evaluate(() => I18N.missing()); console.log('== ' + tag + ' (' + m.length + ')'); m.forEach(x => console.log('  ' + x.slice(0, 160))); };
+  const dump = async tag => { const t = await p.evaluate(() => { const out = new Set(); const root = document.querySelector('#modalBg') || document.body; const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n; while ((n = tw.nextNode())) { const p = n.parentElement; if (!p || p.closest('script,style,textarea,.k3')) continue; const s = n.data.replace(/\s+/g, ' ').trim(); if (s) out.add(s); } root.querySelectorAll('[title],[placeholder]').forEach(e => { if (e.title) out.add('@ ' + e.title); if (e.placeholder) out.add('@ ' + e.placeholder); }); root.querySelectorAll('option').forEach(o => out.add('opt ' + o.textContent.trim())); return [...out]; }); console.log('== ' + tag + '\n' + t.map(x => '  ' + x.slice(0, 120)).join('\n')); };
+  const close = () => p.evaluate(() => { const m = document.querySelector('#modalBg'); m && m.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); });
+  await p.evaluate(() => __rb.markForm({ icon: 'pin', lat: 42.5, lon: 1.5 }, true)); await p.waitForTimeout(400); await dump('nouveau marqueur'); await close();
+  await p.evaluate(() => __rb.marksDialog()); await p.waitForTimeout(400); await dump('liste marqueurs'); await close();
+  await p.evaluate(() => __rb.altDialog()); await p.waitForTimeout(600); await dump('altitude'); await close();
+  await p.evaluate(() => __rb.view3D()); await p.waitForTimeout(600); await dump('3D'); await close();
+  await p.evaluate(() => __rb.stagesDialog()); await p.waitForTimeout(400); await dump('étapes'); await close();
+  await b.close(); })();
