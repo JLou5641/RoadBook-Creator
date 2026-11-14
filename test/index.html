@@ -1039,7 +1039,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261114.0919</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261114.0928</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1071,7 +1071,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="report">📋 Dernier rapport de génération</button>
           <button data-act="lang" data-i18n-skip>🌐 Langue / Language : <span id="langName">Français</span></button>
           <button data-act="manual">📖 Manuel d'utilisation</button>
-          <div class="ver">Version v0.261114.0919 · VERSION DE TEST</div>
+          <div class="ver">Version v0.261114.0928 · VERSION DE TEST</div>
         </div>
       </div>
     </div>
@@ -2222,7 +2222,7 @@ const I18N_EN = {
 "m le long de la trace).": "m along the track).",
 "La note est": "The note is",
 "entièrement régénérée": "completely regenerated",
-"à la nouvelle position (texte, symboles, tulipe, CAP). Tes modifications sur cette note": "at the new position (text, symbols, tulip, HDG). Your changes to this note",
+"à la nouvelle position (texte, symboles, tulipe, CAP). Tes modifications sur cette note": "at the new position (text, symbols, tulip, Heading CAP). Your changes to this note",
 "seront perdues, mais tu pourras annuler juste après.": "will be lost, but you can undo right afterwards.",
 "Déplacer": "Move",
 "↔ glisse pour déplacer": "↔ drag to move",
@@ -2363,7 +2363,7 @@ const I18N_EN = {
 "Bibliothèque de symboles pleine : le symbole reste dans le projet seulement.": "Symbol library full: the symbol stays in the project only.",
 "Texte de la note (1re ligne en gros)": "Note text (1st line in large type)",
 "Couleur du texte": "Text colour",
-"Afficher le CAP sur cette note": "Show the HDG on this note",
+"Afficher le CAP sur cette note": "Show the Heading CAP on this note",
 "Rayon dessiné dans la tulipe (m)": "Radius drawn in the tulip (m)",
 "Plus grand = la tulipe montre une zone plus large autour du carrefour.": "Larger = the tulip shows a wider area around the junction.",
 "✏️ Modifier la tulipe (traits, points)": "✏️ Edit the tulip (lines, points)",
@@ -2488,7 +2488,7 @@ const I18N_EN = {
 "Noter les changements « fin / début goudron »": "Note “end / start of tarmac” changes",
 "Noter les virages serrés hors intersection": "Note sharp turns away from junctions",
 "Angle mini d’un virage serré (°)": "Minimum angle of a sharp turn (°)",
-"Noter les passages hors piste (trace hors des chemins : direction, flèche pointillée et CAP)": "Note off-piste sections (track off the paths: direction, dotted arrow and HDG)",
+"Noter les passages hors piste (trace hors des chemins : direction, flèche pointillée et CAP)": "Note off-piste sections (track off the paths: direction, dotted arrow and Heading CAP)",
 "Notes de repères : gués, passages à niveau, stops, portails, ponts, tunnels, sable, pentes, clôtures, villages, cols, stations-service": "Landmark notes: fords, level crossings, stops, gates, bridges, tunnels, sand, slopes, fences, villages, passes, petrol stations",
 "Repères visuels : châteaux d’eau, antennes, églises, éoliennes, sommets, lieux-dits, noms des pistes": "Visual landmarks: water towers, masts, churches, wind turbines, summits, hamlets, track names",
 "Notes de repères": "Landmark notes",
@@ -2502,7 +2502,7 @@ const I18N_EN = {
 "Afficher « sur piste » (symbole P) — le regroupement « Suivre la piste » (FPP) reste actif": "Show “on track” (P symbol) — the “Follow the track” (FPP) merging stays active",
 "Afficher « sur sentier » (symbole T)": "Show “on trail” (T symbol)",
 "Afficher les noms de route dans les instructions (nom de la rue ou de la piste, numéro de route : D 976…)": "Show road names in the instructions (street or track name, road number: D 976…)",
-"Afficher le CAP sur les nouvelles notes": "Show the HDG on new notes",
+"Afficher le CAP sur les nouvelles notes": "Show the Heading CAP on new notes",
 "🗺️ Données et trace": "🗺️ Data and track",
 "Source des chemins": "Paths source",
 "Rapide — fond vectoriel OpenFreeMap (par défaut)": "Fast — OpenFreeMap vector base (default)",
@@ -2709,7 +2709,7 @@ Object.assign(I18N_EN, {
 "Les chemins téléchargés sont gardés dans ce navigateur pour aller plus vite (⋯ › « Enregistrer les chemins OSM » pour en faire une copie dans un dossier).": "Downloaded paths are kept in this browser to go faster (⋯ › “Save the OSM paths” to make a copy in a folder).",
 "tenir compte de la pente": "take the slope into account",
 "Intersections manquantes": "Missing junctions",
-": ✎ sur une note (texte, CAP, danger, symboles du lexique FIA, waypoint WPV/WPM/WPS, zone de vitesse DZ/FZ). Clique sur la trace pour ajouter une note.": ": ✎ on a note (text, HDG, danger, FIA lexicon symbols, WPV/WPM/WPS waypoint, DZ/FZ speed zone). Click on the track to add a note.",
+": ✎ sur une note (texte, CAP, danger, symboles du lexique FIA, waypoint WPV/WPM/WPS, zone de vitesse DZ/FZ). Clique sur la trace pour ajouter une note.": ": ✎ on a note (text, Heading CAP, danger, FIA lexicon symbols, WPV/WPM/WPS waypoint, DZ/FZ speed zone). Click on the track to add a note.",
 "est nécessaire pour la carte, le calcul d'itinéraire et les chemins. Mode rapide (par défaut) : fond vectoriel OpenFreeMap. Mode IGN (⚙️ Réglages, France) : BD TOPO, la base des cartes IGN. Mode détaillé : OpenStreetMap complet via Overpass, plus lent mais avec tous les repères. Ton travail est gardé automatiquement dans ce navigateur.": "is required for the map, route calculation and paths. Fast mode (default): OpenFreeMap vector base. IGN mode (⚙️ Settings, France): BD TOPO, the base of IGN maps. Detailed mode: full OpenStreetMap via Overpass, slower but with all landmarks. Your work is saved automatically in this browser.",
 "Données © contributeurs OpenStreetMap (ODbL). Chemins du mode rapide : OpenFreeMap © OpenMapTiles. Mode IGN : BD TOPO® © IGN (Licence Ouverte). Itinéraires BRouter / OSRM. Fonds OpenTopoMap, IGN, CyclOSM, Esri.": "Data © OpenStreetMap contributors (ODbL). Fast mode paths: OpenFreeMap © OpenMapTiles. IGN mode: BD TOPO® © IGN (Open Licence). BRouter / OSRM routes. Base maps OpenTopoMap, IGN, CyclOSM, Esri.",
 "Description du roadbook : rallye, étape, date, départ, consignes, rappels…": "Roadbook description: rally, stage, date, start, instructions, reminders…",
@@ -2722,7 +2722,7 @@ Object.assign(I18N_EN, {
 "Importer une image (PNG, JPG, SVG) : le fond blanc est retiré": "Import an image (PNG, JPG, SVG): the white background is removed",
 "Chercher : pont, trou, clôture, kpL…": "Search: bridge, hole, fence, kpL…",
 "ouverture": "opening",
-"CAP (°)": "HDG (°)",
+"CAP (°)": "Heading CAP (°)",
 "📐 Mesurer": "📐 Measure",
 "Noir": "Black",
 "⛽ Carburant (ravitaillement)": "⛽ Fuel (refuelling)",
@@ -2750,7 +2750,7 @@ Object.assign(I18N_EN, {
 "Lieu-dit, hameau": "Hamlet, locality",
 "bleu": "blue",
 "Compare, autour de chaque note (40 m), les voies connues par deux sources. Une note est signalée quand l'une montre au moins 25 m de voie que l'autre ne montre pas. Rien n'est modifié.": "Around each note (40 m), compares the roads known by two sources. A note is flagged when one shows at least 25 m of road that the other does not. Nothing is modified.",
-"Afficher le CAP": "Show the HDG",
+"Afficher le CAP": "Show the Heading CAP",
 "Sur toutes les notes": "On all notes",
 "Uniquement sur les notes hors piste (HP)": "Only on off-track notes (HP)",
 "Jamais": "Never",
