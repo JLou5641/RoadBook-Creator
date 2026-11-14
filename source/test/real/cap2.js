@@ -15,5 +15,8 @@ const { chromium } = require('playwright'); const fs = require('fs'), path = req
   const els = await p.$$('#rb .cap'); await els[1].click(); await p.waitForTimeout(450);
   console.log('après clic sur 112 :', await info(), 'showCap=', await p.evaluate(() => window.__rb.S.notes[1].showCap));
   await els[0].click(); await p.waitForTimeout(450); console.log('après clic sur 27 :', await p.evaluate(() => window.__rb.S.notes[0].showCap));
-  await els[2].dblclick(); await p.waitForTimeout(500); console.log('mesure ouverte :', await p.evaluate(() => document.querySelector('#measBox').classList.contains('show')), 'showCap note3 =', await p.evaluate(() => window.__rb.S.notes[2].showCap));
+  await els[2].dblclick(); await p.waitForTimeout(500); console.log('mesure ouverte :', await p.evaluate(() => document.querySelector('#measBox').classList.contains('show')), 'modale ouverte :', await p.evaluate(() => document.querySelector('#modalBg').classList.contains('show') || document.querySelector('#modalBg').style.display === 'flex'), 'showCap note3 =', await p.evaluate(() => window.__rb.S.notes[2].showCap));
+  await p.evaluate(() => document.querySelector('#measBox').classList.remove('show'));
+  await (await p.$$('#rb .row'))[0].dblclick({ position: { x: 20, y: 20 } }); await p.waitForTimeout(500);
+  console.log('double clic ailleurs → modale note :', await p.evaluate(() => !!document.querySelector('#modal h2')), await p.evaluate(() => (document.querySelector('#modal h2') || {}).textContent));
   await b.close(); })();

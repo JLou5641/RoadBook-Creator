@@ -625,7 +625,7 @@ const capNote = e => { const c = e.target.closest('.cap'); if (!c) return null; 
 $('#rb').addEventListener('click', e => { const r = capNote(e); if (!r) return; clearTimeout(capTimer);
   capTimer = setTimeout(() => { const { c, n, row } = r; n.showCap = !n.showCap; n.capSet = true; const i = S.notes.indexOf(n); row.innerHTML = rowInner(n, i, n.s - (i ? S.notes[i - 1].s : 0), rbFlags(S.notes)[i], true); save(); renderInfo(); }, 260); });
 $('#rb').addEventListener('dblclick', e => { const r = capNote(e); if (!r) return; clearTimeout(capTimer); measureForNote(r.n, false); });
-$('#rb').addEventListener('dblclick', e => { const row = e.target.closest('.row'); if (row) editNote(+row.dataset.id); });
+$('#rb').addEventListener('dblclick', e => { const row = e.target.closest('.row'); if (row && !e.target.closest('.cap')) editNote(+row.dataset.id); });
 
 function noteNeighbors(n) {
   let p = null, q = null;
