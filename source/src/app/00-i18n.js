@@ -86,13 +86,14 @@ const I18N = (() => {
       document.documentElement.lang = lang;
     } finally { obs.takeRecords(); busy = false; }
   }
+  let hook = null;
   function set(l) {
     l = l === 'en' ? 'en' : 'fr'; if (l === lang) return;
     // retour au français : on restaure d'abord, puis on change
     lang = l; try { localStorage.setItem(KEY, l); } catch (e) { }
     if (l === 'fr') { lang = 'fr'; applyAll(); } else applyAll();
     const nm = document.getElementById('langName'); if (nm) nm.textContent = l === 'en' ? 'English' : 'Français';
-    if (typeof renderAll === 'function' && typeof S !== 'undefined' && S.notes && S.notes.length) { try { renderRoadbook(); } catch (e) { } }
+    if (hook) { try { hook(l); } catch (e) { } }
     if (typeof toast === 'function') toast(l === 'en' ? 'Interface language: English.' : 'Langue de l’interface : français.', 'ok');
   }
   // fenêtres natives
@@ -113,5 +114,5 @@ const I18N = (() => {
     document.querySelectorAll('[title],[placeholder],[aria-label]').forEach(e => ATTRS.forEach(a => { const s = e.getAttribute(a); if (s && fr.test(s) && !e.closest('.k3')) out.add('@' + a + ': ' + norm(s)); }));
     return [...out];
   }
-  return { get lang() { return lang; }, set, tr: trStr, init, missing };
+  return { get lang() { return lang; }, set, onSet(f) { hook = f; }, tr: trStr, init, missing };
 })();

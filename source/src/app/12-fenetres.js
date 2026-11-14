@@ -96,7 +96,6 @@ ${num('sR', 'Rayon dessiné dans la tulipe (m)', s.tulipR, 25, 120)}
     ${chk('sTR', 'Afficher « sur sentier » (symbole T)', s.showTR !== false)}
     ${chk('sRoad', 'Afficher les noms de route dans les instructions (nom de la rue ou de la piste, numéro de route : D 976…)', s.showRoad !== false)}
     <label class="chk" style="display:block">Afficher le CAP <select id="sCapMode"><option value="all"${capModeOf(s) === 'all' ? ' selected' : ''}>Sur toutes les notes</option><option value="hp"${capModeOf(s) === 'hp' ? ' selected' : ''}>Uniquement sur les sentiers et hors piste</option><option value="off"${capModeOf(s) === 'off' ? ' selected' : ''}>Jamais</option></select></label>
-    <label class="chk" style="display:block">Langue du texte des notes <select id="sNoteLang"><option value="fr"${s.noteLang !== 'en' ? ' selected' : ''}>Français</option><option value="en"${s.noteLang === 'en' ? ' selected' : ''}>English</option></select></label>
     </details>
     <div class="help" style="margin-top:6px">Les chemins téléchargés sont gardés dans ce navigateur pour aller plus vite (⋯ › « Enregistrer les chemins OSM » pour en faire une copie dans un dossier). <a href="#" id="sClear">Vider cette mémoire</a></div>`, [
     { label: 'Valeurs par défaut', onClick: () => { S.settings = { ...DEF_SETTINGS }; afterSettings(); } }, 'sp',
@@ -106,8 +105,8 @@ ${num('sR', 'Rayon dessiné dans la tulipe (m)', s.tulipR, 25, 120)}
       const same = o => JSON.stringify(Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {}));      // comparaison sans tenir compte de l'ordre des champs
       const before = same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0, showCap: 0, capMode: 0, noteLang: 0, arrows: 0 });
       S.settings = { sv: DEF_SETTINGS.sv, data: /^(osm|ign|ignd)$/.test($('#sData').value) ? $('#sData').value : 'vt', tol: g('sTol', 0, 0, 100), water: $('#sWater').checked, bld: $('#sBld').checked, pois: $('#sPois').checked, landmarks: $('#sLand').checked, merge: g('sMerge', 30, 5, 100), tulipR: g('sR', 50, 25, 120), straight: $('#sStraight').checked, mixY: $('#sMixY').checked, mixT: $('#sMixT').checked,
-        followLvl: +$('#sFollow').value, lmOff: [...document.querySelectorAll('.lmchk')].filter(c => !c.checked).map(c => c.dataset.lm), goudron: $('#sGoudron').checked, bends: $('#sBends').checked, offroad: $('#sOffroad').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showRO: $('#sRO').checked, showPI: $('#sPI').checked, showTR: $('#sTR').checked, capMode: $('#sCapMode').value, noteLang: $('#sNoteLang').value, showCap: $('#sCapMode').value === 'all' };
-      applyNoteLang(); applyCapMode();
+        followLvl: +$('#sFollow').value, lmOff: [...document.querySelectorAll('.lmchk')].filter(c => !c.checked).map(c => c.dataset.lm), goudron: $('#sGoudron').checked, bends: $('#sBends').checked, offroad: $('#sOffroad').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showRO: $('#sRO').checked, showPI: $('#sPI').checked, showTR: $('#sTR').checked, capMode: $('#sCapMode').value, showCap: $('#sCapMode').value === 'all' };
+      applyCapMode();
       afterSettings(before === same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0, showCap: 0, capMode: 0, noteLang: 0, arrows: 0 }));
     } }]);
   const lmSet = v => document.querySelectorAll('.lmchk').forEach(c => { c.checked = v; });

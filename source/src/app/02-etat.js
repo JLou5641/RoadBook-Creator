@@ -58,7 +58,7 @@ function undoAll() {      // revient à l'état d'avant la dernière modificatio
 }
 function restore(o) {
   S.name = o.name || 'Mon roadbook'; S.desc = o.desc || ''; S.src = o.src || ''; S.ctrl = o.ctrl || []; S.segs = o.segs || [];
-  S.notes = o.notes || []; S.settings = { ...DEF_SETTINGS, ...(o.settings || {}) }; S.stale = !!o.stale;
+  S.notes = o.notes || []; S.settings = { ...DEF_SETTINGS, ...(o.settings || {}) }; if (typeof applyNoteLang === 'function' && typeof I18N !== 'undefined') applyNoteLang(); S.stale = !!o.stale;
   if ((o.settings || {}).sv !== DEF_SETTINGS.sv) S.settings = { ...S.settings, sv: DEF_SETTINGS.sv, tol: DEF_SETTINGS.tol, water: true, bld: true };
   S.routeMode = o.routeMode || 'trekking'; S.snapOn = o.snapOn !== false; S.magMax = [0, 5, 10, 20, 30, 40, 50].includes(o.magMax) ? o.magMax : 40; S.prevRoute = o.prevRoute || (S.routeMode !== 'line' ? S.routeMode : 'trekking'); S.nextId = o.nextId || (Math.max(0, ...S.notes.map(n => n.id)) + 1); S.sel = null;
   for (let i = 1; i < S.ctrl.length; i++) if (S.segs[i - 1]) routeCache.set(segKey(S.ctrl[i - 1], S.ctrl[i], S.ctrl[i][2]), S.segs[i - 1]);

@@ -1046,7 +1046,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261114.1314</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261114.1319</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1087,7 +1087,7 @@ body.dragNote .leaflet-tooltip{display:none}
             <button data-act="help">❓ Aide</button>
             <button data-act="manual">📖 Manuel d'utilisation</button>
           </div>
-          <div class="ver">Version v0.261114.1314 · VERSION DE TEST</div>
+          <div class="ver">Version v0.261114.1319 · VERSION DE TEST</div>
         </div>
       </div>
     </div>
@@ -2776,7 +2776,6 @@ Object.assign(I18N_EN, {
 "❓ Aide": "❓ Help",
 "Clic : afficher le CAP · double clic : mesurer": "Click: show the heading CAP · double-click: measure",
 "Glisse pour déplacer la fenêtre": "Drag to move the window",
-"Langue du texte des notes": "Language of note text",
   "sans note": "without note",
 "Pas de note": "No note",
 });
@@ -2868,13 +2867,14 @@ const I18N = (() => {
       document.documentElement.lang = lang;
     } finally { obs.takeRecords(); busy = false; }
   }
+  let hook = null;
   function set(l) {
     l = l === 'en' ? 'en' : 'fr'; if (l === lang) return;
     // retour au français : on restaure d'abord, puis on change
     lang = l; try { localStorage.setItem(KEY, l); } catch (e) { }
     if (l === 'fr') { lang = 'fr'; applyAll(); } else applyAll();
     const nm = document.getElementById('langName'); if (nm) nm.textContent = l === 'en' ? 'English' : 'Français';
-    if (typeof renderAll === 'function' && typeof S !== 'undefined' && S.notes && S.notes.length) { try { renderRoadbook(); } catch (e) { } }
+    if (hook) { try { hook(l); } catch (e) { } }
     if (typeof toast === 'function') toast(l === 'en' ? 'Interface language: English.' : 'Langue de l’interface : français.', 'ok');
   }
   // fenêtres natives
@@ -2895,7 +2895,7 @@ const I18N = (() => {
     document.querySelectorAll('[title],[placeholder],[aria-label]').forEach(e => ATTRS.forEach(a => { const s = e.getAttribute(a); if (s && fr.test(s) && !e.closest('.k3')) out.add('@' + a + ': ' + norm(s)); }));
     return [...out];
   }
-  return { get lang() { return lang; }, set, tr: trStr, init, missing };
+  return { get lang() { return lang; }, set, onSet(f) { hook = f; }, tr: trStr, init, missing };
 })();
 /* Générateur de Roadbook — tulipes automatiques depuis les chemins OpenStreetMap
    Export GPX OpenRally v1.0.3 (tulipes et notes en PNG base64, cap, waypoints). */
@@ -3034,7 +3034,7 @@ function undoAll() {      // revient à l'état d'avant la dernière modificatio
 }
 function restore(o) {
   S.name = o.name || 'Mon roadbook'; S.desc = o.desc || ''; S.src = o.src || ''; S.ctrl = o.ctrl || []; S.segs = o.segs || [];
-  S.notes = o.notes || []; S.settings = { ...DEF_SETTINGS, ...(o.settings || {}) }; S.stale = !!o.stale;
+  S.notes = o.notes || []; S.settings = { ...DEF_SETTINGS, ...(o.settings || {}) }; if (typeof applyNoteLang === 'function' && typeof I18N !== 'undefined') applyNoteLang(); S.stale = !!o.stale;
   if ((o.settings || {}).sv !== DEF_SETTINGS.sv) S.settings = { ...S.settings, sv: DEF_SETTINGS.sv, tol: DEF_SETTINGS.tol, water: true, bld: true };
   S.routeMode = o.routeMode || 'trekking'; S.snapOn = o.snapOn !== false; S.magMax = [0, 5, 10, 20, 30, 40, 50].includes(o.magMax) ? o.magMax : 40; S.prevRoute = o.prevRoute || (S.routeMode !== 'line' ? S.routeMode : 'trekking'); S.nextId = o.nextId || (Math.max(0, ...S.notes.map(n => n.id)) + 1); S.sel = null;
   for (let i = 1; i < S.ctrl.length; i++) if (S.segs[i - 1]) routeCache.set(segKey(S.ctrl[i - 1], S.ctrl[i], S.ctrl[i][2]), S.segs[i - 1]);
@@ -5175,9 +5175,9 @@ const capModeOf = s => s.capMode || (s.showCap ? 'all' : 'off');
 const dottedExit = n => { const r = n.tulip && n.tulip.route; return !!(r && r.length && r[r.length - 1].c === 'trail'); };      // sortie de la tulipe en pointillés (sentier, hors piste)
 const isHPNote = n => dottedExit(n) || /hors[ -]piste|off[ -]piste|(^|\n|\s)HP(\s|$)/i.test(n.text || '') || (n.syms || []).some(y => /^HP/.test(y.k || y.key || ''));
 const capRule = n => { const m = capModeOf(S.settings); return m === 'all' ? true : m === 'hp' ? isHPNote(n) : false; };
-function applyNoteLang() { const L = S.settings.noteLang; for (const n of S.notes) { if (n.edited || n.auto === false) continue; if (n.fr == null) n.fr = n.text; n.text = trNote(n.fr, L); } }
+function applyNoteLang() { const L = I18N.lang; for (const n of S.notes) { if (n.edited || n.auto === false) continue; if (n.fr == null) n.fr = n.text; n.text = trNote(n.fr, L); } }
 function applyCapMode() { for (const n of S.notes) if (n.kind !== 'end' && !n.edited && !n.capSet && n.auto !== false) n.showCap = capRule(n) && n.cap != null; }
-/* ---- langue du texte des notes générées (réglage noteLang, indépendant de la langue de l'interface) ---- */
+/* ---- langue du texte des notes générées (suit la langue de l'interface) ---- */
 const NOTE_EN = [
   [/^TD$/, 'Straight'], [/^Lég\. à ([DG])$/, 'Slight $1'], [/^À ([DG])$/, 'Turn $1'], [/^Épingle à ([DG])$/, 'Hairpin $1'],
   [/^Serrer à ([DG])$/, 'Keep $1'], [/^Virage serré à ([DG])$/, 'Tight bend $1'], [/^Demi-tour$/, 'U-turn'],
@@ -6932,7 +6932,6 @@ ${num('sR', 'Rayon dessiné dans la tulipe (m)', s.tulipR, 25, 120)}
     ${chk('sTR', 'Afficher « sur sentier » (symbole T)', s.showTR !== false)}
     ${chk('sRoad', 'Afficher les noms de route dans les instructions (nom de la rue ou de la piste, numéro de route : D 976…)', s.showRoad !== false)}
     <label class="chk" style="display:block">Afficher le CAP <select id="sCapMode"><option value="all"${capModeOf(s) === 'all' ? ' selected' : ''}>Sur toutes les notes</option><option value="hp"${capModeOf(s) === 'hp' ? ' selected' : ''}>Uniquement sur les sentiers et hors piste</option><option value="off"${capModeOf(s) === 'off' ? ' selected' : ''}>Jamais</option></select></label>
-    <label class="chk" style="display:block">Langue du texte des notes <select id="sNoteLang"><option value="fr"${s.noteLang !== 'en' ? ' selected' : ''}>Français</option><option value="en"${s.noteLang === 'en' ? ' selected' : ''}>English</option></select></label>
     </details>
     <div class="help" style="margin-top:6px">Les chemins téléchargés sont gardés dans ce navigateur pour aller plus vite (⋯ › « Enregistrer les chemins OSM » pour en faire une copie dans un dossier). <a href="#" id="sClear">Vider cette mémoire</a></div>`, [
     { label: 'Valeurs par défaut', onClick: () => { S.settings = { ...DEF_SETTINGS }; afterSettings(); } }, 'sp',
@@ -6942,8 +6941,8 @@ ${num('sR', 'Rayon dessiné dans la tulipe (m)', s.tulipR, 25, 120)}
       const same = o => JSON.stringify(Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {}));      // comparaison sans tenir compte de l'ordre des champs
       const before = same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0, showCap: 0, capMode: 0, noteLang: 0, arrows: 0 });
       S.settings = { sv: DEF_SETTINGS.sv, data: /^(osm|ign|ignd)$/.test($('#sData').value) ? $('#sData').value : 'vt', tol: g('sTol', 0, 0, 100), water: $('#sWater').checked, bld: $('#sBld').checked, pois: $('#sPois').checked, landmarks: $('#sLand').checked, merge: g('sMerge', 30, 5, 100), tulipR: g('sR', 50, 25, 120), straight: $('#sStraight').checked, mixY: $('#sMixY').checked, mixT: $('#sMixT').checked,
-        followLvl: +$('#sFollow').value, lmOff: [...document.querySelectorAll('.lmchk')].filter(c => !c.checked).map(c => c.dataset.lm), goudron: $('#sGoudron').checked, bends: $('#sBends').checked, offroad: $('#sOffroad').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showRO: $('#sRO').checked, showPI: $('#sPI').checked, showTR: $('#sTR').checked, capMode: $('#sCapMode').value, noteLang: $('#sNoteLang').value, showCap: $('#sCapMode').value === 'all' };
-      applyNoteLang(); applyCapMode();
+        followLvl: +$('#sFollow').value, lmOff: [...document.querySelectorAll('.lmchk')].filter(c => !c.checked).map(c => c.dataset.lm), goudron: $('#sGoudron').checked, bends: $('#sBends').checked, offroad: $('#sOffroad').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showRO: $('#sRO').checked, showPI: $('#sPI').checked, showTR: $('#sTR').checked, capMode: $('#sCapMode').value, showCap: $('#sCapMode').value === 'all' };
+      applyCapMode();
       afterSettings(before === same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0, showCap: 0, capMode: 0, noteLang: 0, arrows: 0 }));
     } }]);
   const lmSet = v => document.querySelectorAll('.lmchk').forEach(c => { c.checked = v; });
@@ -7876,6 +7875,7 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
 
 // accès pour les tests automatisés
 window.__rb = { trNote, noteView, svgToPNG, tulipSVG, pointAt, inv, tulipEditor, measureForNote, openMeasure, measureAtLL, bendList, bendAt, editNote, altDialog, view3D, cleanEle, timeSeries, timeAt, buildGPX, stagesDialog, stageList, addStage, marksDialog, markForm, pickTrack, parseGPX, cutAt, reverseCtrl, mergeFile, reduceDialog, snapDialog, cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, addManualNote, notesSVG, renderAll, renderRadii, noteRadii };
+I18N.onSet(() => { applyNoteLang(); if (S.notes && S.notes.length) { renderRoadbook(); save(); } });      // la langue des notes suit celle de l'interface
 })();
 
 // Version installable (PWA) : actif seulement quand la page est servie en https (pas en fichier local)
