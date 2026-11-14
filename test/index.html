@@ -1046,7 +1046,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261114.1247</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261114.1256</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1087,7 +1087,7 @@ body.dragNote .leaflet-tooltip{display:none}
             <button data-act="help">❓ Aide</button>
             <button data-act="manual">📖 Manuel d'utilisation</button>
           </div>
-          <div class="ver">Version v0.261114.1247 · VERSION DE TEST</div>
+          <div class="ver">Version v0.261114.1256 · VERSION DE TEST</div>
         </div>
       </div>
     </div>
@@ -2776,7 +2776,8 @@ Object.assign(I18N_EN, {
 "❓ Aide": "❓ Help",
 "Clic : afficher le CAP · double clic : mesurer": "Click: show the heading CAP · double-click: measure",
 "Glisse pour déplacer la fenêtre": "Drag to move the window",
-"sans note": "without note",
+"Langue du texte des notes": "Language of note text",
+  "sans note": "without note",
 "Pas de note": "No note",
 });
 // Langue de l'interface : français (par défaut) ou anglais. Traduction au vol du texte affiché (DOM) à partir du dictionnaire I18N_EN.
@@ -5172,12 +5173,50 @@ const whyOf = n => n.why || (n.auto === false || n.edited || n.manual ? 'Note mo
 // CAP affiché : sur toutes les notes, seulement sur les notes hors piste (HP), ou jamais
 const capModeOf = s => s.capMode || (s.showCap ? 'all' : 'off');
 const dottedExit = n => { const r = n.tulip && n.tulip.route; return !!(r && r.length && r[r.length - 1].c === 'trail'); };      // sortie de la tulipe en pointillés (sentier, hors piste)
-const isHPNote = n => dottedExit(n) || /hors[ -]piste|(^|\n|\s)HP(\s|$)/i.test(n.text || '') || (n.syms || []).some(y => /^HP/.test(y.k || y.key || ''));
+const isHPNote = n => dottedExit(n) || /hors[ -]piste|off[ -]piste|(^|\n|\s)HP(\s|$)/i.test(n.text || '') || (n.syms || []).some(y => /^HP/.test(y.k || y.key || ''));
 const capRule = n => { const m = capModeOf(S.settings); return m === 'all' ? true : m === 'hp' ? isHPNote(n) : false; };
+function applyNoteLang() { const L = S.settings.noteLang; for (const n of S.notes) if (n.fr != null && !n.edited && n.auto !== false) n.text = trNote(n.fr, L); }
 function applyCapMode() { for (const n of S.notes) if (n.kind !== 'end' && !n.edited && !n.capSet && n.auto !== false) n.showCap = capRule(n) && n.cap != null; }
+/* ---- langue du texte des notes générées (réglage noteLang, indépendant de la langue de l'interface) ---- */
+const NOTE_EN = [
+  [/^TD$/, 'Straight'], [/^Lég\. à ([DG])$/, 'Slight $1'], [/^À ([DG])$/, 'Turn $1'], [/^Épingle à ([DG])$/, 'Hairpin $1'],
+  [/^Serrer à ([DG])$/, 'Keep $1'], [/^Virage serré à ([DG])$/, 'Tight bend $1'], [/^Demi-tour$/, 'U-turn'],
+  [/^Rond-point$/, 'Roundabout'], [/^1re sortie$/, '1st exit'], [/^2e sortie$/, '2nd exit'], [/^3e sortie$/, '3rd exit'], [/^(\d+)e sortie$/, '$1th exit'],
+  [/^sur petite piste$/, 'on small track'], [/^sur piste$/, 'on track'], [/^sur sentier$/, 'on trail'], [/^sur rue$/, 'on street'], [/^sur route(.*)$/, 'on road$1'],
+  [/^Hors piste$/, 'Off piste'], [/^Début goudron$/, 'Tarmac starts'], [/^Fin goudron$/, 'Tarmac ends'], [/^Départ$/, 'Start'], [/^Arrivée$/, 'Finish'],
+  [/^Gué$/, 'Ford'], [/^Passage à niveau$/, 'Level crossing'], [/^Cédez le passage$/, 'Give way'], [/^Passage piéton$/, 'Pedestrian crossing'],
+  [/^Feux tricolores \(passage piéton\)$/, 'Traffic lights (pedestrian crossing)'], [/^Feux tricolores$/, 'Traffic lights'],
+  [/^Ralentisseur$/, 'Speed bump'], [/^Bandes sonores$/, 'Rumble strips'], [/^Pont$/, 'Bridge'], [/^Sous pont$/, 'Under bridge'],
+  [/^Passage sous bâtiment$/, 'Passage under building'], [/^Marches$/, 'Steps'],
+  [/^Sable$/, 'Sand'], [/^Boue$/, 'Mud'], [/^Cailloux$/, 'Rocks'], [/^Neige$/, 'Snow'], [/^Glace$/, 'Ice'],
+  [/^Piste dégradée$/, 'Poor track'], [/^Piste très dégradée$/, 'Very poor track'], [/^Piste impraticable$/, 'Impassable track'],
+  [/^Montée raide/, 'Steep climb'], [/^Descente raide/, 'Steep descent'],
+  [/^Longer clôture à ([DG])$/, 'Follow fence on $1'], [/^Longer mur à ([DG])$/, 'Follow wall on $1'], [/^Longer haie à ([DG])$/, 'Follow hedge on $1'],
+  [/^Entrée agglomération$/, 'Entering town'], [/^Sortie agglomération$/, 'Leaving town'], [/^Entrée /, 'Entering '], [/^Sortie /, 'Leaving '],
+  [/^Danger : /, 'Danger: '],
+  [/^Portail coulissant/, 'Sliding gate'], [/^Portail/, 'Gate'], [/^Barrière pivotante/, 'Swing gate'], [/^Barrière anti-moto/, 'Anti-motorcycle barrier'], [/^Barrière/, 'Barrier'],
+  [/^Grille à bétail/, 'Cattle grid'], [/^Chaîne/, 'Chain'], [/^Plots/, 'Bollards'], [/^Blocs/, 'Blocks'], [/^Passage étroit/, 'Narrow passage'],
+  [/^Chicane/, 'Chicane'], [/^Péage/, 'Toll'], [/^Douane/, 'Customs'], [/^Muret/, 'Low wall'], [/^Tronc en travers/, 'Fallen log'], [/^Débris/, 'Debris'], [/^Corde/, 'Rope'],
+  [/^Château d'eau$/, 'Water tower'], [/^Antenne$/, 'Mast'], [/^Tour$/, 'Tower'], [/^Cheminée$/, 'Chimney'], [/^Moulin$/, 'Windmill'], [/^Phare$/, 'Lighthouse'],
+  [/^Éolienne$/, 'Wind turbine'], [/^Église$/, 'Church'], [/^Lieu de culte$/, 'Place of worship'], [/^Station-service/, 'Fuel station'],
+  [/^Sommet /, 'Summit '], [/^Hameau /, 'Hamlet '], [/^Lieu-dit /, 'Locality '], [/^Col$/, 'Pass'], [/^Col( \(|$)/, 'Pass$1'],
+  [/\(privé\)/, '(private)'],
+];
+const NOTE_EN_HZ = { 'chute de pierres': 'falling rocks', glissant: 'slippery', animaux: 'animals', verglas: 'ice', 'glissement de terrain': 'landslide', 'zone inondable': 'flood zone',
+  'carrefour dangereux': 'dangerous junction', virage: 'bend', virages: 'bends', bosse: 'bump', cassis: 'dip', école: 'school', enfants: 'children', cyclistes: 'cyclists',
+  cavaliers: 'horse riders', 'vent latéral': 'side wind', 'route abîmée': 'damaged road' };
+function trNote(text, lang) {
+  if (lang !== 'en' || !text) return text;
+  return String(text).split('\n').map(l => {
+    let o = l;
+    for (const [re, to] of NOTE_EN) if (re.test(l)) { o = l.replace(re, to); break; }
+    o = o.replace(/\(privé\)/, '(private)').replace(/^(Danger: )(.+)$/, (m, a, b) => a + (NOTE_EN_HZ[b] || b)).replace(/^(.+?) à ([DG])$/, '$1 on $2').replace(/^((?:Slight|Turn|Hairpin|Keep|Tight bend|Follow \w+ on) )([DG])$/, (m, a, c) => a + (c === 'D' ? 'R' : 'L'));
+    return o;
+  }).join('\n');
+}
 function mkNote(o) {
   const ll = inv(o.xy[0], o.xy[1]);
-  return { id: S.nextId++, s: Math.round(o.s * 10) / 10, lat: +ll[0].toFixed(6), lon: +ll[1].toFixed(6), text: o.text || '',
+  return { id: S.nextId++, s: Math.round(o.s * 10) / 10, lat: +ll[0].toFixed(6), lon: +ll[1].toFixed(6), text: trNote(o.text || '', (S.settings || {}).noteLang), fr: o.text || '',
     cap: o.cap == null ? null : o.cap, showCap: o.showCap != null ? o.showCap : capRule({ text: o.text, kind: o.kind, tulip: o.tulip }), danger: 0, wp: null,
     auto: o.auto !== false, edited: false, kind: o.kind, tulip: o.tulip };
 }
@@ -6893,6 +6932,7 @@ ${num('sR', 'Rayon dessiné dans la tulipe (m)', s.tulipR, 25, 120)}
     ${chk('sTR', 'Afficher « sur sentier » (symbole T)', s.showTR !== false)}
     ${chk('sRoad', 'Afficher les noms de route dans les instructions (nom de la rue ou de la piste, numéro de route : D 976…)', s.showRoad !== false)}
     <label class="chk" style="display:block">Afficher le CAP <select id="sCapMode"><option value="all"${capModeOf(s) === 'all' ? ' selected' : ''}>Sur toutes les notes</option><option value="hp"${capModeOf(s) === 'hp' ? ' selected' : ''}>Uniquement sur les sentiers et hors piste</option><option value="off"${capModeOf(s) === 'off' ? ' selected' : ''}>Jamais</option></select></label>
+    <label class="chk" style="display:block">Langue du texte des notes <select id="sNoteLang"><option value="fr"${s.noteLang !== 'en' ? ' selected' : ''}>Français</option><option value="en"${s.noteLang === 'en' ? ' selected' : ''}>English</option></select></label>
     </details>
     <div class="help" style="margin-top:6px">Les chemins téléchargés sont gardés dans ce navigateur pour aller plus vite (⋯ › « Enregistrer les chemins OSM » pour en faire une copie dans un dossier). <a href="#" id="sClear">Vider cette mémoire</a></div>`, [
     { label: 'Valeurs par défaut', onClick: () => { S.settings = { ...DEF_SETTINGS }; afterSettings(); } }, 'sp',
@@ -6900,11 +6940,11 @@ ${num('sR', 'Rayon dessiné dans la tulipe (m)', s.tulipR, 25, 120)}
     { label: 'Enregistrer', cls: 'primary', onClick: () => {
       const g = (id, d, a, b) => { const v = parseFloat($('#' + id).value); return isFinite(v) ? clamp(v, a, b) : d; };
       const same = o => JSON.stringify(Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {}));      // comparaison sans tenir compte de l'ordre des champs
-      const before = same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0, showCap: 0, capMode: 0, arrows: 0 });
+      const before = same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0, showCap: 0, capMode: 0, noteLang: 0, arrows: 0 });
       S.settings = { sv: DEF_SETTINGS.sv, data: /^(osm|ign|ignd)$/.test($('#sData').value) ? $('#sData').value : 'vt', tol: g('sTol', 0, 0, 100), water: $('#sWater').checked, bld: $('#sBld').checked, pois: $('#sPois').checked, landmarks: $('#sLand').checked, merge: g('sMerge', 30, 5, 100), tulipR: g('sR', 50, 25, 120), straight: $('#sStraight').checked, mixY: $('#sMixY').checked, mixT: $('#sMixT').checked,
-        followLvl: +$('#sFollow').value, lmOff: [...document.querySelectorAll('.lmchk')].filter(c => !c.checked).map(c => c.dataset.lm), goudron: $('#sGoudron').checked, bends: $('#sBends').checked, offroad: $('#sOffroad').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showRO: $('#sRO').checked, showPI: $('#sPI').checked, showTR: $('#sTR').checked, capMode: $('#sCapMode').value, showCap: $('#sCapMode').value === 'all' };
-      applyCapMode();
-      afterSettings(before === same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0, showCap: 0, capMode: 0, arrows: 0 }));
+        followLvl: +$('#sFollow').value, lmOff: [...document.querySelectorAll('.lmchk')].filter(c => !c.checked).map(c => c.dataset.lm), goudron: $('#sGoudron').checked, bends: $('#sBends').checked, offroad: $('#sOffroad').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showRO: $('#sRO').checked, showPI: $('#sPI').checked, showTR: $('#sTR').checked, capMode: $('#sCapMode').value, noteLang: $('#sNoteLang').value, showCap: $('#sCapMode').value === 'all' };
+      applyNoteLang(); applyCapMode();
+      afterSettings(before === same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0, showCap: 0, capMode: 0, noteLang: 0, arrows: 0 }));
     } }]);
   const lmSet = v => document.querySelectorAll('.lmchk').forEach(c => { c.checked = v; });
   if ($('#lmAll')) { $('#lmAll').onclick = () => lmSet(true); $('#lmNone').onclick = () => lmSet(false); }
@@ -7835,7 +7875,7 @@ window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dr
 })();
 
 // accès pour les tests automatisés
-window.__rb = { noteView, svgToPNG, tulipSVG, pointAt, inv, tulipEditor, measureForNote, openMeasure, measureAtLL, bendList, bendAt, editNote, altDialog, view3D, cleanEle, timeSeries, timeAt, buildGPX, stagesDialog, stageList, addStage, marksDialog, markForm, pickTrack, parseGPX, cutAt, reverseCtrl, mergeFile, reduceDialog, snapDialog, cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, addManualNote, notesSVG, renderAll, renderRadii, noteRadii };
+window.__rb = { trNote, noteView, svgToPNG, tulipSVG, pointAt, inv, tulipEditor, measureForNote, openMeasure, measureAtLL, bendList, bendAt, editNote, altDialog, view3D, cleanEle, timeSeries, timeAt, buildGPX, stagesDialog, stageList, addStage, marksDialog, markForm, pickTrack, parseGPX, cutAt, reverseCtrl, mergeFile, reduceDialog, snapDialog, cleanEnds, rebuildFromSegs, S, map, get T() { return T; }, get G() { return G; }, generate: runGenerate, buildGPX, loadText: (txt, name) => loadFile(new File([txt], name || 'test.gpx')), tulipSVG, openSettings, followRoad, ringCircle, dxy, allIGN, importOsm, noteView, addManualNote, notesSVG, renderAll, renderRadii, noteRadii };
 })();
 
 // Version installable (PWA) : actif seulement quand la page est servie en https (pas en fichier local)
