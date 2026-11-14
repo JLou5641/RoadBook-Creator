@@ -5,7 +5,9 @@ const { chromium } = require('playwright'); const fs = require('fs'), path = req
   await p.evaluate(t => window.__rb.loadText(t, 'a.gpx'), fs.readFileSync(path.join(__dirname, 'andorra.gpx'), 'utf8')); await p.waitForTimeout(400);
   await p.evaluate(() => { const R = window.__rb, ll = R.S.ll; const mk = (id, s, i, text, on) => ({ id, s, lat: ll[i][0], lon: ll[i][1], text, kind: 'info', tulip: null, cap: 34, showCap: on, auto: true, danger: 1 });
     R.S.notes = [mk(1, 300, 10, 'Voie ferrée\nSTOP', false), mk(2, 900, 30, 'Voie ferrée\nSTOP', true)]; R.renderAll && R.renderAll(); });
+  const shot = async f => { await p.waitForTimeout(450); await p.screenshot({ path: f, clip: { x: 530, y: 480, width: 470, height: 420 } }); };
   await p.waitForTimeout(400);
-  await p.evaluate(() => document.querySelector('#rb .row') && document.querySelectorAll('#rb .row')[0].scrollIntoView());
-  await p.screenshot({ path: '/tmp/cap3.png', clip: { x: 530, y: 480, width: 470, height: 420 } });
+  await p.evaluate(() => document.querySelectorAll('#rb .row')[0].scrollIntoView()); await shot('/tmp/cap4_a.png');
+  await (await p.$$('#rb .cap'))[0].click(); await shot('/tmp/cap4_b.png');
+  await (await p.$$('#rb .cap'))[1].click(); await shot('/tmp/cap4_c.png');
   await b.close(); })();
