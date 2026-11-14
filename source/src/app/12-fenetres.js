@@ -95,7 +95,7 @@ ${num('sR', 'Rayon dessiné dans la tulipe (m)', s.tulipR, 25, 120)}
     ${chk('sPI', 'Afficher « sur piste » (symbole P) — le regroupement « Suivre la piste » (FPP) reste actif', s.showPI !== false)}
     ${chk('sTR', 'Afficher « sur sentier » (symbole T)', s.showTR !== false)}
     ${chk('sRoad', 'Afficher les noms de route dans les instructions (nom de la rue ou de la piste, numéro de route : D 976…)', s.showRoad !== false)}
-    <label class="chk" style="display:block">Afficher le CAP <select id="sCapMode"><option value="all"${capModeOf(s) === 'all' ? ' selected' : ''}>Sur toutes les notes</option><option value="hp"${capModeOf(s) === 'hp' ? ' selected' : ''}>Uniquement sur les notes hors piste (HP)</option><option value="off"${capModeOf(s) === 'off' ? ' selected' : ''}>Jamais</option></select></label>
+    <label class="chk" style="display:block">Afficher le CAP <select id="sCapMode"><option value="all"${capModeOf(s) === 'all' ? ' selected' : ''}>Sur toutes les notes</option><option value="hp"${capModeOf(s) === 'hp' ? ' selected' : ''}>Uniquement sur les notes en pointillés (sentier, hors piste)</option><option value="off"${capModeOf(s) === 'off' ? ' selected' : ''}>Jamais</option></select></label>
     </details>
     <div class="help" style="margin-top:6px">Les chemins téléchargés sont gardés dans ce navigateur pour aller plus vite (⋯ › « Enregistrer les chemins OSM » pour en faire une copie dans un dossier). <a href="#" id="sClear">Vider cette mémoire</a></div>`, [
     { label: 'Valeurs par défaut', onClick: () => { S.settings = { ...DEF_SETTINGS }; afterSettings(); } }, 'sp',

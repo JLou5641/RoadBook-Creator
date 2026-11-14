@@ -5,8 +5,8 @@ const { chromium } = require('playwright'); const fs = require('fs'), path = req
   await p.evaluate(() => localStorage.clear()); await p.reload();
   await p.evaluate(t => window.__rb.loadText(t, 'a.gpx'), fs.readFileSync(path.join(__dirname, 'andorra.gpx'), 'utf8')); await p.waitForTimeout(400);
   await p.evaluate(() => { const R = window.__rb, ll = R.S.ll; R.S.notes = [
-    { id: 1, s: 300, lat: ll[10][0], lon: ll[10][1], text: 'À droite\nHors piste', kind: 'bend', tulip: null, cap: 247, showCap: true, auto: true },
-    { id: 2, s: 900, lat: ll[30][0], lon: ll[30][1], text: 'À droite\nRoute D 976', kind: 'info', tulip: null, cap: 120, showCap: true, auto: true }]; R.renderAll && R.renderAll(); });
+    { id: 1, s: 300, lat: ll[10][0], lon: ll[10][1], text: 'À droite', kind: 'bend', tulip: { route: [{ p: [0, 0], c: 'trail' }, { p: [0, -30], c: 'trail' }] }, cap: 247, showCap: true, auto: true },
+    { id: 2, s: 900, lat: ll[30][0], lon: ll[30][1], text: 'À droite\nRoute D 976', kind: 'info', tulip: { route: [{ p: [0, 0], c: 'road' }, { p: [0, -30], c: 'road' }] }, cap: 120, showCap: true, auto: true }]; });
   const caps = () => p.evaluate(() => [...document.querySelectorAll('#rb .cap')].map(e => e.textContent));
   console.log('départ', await caps());
   const setMode = async v => { await p.evaluate(() => document.querySelector('#moreMenu [data-act="settings"]').click()); await p.waitForTimeout(300);
