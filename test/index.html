@@ -1046,7 +1046,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261114.1311</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261114.1314</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1087,7 +1087,7 @@ body.dragNote .leaflet-tooltip{display:none}
             <button data-act="help">❓ Aide</button>
             <button data-act="manual">📖 Manuel d'utilisation</button>
           </div>
-          <div class="ver">Version v0.261114.1311 · VERSION DE TEST</div>
+          <div class="ver">Version v0.261114.1314 · VERSION DE TEST</div>
         </div>
       </div>
     </div>
@@ -5175,7 +5175,7 @@ const capModeOf = s => s.capMode || (s.showCap ? 'all' : 'off');
 const dottedExit = n => { const r = n.tulip && n.tulip.route; return !!(r && r.length && r[r.length - 1].c === 'trail'); };      // sortie de la tulipe en pointillés (sentier, hors piste)
 const isHPNote = n => dottedExit(n) || /hors[ -]piste|off[ -]piste|(^|\n|\s)HP(\s|$)/i.test(n.text || '') || (n.syms || []).some(y => /^HP/.test(y.k || y.key || ''));
 const capRule = n => { const m = capModeOf(S.settings); return m === 'all' ? true : m === 'hp' ? isHPNote(n) : false; };
-function applyNoteLang() { const L = S.settings.noteLang; for (const n of S.notes) if (n.fr != null && !n.edited && n.auto !== false) n.text = trNote(n.fr, L); }
+function applyNoteLang() { const L = S.settings.noteLang; for (const n of S.notes) { if (n.edited || n.auto === false) continue; if (n.fr == null) n.fr = n.text; n.text = trNote(n.fr, L); } }
 function applyCapMode() { for (const n of S.notes) if (n.kind !== 'end' && !n.edited && !n.capSet && n.auto !== false) n.showCap = capRule(n) && n.cap != null; }
 /* ---- langue du texte des notes générées (réglage noteLang, indépendant de la langue de l'interface) ---- */
 const NOTE_EN = [
@@ -5216,7 +5216,7 @@ function trNote(text, lang) {
 }
 function mkNote(o) {
   const ll = inv(o.xy[0], o.xy[1]);
-  return { id: S.nextId++, s: Math.round(o.s * 10) / 10, lat: +ll[0].toFixed(6), lon: +ll[1].toFixed(6), text: trNote(o.text || '', (S.settings || {}).noteLang), fr: o.text || '',
+  return { id: S.nextId++, s: Math.round(o.s * 10) / 10, lat: +ll[0].toFixed(6), lon: +ll[1].toFixed(6), text: o.text || '',
     cap: o.cap == null ? null : o.cap, showCap: o.showCap != null ? o.showCap : capRule({ text: o.text, kind: o.kind, tulip: o.tulip }), danger: 0, wp: null,
     auto: o.auto !== false, edited: false, kind: o.kind, tulip: o.tulip };
 }
@@ -6655,7 +6655,7 @@ async function runGenerate() {
     let fr = null;
     if (S.settings.followLvl !== 0 && !(S.settings.followLvl === undefined && S.settings.followRoad === false)) { fr = followRoad(all); all.length = 0; all.push(...fr.notes); }
     G = G0;      // le réseau des tulipes reste celui du roadbook (retouche des tulipes)
-    S.notes = [...all, ...manual];
+    S.notes = [...all, ...manual]; applyNoteLang();
     S.stale = false; S.sel = null;
     closeModal(); renderTrack(); renderAll();
     if (S.notes.length > 1) map.fitBounds(line.getBounds(), { padding: [40, 40] });

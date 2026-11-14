@@ -373,7 +373,7 @@ const capModeOf = s => s.capMode || (s.showCap ? 'all' : 'off');
 const dottedExit = n => { const r = n.tulip && n.tulip.route; return !!(r && r.length && r[r.length - 1].c === 'trail'); };      // sortie de la tulipe en pointillés (sentier, hors piste)
 const isHPNote = n => dottedExit(n) || /hors[ -]piste|off[ -]piste|(^|\n|\s)HP(\s|$)/i.test(n.text || '') || (n.syms || []).some(y => /^HP/.test(y.k || y.key || ''));
 const capRule = n => { const m = capModeOf(S.settings); return m === 'all' ? true : m === 'hp' ? isHPNote(n) : false; };
-function applyNoteLang() { const L = S.settings.noteLang; for (const n of S.notes) if (n.fr != null && !n.edited && n.auto !== false) n.text = trNote(n.fr, L); }
+function applyNoteLang() { const L = S.settings.noteLang; for (const n of S.notes) { if (n.edited || n.auto === false) continue; if (n.fr == null) n.fr = n.text; n.text = trNote(n.fr, L); } }
 function applyCapMode() { for (const n of S.notes) if (n.kind !== 'end' && !n.edited && !n.capSet && n.auto !== false) n.showCap = capRule(n) && n.cap != null; }
 /* ---- langue du texte des notes générées (réglage noteLang, indépendant de la langue de l'interface) ---- */
 const NOTE_EN = [
@@ -414,7 +414,7 @@ function trNote(text, lang) {
 }
 function mkNote(o) {
   const ll = inv(o.xy[0], o.xy[1]);
-  return { id: S.nextId++, s: Math.round(o.s * 10) / 10, lat: +ll[0].toFixed(6), lon: +ll[1].toFixed(6), text: trNote(o.text || '', (S.settings || {}).noteLang), fr: o.text || '',
+  return { id: S.nextId++, s: Math.round(o.s * 10) / 10, lat: +ll[0].toFixed(6), lon: +ll[1].toFixed(6), text: o.text || '',
     cap: o.cap == null ? null : o.cap, showCap: o.showCap != null ? o.showCap : capRule({ text: o.text, kind: o.kind, tulip: o.tulip }), danger: 0, wp: null,
     auto: o.auto !== false, edited: false, kind: o.kind, tulip: o.tulip };
 }

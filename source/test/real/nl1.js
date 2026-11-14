@@ -5,10 +5,13 @@ const { chromium } = require('playwright'); const path = require('path');
   // dialogue réglages
   await p.evaluate(() => { document.querySelector('.mhd[data-g="cfg"]').click(); document.querySelector('#moreMenu [data-act="settings"]').click(); });
   await p.waitForTimeout(300);
-  await p.evaluate(() => { __rb.S.notes = [{ id: 1, s: 10, text: 'Lég. à D\nsur piste', fr: 'Lég. à D\nsur piste', auto: true, edited: false, kind: 'junction', cap: 10 }, { id: 2, s: 20, text: 'Mon texte', fr: 'TD', auto: true, edited: true, kind: 'junction', cap: 10 }]; });
+  await p.evaluate(() => { __rb.S.notes = [{ id: 1, s: 10, text: 'Lég. à D\nsur piste', auto: true, edited: false, kind: 'junction', cap: 10 }, { id: 2, s: 20, text: 'Mon texte', auto: true, edited: true, kind: 'junction', cap: 10 }]; });
   console.log('select présent:', await p.evaluate(() => !!document.querySelector('#sNoteLang')));
   await p.evaluate(() => { document.querySelector('#sNoteLang').value = 'en'; });
   await p.evaluate(() => { document.querySelectorAll('.mf button')[document.querySelectorAll('.mf button').length-1].click(); });
   await p.waitForTimeout(500);
   console.log(await p.evaluate(() => JSON.stringify(__rb.S.notes.map(n => n.text)) + ' lang=' + __rb.S.settings.noteLang));
+  await p.evaluate(() => { document.querySelector('.mhd[data-g="cfg"]').click(); document.querySelector('#moreMenu [data-act="settings"]').click(); }); await p.waitForTimeout(300);
+  await p.evaluate(() => { document.querySelector('#sNoteLang').value = 'fr'; document.querySelectorAll('.mf button')[document.querySelectorAll('.mf button').length-1].click(); }); await p.waitForTimeout(400);
+  console.log(await p.evaluate(() => JSON.stringify(__rb.S.notes.map(n => n.text))));
   await b.close(); })();

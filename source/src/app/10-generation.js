@@ -96,7 +96,7 @@ async function runGenerate() {
     let fr = null;
     if (S.settings.followLvl !== 0 && !(S.settings.followLvl === undefined && S.settings.followRoad === false)) { fr = followRoad(all); all.length = 0; all.push(...fr.notes); }
     G = G0;      // le réseau des tulipes reste celui du roadbook (retouche des tulipes)
-    S.notes = [...all, ...manual];
+    S.notes = [...all, ...manual]; applyNoteLang();
     S.stale = false; S.sel = null;
     closeModal(); renderTrack(); renderAll();
     if (S.notes.length > 1) map.fitBounds(line.getBounds(), { padding: [40, 40] });
