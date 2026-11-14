@@ -73,7 +73,7 @@ Object.assign(I18N_EN, {
 "Compare, autour de chaque note (40 m), les voies connues par deux sources. Une note est signalée quand l'une montre au moins 25 m de voie que l'autre ne montre pas. Rien n'est modifié.": "Around each note (40 m), compares the roads known by two sources. A note is flagged when one shows at least 25 m of road that the other does not. Nothing is modified.",
 "Afficher le CAP": "Show the Heading CAP",
 "Sur toutes les notes": "On all notes",
-"Uniquement sur les notes en pointillés (sentier, hors piste)": "Only on dotted-path notes (trail, off-track)",
+"Uniquement sur les sentiers et hors piste": "Only on trails and off-track",
 "Jamais": "Never",
 "sans note": "without note",
 "Pas de note": "No note",
