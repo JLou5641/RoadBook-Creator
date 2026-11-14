@@ -1,0 +1,14 @@
+const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
+(async () => { const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1100, height: 900 }, locale: 'en-GB' });
+  await p.route(/^(?!file).*/, r => r.abort()); p.on('pageerror', e => { if (!/LatLng/.test(e.message)) console.log('ERR', e.message); });
+  await p.goto('file://' + path.join(__dirname, '..', '..', 'dist', 'generateur-roadbook.html'));
+  await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(300);
+  await p.evaluate(t => window.__rb.loadText(t, 'a.gpx'), fs.readFileSync(path.join(__dirname, 'andorra.gpx'), 'utf8')); await p.waitForTimeout(500);
+  const miss = async tag => { const m = await p.evaluate(() => I18N.missing()); console.log('== ' + tag + ' (' + m.length + ')'); m.forEach(x => console.log('  ' + x.slice(0, 160))); };
+  const tul = { R: 50, kind: 'junction', route: [{ p: [0, -50], c: 'road' }, { p: [0, 0], c: 'road' }, { p: [35, 35], c: 'track' }], others: [{ c: 'road', p: [[-50, 5], [50, -5]] }] };
+  await p.evaluate(tul => { const S = __rb.S; const L = S.ll && S.ll[0] ? S.ll[0] : [42.5, 1.5]; S.notes = [{ id: 901, s: 100, lat: L[0], lon: L[1], text: 'Lég. à D\nsur piste', auto: false, edited: true, kind: 'junction', cap: 10, showCap: true, tulip: tul, syms: [] }]; S.nextId = 1000; __rb.editNote(901); }, tul);
+  await p.waitForTimeout(600); await miss('edit note'); await p.screenshot({ path: '/tmp/en_edit.png' });
+  const dump = async tag => { const t = await p.evaluate(() => { const out = new Set(); const root = document.querySelector('#modalBg') || document.body; const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n; while ((n = tw.nextNode())) { const p = n.parentElement; if (!p || p.closest('script,style,textarea,.k3')) continue; const s = n.data.replace(/\s+/g, ' ').trim(); if (s) out.add(s); } root.querySelectorAll('[title],[placeholder]').forEach(e => { if (e.title) out.add('@ ' + e.title); if (e.placeholder) out.add('@ ' + e.placeholder); }); root.querySelectorAll('option').forEach(o => out.add('opt ' + o.textContent.trim())); return [...out]; }); console.log('== ' + tag + '\n' + t.map(x => '  ' + x.slice(0, 120)).join('\n')); };
+  await p.evaluate(() => document.getElementById('stAddTx').click()); await p.waitForTimeout(400); await dump('après + Texte'); await p.screenshot({ path: '/tmp/en_addtx.png' });
+  await p.evaluate(() => document.getElementById('eTulEdit').click()); await p.waitForTimeout(700); await dump('éditeur de tulipe'); await p.screenshot({ path: '/tmp/en_tuled.png' });
+  await b.close(); })();

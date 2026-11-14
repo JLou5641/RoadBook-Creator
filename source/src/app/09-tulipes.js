@@ -1,6 +1,8 @@
 /* ============================================================
    9. Tulipes : géométrie & dessin
    ============================================================ */
+const lexName = k => { const L = FIA_LEX[k]; return I18N.lang === 'en' && L.en ? L.en : L.l; };      // libellé d'un symbole du lexique, dans la langue de l'interface
+const lexTitle = k => { const L = FIA_LEX[k]; return I18N.lang === 'en' && L.en ? L.en : (L.en && L.en !== L.l ? L.l + ' — ' + L.en : L.l); };
 const rnd = p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10];
 // Tulipe carrée : échelle et centre (unités SVG 0..100) ; le carrefour est un peu au-dessus du milieu
 const TK = 44, TCX = 50, TCY = 52;
@@ -573,7 +575,7 @@ function rowInner(n, i, par, f, screen) {
   if (!lines.length && lr > 1) for (let h = 10.5; h >= 6; h -= 0.5) if (lexRows(lk, h, 29.6, 0.6) === 1) { lh = h; lr = 1; break; }      // sans texte : plutôt une seule rangée, un peu plus petite
   const need = 3.96 * Math.min(3, lines.slice(1).filter(Boolean).slice(0, 2).reduce((t, l) => t + textRows(l), 0));      // on garde la place des 2 premières lignes de texte (nom de rue, de village…), même si elles passent à la ligne
   while (lk.length && lh > 3.5 && lr * (lh + 0.6) + need > avail) { lh -= 0.5; lr = lexRows(lk, lh, 29.6, 0.6); }
-  const lx = lk.length ? `<div class="lx" style="--lh:${lh}cqw">${lk.map(k => `<img src="${FIA_LEX[k].d}" alt="${esc(FIA_LEX[k].l)}" title="${esc(FIA_LEX[k].l)}">`).join('')}</div>` : '';
+  const lx = lk.length ? `<div class="lx" style="--lh:${lh}cqw">${lk.map(k => `<img src="${FIA_LEX[k].d}" alt="${esc(lexName(k))}" title="${esc(lexTitle(k))}">`).join('')}</div>` : '';
   return `<div class="k k1" style="background:${bg}"><div class="tot">${kmFr(n.s)}</div><div class="bl"><div class="par">${kmFr(par)}</div>${f.close ? ARROW_SVG : ''}</div>${sym}<div class="br"><div class="num">${i + 1}</div></div></div>`
     + `<div class="k k2">${tulipSVG(n.tulip, 200)}${freeLayer(n.sym, 't')}${t === 'cp' ? '<div class="cpf"></div>' : ''}</div>`
     + `<div class="k k3${signs.length ? ' hs' : cap ? ' hc' : ''}">${big}${top}${n.kind === 'info' ? lx : ''}<div class="t1"${tst(n, 800)}>${esc(lines[0] || '')}</div>${n.kind === 'info' ? '' : lx}${freeLayer((n.sym || []).concat(mainFree), 'd')}<div class="t2"${tst(n, 400)}>${esc(fitLines(lines, !!(dg || tl), !!(cap || signs.length), lk.length ? lr * (lh + 0.6) - 0.6 : 0, signs.length ? 12.4 : 0).join('\n'))}</div>${cap}${capOff}${sg}`
@@ -832,13 +834,13 @@ function editNote(id, isNew) {
   let lexCat = FIA_CATS[0], symSel = null, delMode = false;
   const lexImg = k => `<img src="${FIA_LEX[k].d}" alt="">`;
   const renderLex = () => {
-    $('#eLexSel').innerHTML = lexSel.length ? lexSel.map(k => `<button type="button" class="lexchip" data-k="${k}" title="Retirer : ${esc(FIA_LEX[k].l)}">${lexImg(k)}<span>×</span></button>`).join('')
+    $('#eLexSel').innerHTML = lexSel.length ? lexSel.map(k => `<button type="button" class="lexchip" data-k="${k}" title="Retirer : ${esc(lexName(k))}">${lexImg(k)}<span>×</span></button>`).join('')
       : '<span class="help" style="margin:0">Aucun symbole.</span>';
     const q = ($('#eLexQ').value || '').trim().toLowerCase();
     const norm = t => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const keys = Object.keys(FIA_LEX).filter(k => !FIA_LEX[k].x).filter(k => q ? norm(FIA_LEX[k].l + ' ' + FIA_LEX[k].en + ' ' + k).includes(norm(q)) : FIA_LEX[k].c === lexCat);
     const delBar = !q && lexCat === 'Mes symboles' && keys.length ? `<div class="lexdel" style="grid-column:1/-1"><button type="button" class="mbtn" id="eLexDelBtn">${delMode ? '✔ Terminé' : '🗑 Supprimer un symbole importé'}</button>${delMode ? ' <span class="help" style="margin:0">Clique sur le symbole à supprimer définitivement.</span>' : ''}</div>` : '';
-    $('#eLexGrid').innerHTML = delBar + (keys.length ? keys.map(k => `<button type="button" class="lextile${lexSel.includes(k) ? ' on' : ''}${delMode ? ' del' : ''}" data-k="${k}" title="${esc(FIA_LEX[k].l)} — ${esc(FIA_LEX[k].en)}">${lexImg(k)}<span>${esc(FIA_LEX[k].l)}</span></button>`).join('')
+    $('#eLexGrid').innerHTML = delBar + (keys.length ? keys.map(k => `<button type="button" class="lextile${lexSel.includes(k) ? ' on' : ''}${delMode ? ' del' : ''}" data-k="${k}" title="${esc(lexTitle(k))}">${lexImg(k)}<span>${esc(lexName(k))}</span></button>`).join('')
       : '<div class="help" style="margin:6px 0">Aucun symbole trouvé.</div>');
     $('#eLexTabs').classList.toggle('dim', !!q);
   };
@@ -894,7 +896,7 @@ function editNote(id, isNew) {
     (tp && tp.tx.trim() ? symList.concat([tp]) : symList).forEach((q, i) => {
       let im;
       if (q.tx != null) { im = document.createElement('div'); im.className = 'fs ft' + (q === symSel ? ' sel' : ''); im.innerHTML = ftInner(q); im.title = q.main ? 'Texte principal' : 'Texte'; }
-      else { im = document.createElement('img'); im.src = FIA_LEX[q.k].d; im.className = 'fs' + (q === symSel ? ' sel' : ''); im.draggable = false; im.title = FIA_LEX[q.k].l; }
+      else { im = document.createElement('img'); im.src = FIA_LEX[q.k].d; im.className = 'fs' + (q === symSel ? ' sel' : ''); im.draggable = false; im.title = lexName(q.k); }
       placeEl(im, q);
       im.addEventListener('pointerdown', e => {
         e.preventDefault(); symSel = q; im.setPointerCapture(e.pointerId); syncCtl();
@@ -924,7 +926,7 @@ function editNote(id, isNew) {
   $('#stSize').oninput = () => { if (!symSel) return; symSel.h = +$('#stSize').value; symSel.sized = 1; renderStage(); };
   $('#stFront').onclick = () => { if (!symSel) return; symList.splice(symList.indexOf(symSel), 1); symList.push(symSel); renderStage(); };     // l'ordre de la liste = ordre de superposition
   $('#stBack').onclick = () => { if (!symSel) return; symList.splice(symList.indexOf(symSel), 1); symList.unshift(symSel); renderStage(); };
-  $('#stAddTx').onclick = () => { symSel = { tx: 'Texte', c: lastCase, x: 50, y: 50, h: 14 }; symList.push(symSel); renderStage(); $('#stTxt').focus(); $('#stTxt').select(); };
+  $('#stAddTx').onclick = () => { symSel = { tx: I18N.lang === 'en' ? 'Text' : 'Texte', c: lastCase, x: 50, y: 50, h: 14 }; symList.push(symSel); renderStage(); $('#stTxt').focus(); $('#stTxt').select(); };
   $('#stTxt').oninput = () => { if (symSel && symSel.tx != null && !symSel.main) { symSel.tx = $('#stTxt').value; if (!symSel.sized) symSel.h = Math.min(14, Math.max(5, Math.floor(176 / Math.max(4, ...symSel.tx.split('\n').map(l => l.length))))); renderStage(); } };
   $('#eTpos').onchange = () => { if ($('#eTpos').checked) { const L = noteView({ ...n, symLocked: conv || n.symLocked, text: lockTxt($('#eText').value), tpos: null }).lines, mx = Math.max(4, ...L.map((l, i) => l.length * (i ? .62 : 1)));
     tp = { main: 1, c: 'd', x: 50, y: 28, h: Math.min(16, Math.max(5, Math.floor(176 / mx))) }; symSel = tp; } else { if (symSel === tp) symSel = null; tp = null; } renderStage(); };
