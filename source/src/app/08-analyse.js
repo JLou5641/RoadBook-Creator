@@ -405,11 +405,14 @@ const NOTE_EN_HZ = { 'chute de pierres': 'falling rocks', glissant: 'slippery', 
   cavaliers: 'horse riders', 'vent latéral': 'side wind', 'route abîmée': 'damaged road' };
 function trNote(text, lang) {
   if (lang !== 'en' || !text) return text;
+  const one = l => { for (const [re, to] of NOTE_EN) if (re.test(l)) return l.replace(re, to); return null; };
   return String(text).split('\n').map(l => {
-    let o = l;
-    for (const [re, to] of NOTE_EN) if (re.test(l)) { o = l.replace(re, to); break; }
-    o = o.replace(/\(privé\)/, '(private)').replace(/^(Danger: )(.+)$/, (m, a, b) => a + (NOTE_EN_HZ[b] || b)).replace(/^(.+?) à ([DG])$/, '$1 on $2').replace(/^((?:Slight|Turn|Hairpin|Keep|Tight bend|Follow \w+ on) )([DG])$/, (m, a, c) => a + (c === 'D' ? 'R' : 'L'));
-    return o;
+    let o = one(l), side = '';
+    if (o == null) { const m = /^(.+) à ([DG])$/.exec(l); if (m) { o = one(m[1]); if (o != null) side = ' on ' + (m[2] === 'D' ? 'R' : 'L'); } }      // repère posé à droite / à gauche
+    if (o == null) o = l;
+    o = o.replace(/\(privé\)/, '(private)').replace(/^(Danger: )(.+?)( à ([DG]))?$/, (m, a, b, c, d) => a + (NOTE_EN_HZ[b] || b) + (d ? ' on ' + (d === 'D' ? 'R' : 'L') : '')).replace(/^((?:Slight|Turn|Hairpin|Keep|Tight bend|Follow \w+ on) )([DG])$/, (m, a, c) => a + (c === 'D' ? 'R' : 'L'));
+    o = o.replace(/ à ([DG])$/, (m, c) => ' on ' + (c === 'D' ? 'R' : 'L'));
+    return o + side;
   }).join('\n');
 }
 function mkNote(o) {
