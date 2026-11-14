@@ -568,7 +568,7 @@ function rowInner(n, i, par, f, screen) {
   const cap = n.showCap && n.cap != null ? `<div class="cap">${Math.round(n.cap) % 360}°</div>` : '';      // CAP actif (jaune) : exporté et imprimé
   const capOff = screen && !n.showCap && n.cap != null ? `<div class="cap off" title="Clic : afficher le CAP · double clic : mesurer">${Math.round(n.cap) % 360}°</div>` : '';      // CAP inactif (gris) : seulement à l'écran
   // symboles du lexique : on les réduit si besoin pour qu'ils tiennent entre la direction et l'encadré du CAP
-  const lk = NV.keys, avail = 33.3 - 1.4 - (signs.length ? 12.4 : cap ? 6.6 : 1.4) - (dg || tl ? 5.7 : 0) - (lines[0] ? 5.6 * (lines[0].length > 13 ? 2 : 1) : 0) - 0.7;
+  const lk = NV.keys, avail = 33.3 - 1.4 - (signs.length ? 12.4 : cap || capOff ? 6.6 : 1.4) - (dg || tl ? 5.7 : 0) - (lines[0] ? 5.6 * (lines[0].length > 13 ? 2 : 1) : 0) - 0.7;
   let lh = lines.length ? 7.5 : 11, lr = lexRows(lk, lh, 29.6, 0.6);
   if (!lines.length && lr > 1) for (let h = 10.5; h >= 6; h -= 0.5) if (lexRows(lk, h, 29.6, 0.6) === 1) { lh = h; lr = 1; break; }      // sans texte : plutôt une seule rangée, un peu plus petite
   const need = 3.96 * Math.min(3, lines.slice(1).filter(Boolean).slice(0, 2).reduce((t, l) => t + textRows(l), 0));      // on garde la place des 2 premières lignes de texte (nom de rue, de village…), même si elles passent à la ligne
@@ -576,7 +576,7 @@ function rowInner(n, i, par, f, screen) {
   const lx = lk.length ? `<div class="lx" style="--lh:${lh}cqw">${lk.map(k => `<img src="${FIA_LEX[k].d}" alt="${esc(FIA_LEX[k].l)}" title="${esc(FIA_LEX[k].l)}">`).join('')}</div>` : '';
   return `<div class="k k1" style="background:${bg}"><div class="tot">${kmFr(n.s)}</div><div class="bl"><div class="par">${kmFr(par)}</div>${f.close ? ARROW_SVG : ''}</div>${sym}<div class="br"><div class="num">${i + 1}</div></div></div>`
     + `<div class="k k2">${tulipSVG(n.tulip, 200)}${freeLayer(n.sym, 't')}${t === 'cp' ? '<div class="cpf"></div>' : ''}</div>`
-    + `<div class="k k3${signs.length ? ' hs' : cap ? ' hc' : ''}">${big}${top}${n.kind === 'info' ? lx : ''}<div class="t1"${tst(n, 800)}>${esc(lines[0] || '')}</div>${n.kind === 'info' ? '' : lx}${freeLayer((n.sym || []).concat(mainFree), 'd')}<div class="t2"${tst(n, 400)}>${esc(fitLines(lines, !!(dg || tl), !!(cap || signs.length), lk.length ? lr * (lh + 0.6) - 0.6 : 0, signs.length ? 12.4 : 0).join('\n'))}</div>${cap}${capOff}${sg}`
+    + `<div class="k k3${signs.length ? ' hs' : cap || capOff ? ' hc' : ''}">${big}${top}${n.kind === 'info' ? lx : ''}<div class="t1"${tst(n, 800)}>${esc(lines[0] || '')}</div>${n.kind === 'info' ? '' : lx}${freeLayer((n.sym || []).concat(mainFree), 'd')}<div class="t2"${tst(n, 400)}>${esc(fitLines(lines, !!(dg || tl), !!(cap || signs.length), lk.length ? lr * (lh + 0.6) - 0.6 : 0, signs.length ? 12.4 : 0).join('\n'))}</div>${cap}${capOff}${sg}`
     + (screen && (!n.auto || n.moved) ? '<div class="man">manuelle</div>' : '')
     + (screen ? `<div class="acts">${whyOf(n) ? '<button data-a="why" title="Pourquoi cette note ?">?</button>' : ''}<button data-a="edit" title="Modifier la note">✎</button><button data-a="del" title="Supprimer la note">🗑</button></div>` : '') + `</div>`
     + (f.zone ? `<div class="fr zone${f.zTop ? ' zt' : ''}${f.zBot ? ' zb' : ''}"></div>` : '') + (f.red ? '<div class="fr red"></div>' : '');
@@ -623,7 +623,7 @@ $('#rb').addEventListener('click', e => {
 let capTimer = 0;
 const capNote = e => { const c = e.target.closest('.cap'); if (!c) return null; const row = e.target.closest('.row'); const n = row && S.notes.find(x => x.id === +row.dataset.id); return n ? { c, n, row } : null; };
 $('#rb').addEventListener('click', e => { const r = capNote(e); if (!r) return; clearTimeout(capTimer);
-  capTimer = setTimeout(() => { const { c, n, row } = r; n.showCap = !n.showCap; n.capSet = true; c.classList.toggle('off', !n.showCap); const k3 = row.querySelector('.k3'); if (k3 && !k3.classList.contains('hs')) k3.classList.toggle('hc', n.showCap); save(); renderInfo && renderInfo(); }, 260); });
+  capTimer = setTimeout(() => { const { c, n, row } = r; n.showCap = !n.showCap; n.capSet = true; c.classList.toggle('off', !n.showCap); save(); renderInfo && renderInfo(); }, 260); });
 $('#rb').addEventListener('dblclick', e => { const r = capNote(e); if (!r) return; clearTimeout(capTimer); measureForNote(r.n, false); });
 $('#rb').addEventListener('dblclick', e => { const row = e.target.closest('.row'); if (row) editNote(+row.dataset.id); });
 
