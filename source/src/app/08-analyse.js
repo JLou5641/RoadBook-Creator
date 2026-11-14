@@ -368,10 +368,15 @@ const dataLbl = () => ({ osm: 'OSM', vt: 'OSM', ign: 'IGN', ignd: 'IGN détaill�
 const srcLbl = g => ({ bdtopo: 'IGN BD TOPO', ofm: 'OpenFreeMap (OSM)', osm: 'OSM' }[g && g.used] || dataLbl());      // source réellement lue pour les repères
 // raison d'une note ; pour une note sans raison enregistrée, on explique pourquoi (gardée à la main, ou générée avant cette version)
 const whyOf = n => n.why || (n.auto === false || n.edited || n.manual ? 'Note modifiée ou ajoutée à la main : elle est conservée telle quelle quand on régénère le roadbook.' : 'Note générée avec une ancienne version : relance « Générer » pour connaître la raison (tes notes modifiées à la main sont conservées).');
+// CAP affiché : sur toutes les notes, seulement sur les notes hors piste (HP), ou jamais
+const capModeOf = s => s.capMode || (s.showCap ? 'all' : 'off');
+const isHPNote = n => /hors[ -]piste|(^|\n|\s)HP(\s|$)/i.test(n.text || '') || (n.syms || []).some(y => /^HP/.test(y.k || y.key || ''));
+const capRule = n => { const m = capModeOf(S.settings); return m === 'all' ? true : m === 'hp' ? isHPNote(n) : false; };
+function applyCapMode() { for (const n of S.notes) if (n.kind !== 'end' && !n.edited && n.auto !== false) n.showCap = capRule(n) && n.cap != null; }
 function mkNote(o) {
   const ll = inv(o.xy[0], o.xy[1]);
   return { id: S.nextId++, s: Math.round(o.s * 10) / 10, lat: +ll[0].toFixed(6), lon: +ll[1].toFixed(6), text: o.text || '',
-    cap: o.cap == null ? null : o.cap, showCap: o.showCap != null ? o.showCap : S.settings.showCap, danger: 0, wp: null,
+    cap: o.cap == null ? null : o.cap, showCap: o.showCap != null ? o.showCap : capRule({ text: o.text, kind: o.kind }), danger: 0, wp: null,
     auto: o.auto !== false, edited: false, kind: o.kind, tulip: o.tulip };
 }
 function startNote() { const t = trackTulip(0, 'start'), n = mkNote({ s: 0, xy: t.xy, text: 'Départ', cap: Math.round(trackBearing(0, 50)) % 360, kind: 'start', tulip: t.tulip }); n.src = { t: 'trk', kind: 'start' }; return n; }

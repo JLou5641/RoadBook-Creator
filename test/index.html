@@ -1039,7 +1039,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261114.0000</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261114.0919</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1071,7 +1071,7 @@ body.dragNote .leaflet-tooltip{display:none}
           <button data-act="report">📋 Dernier rapport de génération</button>
           <button data-act="lang" data-i18n-skip>🌐 Langue / Language : <span id="langName">Français</span></button>
           <button data-act="manual">📖 Manuel d'utilisation</button>
-          <div class="ver">Version v0.261114.0000 · VERSION DE TEST</div>
+          <div class="ver">Version v0.261114.0919 · VERSION DE TEST</div>
         </div>
       </div>
     </div>
@@ -2750,6 +2750,10 @@ Object.assign(I18N_EN, {
 "Lieu-dit, hameau": "Hamlet, locality",
 "bleu": "blue",
 "Compare, autour de chaque note (40 m), les voies connues par deux sources. Une note est signalée quand l'une montre au moins 25 m de voie que l'autre ne montre pas. Rien n'est modifié.": "Around each note (40 m), compares the roads known by two sources. A note is flagged when one shows at least 25 m of road that the other does not. Nothing is modified.",
+"Afficher le CAP": "Show the HDG",
+"Sur toutes les notes": "On all notes",
+"Uniquement sur les notes hors piste (HP)": "Only on off-track notes (HP)",
+"Jamais": "Never",
 "sans note": "without note",
 "Pas de note": "No note",
 });
@@ -5143,10 +5147,15 @@ const dataLbl = () => ({ osm: 'OSM', vt: 'OSM', ign: 'IGN', ignd: 'IGN détaill�
 const srcLbl = g => ({ bdtopo: 'IGN BD TOPO', ofm: 'OpenFreeMap (OSM)', osm: 'OSM' }[g && g.used] || dataLbl());      // source réellement lue pour les repères
 // raison d'une note ; pour une note sans raison enregistrée, on explique pourquoi (gardée à la main, ou générée avant cette version)
 const whyOf = n => n.why || (n.auto === false || n.edited || n.manual ? 'Note modifiée ou ajoutée à la main : elle est conservée telle quelle quand on régénère le roadbook.' : 'Note générée avec une ancienne version : relance « Générer » pour connaître la raison (tes notes modifiées à la main sont conservées).');
+// CAP affiché : sur toutes les notes, seulement sur les notes hors piste (HP), ou jamais
+const capModeOf = s => s.capMode || (s.showCap ? 'all' : 'off');
+const isHPNote = n => /hors[ -]piste|(^|\n|\s)HP(\s|$)/i.test(n.text || '') || (n.syms || []).some(y => /^HP/.test(y.k || y.key || ''));
+const capRule = n => { const m = capModeOf(S.settings); return m === 'all' ? true : m === 'hp' ? isHPNote(n) : false; };
+function applyCapMode() { for (const n of S.notes) if (n.kind !== 'end' && !n.edited && n.auto !== false) n.showCap = capRule(n) && n.cap != null; }
 function mkNote(o) {
   const ll = inv(o.xy[0], o.xy[1]);
   return { id: S.nextId++, s: Math.round(o.s * 10) / 10, lat: +ll[0].toFixed(6), lon: +ll[1].toFixed(6), text: o.text || '',
-    cap: o.cap == null ? null : o.cap, showCap: o.showCap != null ? o.showCap : S.settings.showCap, danger: 0, wp: null,
+    cap: o.cap == null ? null : o.cap, showCap: o.showCap != null ? o.showCap : capRule({ text: o.text, kind: o.kind }), danger: 0, wp: null,
     auto: o.auto !== false, edited: false, kind: o.kind, tulip: o.tulip };
 }
 function startNote() { const t = trackTulip(0, 'start'), n = mkNote({ s: 0, xy: t.xy, text: 'Départ', cap: Math.round(trackBearing(0, 50)) % 360, kind: 'start', tulip: t.tulip }); n.src = { t: 'trk', kind: 'start' }; return n; }
@@ -6854,7 +6863,7 @@ ${num('sR', 'Rayon dessiné dans la tulipe (m)', s.tulipR, 25, 120)}
     ${chk('sPI', 'Afficher « sur piste » (symbole P) — le regroupement « Suivre la piste » (FPP) reste actif', s.showPI !== false)}
     ${chk('sTR', 'Afficher « sur sentier » (symbole T)', s.showTR !== false)}
     ${chk('sRoad', 'Afficher les noms de route dans les instructions (nom de la rue ou de la piste, numéro de route : D 976…)', s.showRoad !== false)}
-    ${chk('sCap', 'Afficher le CAP sur les nouvelles notes', s.showCap)}
+    <label class="chk" style="display:block">Afficher le CAP <select id="sCapMode"><option value="all"${capModeOf(s) === 'all' ? ' selected' : ''}>Sur toutes les notes</option><option value="hp"${capModeOf(s) === 'hp' ? ' selected' : ''}>Uniquement sur les notes hors piste (HP)</option><option value="off"${capModeOf(s) === 'off' ? ' selected' : ''}>Jamais</option></select></label>
     </details>
     <div class="help" style="margin-top:6px">Les chemins téléchargés sont gardés dans ce navigateur pour aller plus vite (⋯ › « Enregistrer les chemins OSM » pour en faire une copie dans un dossier). <a href="#" id="sClear">Vider cette mémoire</a></div>`, [
     { label: 'Valeurs par défaut', onClick: () => { S.settings = { ...DEF_SETTINGS }; afterSettings(); } }, 'sp',
@@ -6862,10 +6871,11 @@ ${num('sR', 'Rayon dessiné dans la tulipe (m)', s.tulipR, 25, 120)}
     { label: 'Enregistrer', cls: 'primary', onClick: () => {
       const g = (id, d, a, b) => { const v = parseFloat($('#' + id).value); return isFinite(v) ? clamp(v, a, b) : d; };
       const same = o => JSON.stringify(Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {}));      // comparaison sans tenir compte de l'ordre des champs
-      const before = same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0, arrows: 0 });
+      const before = same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0, showCap: 0, capMode: 0, arrows: 0 });
       S.settings = { sv: DEF_SETTINGS.sv, data: /^(osm|ign|ignd)$/.test($('#sData').value) ? $('#sData').value : 'vt', tol: g('sTol', 40, 0, 100), water: $('#sWater').checked, bld: $('#sBld').checked, pois: $('#sPois').checked, landmarks: $('#sLand').checked, merge: g('sMerge', 30, 5, 100), tulipR: g('sR', 50, 25, 120), straight: $('#sStraight').checked, mixY: $('#sMixY').checked, mixT: $('#sMixT').checked,
-        followLvl: +$('#sFollow').value, lmOff: [...document.querySelectorAll('.lmchk')].filter(c => !c.checked).map(c => c.dataset.lm), goudron: $('#sGoudron').checked, bends: $('#sBends').checked, offroad: $('#sOffroad').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showRO: $('#sRO').checked, showPI: $('#sPI').checked, showTR: $('#sTR').checked, showCap: $('#sCap').checked };
-      afterSettings(before === same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0, arrows: 0 }));
+        followLvl: +$('#sFollow').value, lmOff: [...document.querySelectorAll('.lmchk')].filter(c => !c.checked).map(c => c.dataset.lm), goudron: $('#sGoudron').checked, bends: $('#sBends').checked, offroad: $('#sOffroad').checked, bendAngle: g('sBendA', 100, 60, 170), foot: $('#sFoot').checked, routeExt: $('#sExt').checked, symAuto: $('#sSym').checked, showDir: $('#sDir').checked, showRoad: $('#sRoad').checked, showRO: $('#sRO').checked, showPI: $('#sPI').checked, showTR: $('#sTR').checked, capMode: $('#sCapMode').value, showCap: $('#sCapMode').value === 'all' };
+      applyCapMode();
+      afterSettings(before === same({ ...S.settings, routeExt: 0, symAuto: 0, showDir: 0, showRoad: 0, showRO: 0, showPI: 0, showTR: 0, showCap: 0, capMode: 0, arrows: 0 }));
     } }]);
   const lmSet = v => document.querySelectorAll('.lmchk').forEach(c => { c.checked = v; });
   if ($('#lmAll')) { $('#lmAll').onclick = () => lmSet(true); $('#lmNone').onclick = () => lmSet(false); }
