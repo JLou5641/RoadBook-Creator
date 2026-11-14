@@ -50,7 +50,7 @@ async function buildGPX(onProg, mode) {
   const proj = withProject ? await gzipB64(JSON.stringify(snapshot())) : '';      // projet complet : le GPX rouvert dans le générateur redonne le roadbook modifiable
   const o = [];
   o.push('<?xml version="1.0" encoding="UTF-8"?>');
-  o.push(`<gpx xmlns="http://www.topografix.com/GPX/1/1" creator="Generateur de Roadbook OSM" version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:openrally="${NS}" xmlns:rbgen="https://jlou5641.github.io/RoadBook-Creator/ns" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd ${NS} http://www.openrally.org/xmlschemas/GpxExtensions/v1.0.3/openrally.xsd">`);
+  o.push(`<gpx xmlns="http://www.topografix.com/GPX/1/1" creator="Generateur de Roadbook OSM" version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:openrally="${NS}" xmlns:rbgen="https://roadbookreader.github.io/RoadBook-Creator/ns" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd ${NS} http://www.openrally.org/xmlschemas/GpxExtensions/v1.0.3/openrally.xsd">`);
   o.push(`  <metadata>\n    <name>${xmlEsc(S.name)}</name>${(S.desc || '').trim() || srcNote() ? `\n    <desc>${xmlEsc([(S.desc || '').trim(), srcNote()].filter(Boolean).join('\n'))}</desc>` : ''}\n    <time>${new Date().toISOString().replace(/\.\d+Z$/, 'Z')}</time>\n    <extensions>\n      <openrally:units>metric</openrally:units>\n      <openrally:distance>${km(T.L)}</openrally:distance>${proj ? `\n      <rbgen:project encoding="gzip+base64">${proj}</rbgen:project>` : ''}\n    </extensions>\n  </metadata>`);
   let wpCount = 0;
   for (let i = 0; i < S.notes.length; i++) {

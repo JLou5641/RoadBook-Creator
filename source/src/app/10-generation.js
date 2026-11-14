@@ -21,7 +21,7 @@ async function generate() {
 }
 const keepOnRegen = n => !n.auto || n.moved || n.edited || n.wp || n.zone || n.fuel || (n.sym && n.sym.length) || (n.lex && n.lex.length) || n.tpos || n.tulipEdited || n.symLocked;
 let GENLOG = [];
-const WEBAPP_URL = 'https://jlou5641.github.io/RoadBook-Creator/';
+const WEBAPP_URL = 'https://roadbookreader.github.io/RoadBook-Creator/';
 let rptLayer = null;
 function rptClear() { if (rptLayer) { map.removeLayer(rptLayer); rptLayer = null; } $('#modal').classList.remove('rptmini'); }
 function rptGo(li) {      // clic sur un panneau écarté : zoom sur la carte, le rapport reste ouvert (réduit, déplaçable)

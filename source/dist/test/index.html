@@ -6646,7 +6646,7 @@ async function generate() {
 }
 const keepOnRegen = n => !n.auto || n.moved || n.edited || n.wp || n.zone || n.fuel || (n.sym && n.sym.length) || (n.lex && n.lex.length) || n.tpos || n.tulipEdited || n.symLocked;
 let GENLOG = [];
-const WEBAPP_URL = 'https://jlou5641.github.io/RoadBook-Creator/';
+const WEBAPP_URL = 'https://roadbookreader.github.io/RoadBook-Creator/';
 let rptLayer = null;
 function rptClear() { if (rptLayer) { map.removeLayer(rptLayer); rptLayer = null; } $('#modal').classList.remove('rptmini'); }
 function rptGo(li) {      // clic sur un panneau écarté : zoom sur la carte, le rapport reste ouvert (réduit, déplaçable)
@@ -6801,7 +6801,7 @@ async function buildGPX(onProg, mode) {
   const proj = withProject ? await gzipB64(JSON.stringify(snapshot())) : '';      // projet complet : le GPX rouvert dans le générateur redonne le roadbook modifiable
   const o = [];
   o.push('<?xml version="1.0" encoding="UTF-8"?>');
-  o.push(`<gpx xmlns="http://www.topografix.com/GPX/1/1" creator="Generateur de Roadbook OSM" version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:openrally="${NS}" xmlns:rbgen="https://jlou5641.github.io/RoadBook-Creator/ns" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd ${NS} http://www.openrally.org/xmlschemas/GpxExtensions/v1.0.3/openrally.xsd">`);
+  o.push(`<gpx xmlns="http://www.topografix.com/GPX/1/1" creator="Generateur de Roadbook OSM" version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:openrally="${NS}" xmlns:rbgen="https://roadbookreader.github.io/RoadBook-Creator/ns" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd ${NS} http://www.openrally.org/xmlschemas/GpxExtensions/v1.0.3/openrally.xsd">`);
   o.push(`  <metadata>\n    <name>${xmlEsc(S.name)}</name>${(S.desc || '').trim() || srcNote() ? `\n    <desc>${xmlEsc([(S.desc || '').trim(), srcNote()].filter(Boolean).join('\n'))}</desc>` : ''}\n    <time>${new Date().toISOString().replace(/\.\d+Z$/, 'Z')}</time>\n    <extensions>\n      <openrally:units>metric</openrally:units>\n      <openrally:distance>${km(T.L)}</openrally:distance>${proj ? `\n      <rbgen:project encoding="gzip+base64">${proj}</rbgen:project>` : ''}\n    </extensions>\n  </metadata>`);
   let wpCount = 0;
   for (let i = 0; i < S.notes.length; i++) {
@@ -7902,7 +7902,7 @@ $('#moreMenu').addEventListener('click', e => {
   else if (act === 'theme') cycleTheme();
   else if (act === 'help') openHelp();
   else if (act === 'report') { let r = null; try { r = JSON.parse(localStorage.getItem('rbgen.report')); } catch (_) { } if (r && r.html) showReport(r.title, r.html); else toast('Aucun rapport : génère d’abord le roadbook.'); }
-  else if (act === 'manual') window.open((location.protocol === 'file:' ? 'https://jlou5641.github.io/RoadBook-Creator/manuel/' : 'manuel/') + (I18N.lang === 'en' ? 'en.html' : ''), '_blank');
+  else if (act === 'manual') window.open((location.protocol === 'file:' ? 'https://roadbookreader.github.io/RoadBook-Creator/manuel/' : 'manuel/') + (I18N.lang === 'en' ? 'en.html' : ''), '_blank');
   else if (act === 'new') ask('Nouveau roadbook ?', 'Le parcours et les notes en cours seront effacés (pense à exporter ou enregistrer le projet avant).', 'Tout effacer', () => {
     if (drawing) setDrawing(false);
     S.stages = []; S.ele = null; S.marks = []; renderMarks(); candLayer.clearLayers();
