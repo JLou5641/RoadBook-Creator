@@ -1032,6 +1032,12 @@ body.dragNote .leaflet-tooltip{display:none}
 #modal.rptmini{max-height:42vh;overflow:auto;width:min(440px,94vw)}
 #drawBox #bSnapMode{background:#2e8b57;color:#fff;border-color:#1f6b40}
 #drawBox #bSnapMode:not(.on){background:#fff;color:#444;border-color:#aaa}
+
+/* menu ⋯ : sections repliables (une seule ouverte à la fois) */
+.dropdown .mhd{font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.dropdown .mhd .car{font-size:12px;opacity:.6}
+.dropdown .mbody{display:none;padding-left:8px;border-left:3px solid #e5dfd3;margin:0 0 4px 10px}
+.dropdown .mbody.open{display:block}
 </style>
 </head>
 <body>
@@ -1039,7 +1045,7 @@ body.dragNote .leaflet-tooltip{display:none}
   <header>
     <div class="brand">
       <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="7" fill="#e39b2d"/><circle cx="20" cy="31" r="3.4" fill="#1b1a17"/><path d="M20 31 V18 L29 11" stroke="#1b1a17" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M24.6 8.2 L32.6 8.2 L30.4 15.6 Z" fill="#1b1a17"/><path d="M20 18 L10 12" stroke="#1b1a17" stroke-width="2" fill="none"/></svg>
-      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261114.0934</small></div>
+      <div>Roadbook<small>Générateur automatique · OSM</small><small class="vtag">v0.261114.0943</small></div>
     </div>
     <input id="rbName" type="text" value="Mon roadbook" title="Nom du roadbook" aria-label="Nom du roadbook">
     <div class="tools">
@@ -1053,25 +1059,34 @@ body.dragNote .leaflet-tooltip{display:none}
       <div class="menuwrap">
         <button class="btn" id="bMore" title="Plus">⋯</button>
         <div class="dropdown" id="moreMenu">
-          <div class="mgrp">Analyse de la trace</div>
-          <button data-act="stages">🏁 Étapes (distance, dénivelé, verrouillage)</button>
-          <button data-act="meas">📐 Mesurer un cap / liste des virages</button>
-          <button data-act="alt">⛰️ Altitude et horaires (profil, 3D, horodatage)</button>
-          <button data-act="marks">📍 Marqueurs (refuges, eau, repères)</button>
-          <button data-act="ctl">🔍 Contrôler les notes (comparer deux sources)</button>
-          <div class="mgrp">Fichiers</div>
-          <button data-act="saveProject">🗂️ Enregistrer le projet (.json)</button>
-          <button data-act="saveOsm">💾 Enregistrer les chemins OSM (dossier au choix)</button>
-          <button data-act="loadOsm">📥 Charger des chemins OSM</button>
-          <button data-act="new">🆕 Nouveau roadbook</button>
-          <div class="mgrp">Configuration</div>
-          <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
-          <button data-act="settings">⚙️ Réglages de génération</button>
-          <button data-act="help">❓ Aide</button>
-          <button data-act="report">📋 Dernier rapport de génération</button>
-          <button data-act="lang" data-i18n-skip>🌐 Langue / Language : <span id="langName">Français</span></button>
-          <button data-act="manual">📖 Manuel d'utilisation</button>
-          <div class="ver">Version v0.261114.0934 · VERSION DE TEST</div>
+          <button class="mhd" data-g="tools">🛠 Outils <span class="car">▸</span></button>
+          <div class="mbody" id="g-tools">
+            <button data-act="stages">🏁 Étapes (distance, dénivelé, verrouillage)</button>
+            <button data-act="meas">📐 Mesurer un cap / liste des virages</button>
+            <button data-act="alt">⛰️ Altitude et horaires (profil, 3D, horodatage)</button>
+            <button data-act="marks">📍 Marqueurs (refuges, eau, repères)</button>
+            <button data-act="ctl">🔍 Contrôler les notes (comparer deux sources)</button>
+            <button data-act="report">📋 Dernier rapport de génération</button>
+          </div>
+          <button class="mhd" data-g="proj">🗂 Projet <span class="car">▸</span></button>
+          <div class="mbody" id="g-proj">
+            <button data-act="saveProject">🗂️ Enregistrer le projet (.json)</button>
+            <button data-act="new">🆕 Nouveau roadbook</button>
+            <button data-act="saveOsm">💾 Enregistrer les chemins OSM (dossier au choix)</button>
+            <button data-act="loadOsm">📥 Charger des chemins OSM</button>
+          </div>
+          <button class="mhd" data-g="cfg">⚙️ Réglages <span class="car">▸</span></button>
+          <div class="mbody" id="g-cfg">
+            <button data-act="settings">⚙️ Réglages de génération</button>
+            <button data-act="theme">🎨 Thème : <span id="themeName">Dakar jour</span></button>
+            <button data-act="lang" data-i18n-skip>🌐 Langue / Language : <span id="langName">Français</span></button>
+          </div>
+          <button class="mhd" data-g="help">❓ Aide <span class="car">▸</span></button>
+          <div class="mbody" id="g-help">
+            <button data-act="help">❓ Aide</button>
+            <button data-act="manual">📖 Manuel d'utilisation</button>
+          </div>
+          <div class="ver">Version v0.261114.0943 · VERSION DE TEST</div>
         </div>
       </div>
     </div>
@@ -2754,6 +2769,10 @@ Object.assign(I18N_EN, {
 "Sur toutes les notes": "On all notes",
 "Uniquement sur les sentiers et hors piste": "Only on trails and off-track",
 "Jamais": "Never",
+"🛠 Outils": "🛠 Tools",
+"🗂 Projet": "🗂 Project",
+"⚙️ Réglages": "⚙️ Settings",
+"❓ Aide": "❓ Help",
 "sans note": "without note",
 "Pas de note": "No note",
 });
@@ -7734,6 +7753,10 @@ $('#bMore').onclick = e => {
 };
 document.addEventListener('click', () => $('#moreMenu').classList.remove('open'));
 $('#moreMenu').addEventListener('click', e => {
+  const hd = e.target.closest('.mhd');      // titre de section : replie / déplie (une seule ouverte), sans fermer le menu
+  if (hd) { e.stopPropagation(); const body = $('#g-' + hd.dataset.g), was = body.classList.contains('open');
+    document.querySelectorAll('#moreMenu .mbody').forEach(x => x.classList.remove('open')); document.querySelectorAll('#moreMenu .car').forEach(x => { x.textContent = '▸'; });
+    if (!was) { body.classList.add('open'); hd.querySelector('.car').textContent = '▾'; } return; }
   const a = e.target.closest('button[data-act]'); if (!a) return;
   $('#moreMenu').classList.remove('open');
   const act = a.dataset.act;

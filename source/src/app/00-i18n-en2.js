@@ -75,6 +75,10 @@ Object.assign(I18N_EN, {
 "Sur toutes les notes": "On all notes",
 "Uniquement sur les sentiers et hors piste": "Only on trails and off-track",
 "Jamais": "Never",
+"🛠 Outils": "🛠 Tools",
+"🗂 Projet": "🗂 Project",
+"⚙️ Réglages": "⚙️ Settings",
+"❓ Aide": "❓ Help",
 "sans note": "without note",
 "Pas de note": "No note",
 });

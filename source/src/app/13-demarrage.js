@@ -588,6 +588,10 @@ $('#bMore').onclick = e => {
 };
 document.addEventListener('click', () => $('#moreMenu').classList.remove('open'));
 $('#moreMenu').addEventListener('click', e => {
+  const hd = e.target.closest('.mhd');      // titre de section : replie / déplie (une seule ouverte), sans fermer le menu
+  if (hd) { e.stopPropagation(); const body = $('#g-' + hd.dataset.g), was = body.classList.contains('open');
+    document.querySelectorAll('#moreMenu .mbody').forEach(x => x.classList.remove('open')); document.querySelectorAll('#moreMenu .car').forEach(x => { x.textContent = '▸'; });
+    if (!was) { body.classList.add('open'); hd.querySelector('.car').textContent = '▾'; } return; }
   const a = e.target.closest('button[data-act]'); if (!a) return;
   $('#moreMenu').classList.remove('open');
   const act = a.dataset.act;

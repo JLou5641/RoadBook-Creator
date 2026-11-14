@@ -361,3 +361,9 @@ body.dragNote .leaflet-tooltip{display:none}
 #modal.rptmini{max-height:42vh;overflow:auto;width:min(440px,94vw)}
 #drawBox #bSnapMode{background:#2e8b57;color:#fff;border-color:#1f6b40}
 #drawBox #bSnapMode:not(.on){background:#fff;color:#444;border-color:#aaa}
+
+/* menu ⋯ : sections repliables (une seule ouverte à la fois) */
+.dropdown .mhd{font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.dropdown .mhd .car{font-size:12px;opacity:.6}
+.dropdown .mbody{display:none;padding-left:8px;border-left:3px solid #e5dfd3;margin:0 0 4px 10px}
+.dropdown .mbody.open{display:block}
