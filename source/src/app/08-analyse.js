@@ -377,7 +377,7 @@ function applyNoteLang() { const L = S.settings.noteLang; for (const n of S.note
 function applyCapMode() { for (const n of S.notes) if (n.kind !== 'end' && !n.edited && !n.capSet && n.auto !== false) n.showCap = capRule(n) && n.cap != null; }
 /* ---- langue du texte des notes générées (réglage noteLang, indépendant de la langue de l'interface) ---- */
 const NOTE_EN = [
-  [/^TD$/, 'Keep Straight'], [/^Lég\. à ([DG])$/, 'Slight $1'], [/^À ([DG])$/, 'Turn $1'], [/^Épingle à ([DG])$/, 'Hairpin $1'],
+  [/^TD$/, 'Keep Straight'], [/^Lég\. à ([DG])$/, 'Keep $1'], [/^À ([DG])$/, 'Turn $1'], [/^Épingle à ([DG])$/, 'Hairpin $1'],
   [/^Serrer à ([DG])$/, 'Keep $1'], [/^Virage serré à ([DG])$/, 'Tight bend $1'], [/^Demi-tour$/, 'U-turn'],
   [/^Rond-point$/, 'Roundabout'], [/^1re sortie$/, '1st exit'], [/^2e sortie$/, '2nd exit'], [/^3e sortie$/, '3rd exit'], [/^(\d+)e sortie$/, '$1th exit'],
   [/^sur petite piste$/, 'on small track'], [/^sur piste$/, 'on track'], [/^sur sentier$/, 'on trail'], [/^sur rue$/, 'on street'], [/^sur route(.*)$/, 'on road$1'],
@@ -408,7 +408,7 @@ function trNote(text, lang) {
   return String(text).split('\n').map(l => {
     let o = l;
     for (const [re, to] of NOTE_EN) if (re.test(l)) { o = l.replace(re, to); break; }
-    o = o.replace(/\(privé\)/, '(private)').replace(/^(Danger: )(.+)$/, (m, a, b) => a + (NOTE_EN_HZ[b] || b)).replace(/^(.+?) à ([DG])$/, '$1 on $2').replace(/^((?:Slight|Turn|Hairpin|Keep|Tight bend|Follow \w+ on) )([DG])$/, (m, a, c) => a + (c === 'D' ? 'R' : 'L'));
+    o = o.replace(/\(privé\)/, '(private)').replace(/^(Danger: )(.+)$/, (m, a, b) => a + (NOTE_EN_HZ[b] || b)).replace(/^(.+?) à ([DG])$/, '$1 on $2').replace(/^((?:Slight|Turn|Hairpin|Keep|Tight bend|Follow \w+ on) )([DG])$/, (m, a, c) => a + (a === 'Keep ' ? (c === 'D' ? 'Right' : 'Left') : (c === 'D' ? 'R' : 'L')));
     return o;
   }).join('\n');
 }
