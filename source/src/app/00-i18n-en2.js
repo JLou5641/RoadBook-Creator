@@ -81,6 +81,7 @@ Object.assign(I18N_EN, {
 "❓ Aide": "❓ Help",
 "Clic : afficher le CAP · double clic : mesurer": "Click: show the heading CAP · double-click: measure",
 "Glisse pour déplacer la fenêtre": "Drag to move the window",
-"sans note": "without note",
+"Langue du texte des notes": "Language of note text",
+  "sans note": "without note",
 "Pas de note": "No note",
 });

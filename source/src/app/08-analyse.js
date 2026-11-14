@@ -371,12 +371,50 @@ const whyOf = n => n.why || (n.auto === false || n.edited || n.manual ? 'Note mo
 // CAP affiché : sur toutes les notes, seulement sur les notes hors piste (HP), ou jamais
 const capModeOf = s => s.capMode || (s.showCap ? 'all' : 'off');
 const dottedExit = n => { const r = n.tulip && n.tulip.route; return !!(r && r.length && r[r.length - 1].c === 'trail'); };      // sortie de la tulipe en pointillés (sentier, hors piste)
-const isHPNote = n => dottedExit(n) || /hors[ -]piste|(^|\n|\s)HP(\s|$)/i.test(n.text || '') || (n.syms || []).some(y => /^HP/.test(y.k || y.key || ''));
+const isHPNote = n => dottedExit(n) || /hors[ -]piste|off[ -]piste|(^|\n|\s)HP(\s|$)/i.test(n.text || '') || (n.syms || []).some(y => /^HP/.test(y.k || y.key || ''));
 const capRule = n => { const m = capModeOf(S.settings); return m === 'all' ? true : m === 'hp' ? isHPNote(n) : false; };
+function applyNoteLang() { const L = S.settings.noteLang; for (const n of S.notes) if (n.fr != null && !n.edited && n.auto !== false) n.text = trNote(n.fr, L); }
 function applyCapMode() { for (const n of S.notes) if (n.kind !== 'end' && !n.edited && !n.capSet && n.auto !== false) n.showCap = capRule(n) && n.cap != null; }
+/* ---- langue du texte des notes générées (réglage noteLang, indépendant de la langue de l'interface) ---- */
+const NOTE_EN = [
+  [/^TD$/, 'Straight'], [/^Lég\. à ([DG])$/, 'Slight $1'], [/^À ([DG])$/, 'Turn $1'], [/^Épingle à ([DG])$/, 'Hairpin $1'],
+  [/^Serrer à ([DG])$/, 'Keep $1'], [/^Virage serré à ([DG])$/, 'Tight bend $1'], [/^Demi-tour$/, 'U-turn'],
+  [/^Rond-point$/, 'Roundabout'], [/^1re sortie$/, '1st exit'], [/^2e sortie$/, '2nd exit'], [/^3e sortie$/, '3rd exit'], [/^(\d+)e sortie$/, '$1th exit'],
+  [/^sur petite piste$/, 'on small track'], [/^sur piste$/, 'on track'], [/^sur sentier$/, 'on trail'], [/^sur rue$/, 'on street'], [/^sur route(.*)$/, 'on road$1'],
+  [/^Hors piste$/, 'Off piste'], [/^Début goudron$/, 'Tarmac starts'], [/^Fin goudron$/, 'Tarmac ends'], [/^Départ$/, 'Start'], [/^Arrivée$/, 'Finish'],
+  [/^Gué$/, 'Ford'], [/^Passage à niveau$/, 'Level crossing'], [/^Cédez le passage$/, 'Give way'], [/^Passage piéton$/, 'Pedestrian crossing'],
+  [/^Feux tricolores \(passage piéton\)$/, 'Traffic lights (pedestrian crossing)'], [/^Feux tricolores$/, 'Traffic lights'],
+  [/^Ralentisseur$/, 'Speed bump'], [/^Bandes sonores$/, 'Rumble strips'], [/^Pont$/, 'Bridge'], [/^Sous pont$/, 'Under bridge'],
+  [/^Passage sous bâtiment$/, 'Passage under building'], [/^Marches$/, 'Steps'],
+  [/^Sable$/, 'Sand'], [/^Boue$/, 'Mud'], [/^Cailloux$/, 'Rocks'], [/^Neige$/, 'Snow'], [/^Glace$/, 'Ice'],
+  [/^Piste dégradée$/, 'Poor track'], [/^Piste très dégradée$/, 'Very poor track'], [/^Piste impraticable$/, 'Impassable track'],
+  [/^Montée raide/, 'Steep climb'], [/^Descente raide/, 'Steep descent'],
+  [/^Longer clôture à ([DG])$/, 'Follow fence on $1'], [/^Longer mur à ([DG])$/, 'Follow wall on $1'], [/^Longer haie à ([DG])$/, 'Follow hedge on $1'],
+  [/^Entrée agglomération$/, 'Entering town'], [/^Sortie agglomération$/, 'Leaving town'], [/^Entrée /, 'Entering '], [/^Sortie /, 'Leaving '],
+  [/^Danger : /, 'Danger: '],
+  [/^Portail coulissant/, 'Sliding gate'], [/^Portail/, 'Gate'], [/^Barrière pivotante/, 'Swing gate'], [/^Barrière anti-moto/, 'Anti-motorcycle barrier'], [/^Barrière/, 'Barrier'],
+  [/^Grille à bétail/, 'Cattle grid'], [/^Chaîne/, 'Chain'], [/^Plots/, 'Bollards'], [/^Blocs/, 'Blocks'], [/^Passage étroit/, 'Narrow passage'],
+  [/^Chicane/, 'Chicane'], [/^Péage/, 'Toll'], [/^Douane/, 'Customs'], [/^Muret/, 'Low wall'], [/^Tronc en travers/, 'Fallen log'], [/^Débris/, 'Debris'], [/^Corde/, 'Rope'],
+  [/^Château d'eau$/, 'Water tower'], [/^Antenne$/, 'Mast'], [/^Tour$/, 'Tower'], [/^Cheminée$/, 'Chimney'], [/^Moulin$/, 'Windmill'], [/^Phare$/, 'Lighthouse'],
+  [/^Éolienne$/, 'Wind turbine'], [/^Église$/, 'Church'], [/^Lieu de culte$/, 'Place of worship'], [/^Station-service/, 'Fuel station'],
+  [/^Sommet /, 'Summit '], [/^Hameau /, 'Hamlet '], [/^Lieu-dit /, 'Locality '], [/^Col$/, 'Pass'], [/^Col( \(|$)/, 'Pass$1'],
+  [/\(privé\)/, '(private)'],
+];
+const NOTE_EN_HZ = { 'chute de pierres': 'falling rocks', glissant: 'slippery', animaux: 'animals', verglas: 'ice', 'glissement de terrain': 'landslide', 'zone inondable': 'flood zone',
+  'carrefour dangereux': 'dangerous junction', virage: 'bend', virages: 'bends', bosse: 'bump', cassis: 'dip', école: 'school', enfants: 'children', cyclistes: 'cyclists',
+  cavaliers: 'horse riders', 'vent latéral': 'side wind', 'route abîmée': 'damaged road' };
+function trNote(text, lang) {
+  if (lang !== 'en' || !text) return text;
+  return String(text).split('\n').map(l => {
+    let o = l;
+    for (const [re, to] of NOTE_EN) if (re.test(l)) { o = l.replace(re, to); break; }
+    o = o.replace(/\(privé\)/, '(private)').replace(/^(Danger: )(.+)$/, (m, a, b) => a + (NOTE_EN_HZ[b] || b)).replace(/^(.+?) à ([DG])$/, '$1 on $2').replace(/^((?:Slight|Turn|Hairpin|Keep|Tight bend|Follow \w+ on) )([DG])$/, (m, a, c) => a + (c === 'D' ? 'R' : 'L'));
+    return o;
+  }).join('\n');
+}
 function mkNote(o) {
   const ll = inv(o.xy[0], o.xy[1]);
-  return { id: S.nextId++, s: Math.round(o.s * 10) / 10, lat: +ll[0].toFixed(6), lon: +ll[1].toFixed(6), text: o.text || '',
+  return { id: S.nextId++, s: Math.round(o.s * 10) / 10, lat: +ll[0].toFixed(6), lon: +ll[1].toFixed(6), text: trNote(o.text || '', (S.settings || {}).noteLang), fr: o.text || '',
     cap: o.cap == null ? null : o.cap, showCap: o.showCap != null ? o.showCap : capRule({ text: o.text, kind: o.kind, tulip: o.tulip }), danger: 0, wp: null,
     auto: o.auto !== false, edited: false, kind: o.kind, tulip: o.tulip };
 }
